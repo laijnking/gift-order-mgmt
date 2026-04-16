@@ -1,0 +1,472 @@
+[
+  {
+    "id": "ec64bb4c-cd4b-4c64-96d9-0f5f7738fa21",
+    "code": "WH001",
+    "name": "首映礼省内仓",
+    "type": "自有",
+    "address": "广东",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "1397cc82-bf0a-4b07-9092-29f1a760b265",
+    "code": "WH002",
+    "name": "广东云海仓库",
+    "type": "三方",
+    "address": "广东",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "f3af7a7d-e229-4d8a-aa9c-d3d8e27be32a",
+    "code": "WH003",
+    "name": "山东怡坤仓库",
+    "type": "三方",
+    "address": "山东",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "820773b1-086f-4532-ad8f-b5585b2b2314",
+    "code": "WH004",
+    "name": "天津倾心仓库",
+    "type": "三方",
+    "address": "天津",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "65fede50-a884-45f4-bb7a-cc514ab8adeb",
+    "code": "WH005",
+    "name": "杭州舟亢仓库",
+    "type": "三方",
+    "address": "浙江杭州",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "4ab6920a-37d1-4bd1-8af2-5b8b353090a1",
+    "code": "WH006",
+    "name": "上海至梵仓库",
+    "type": "三方",
+    "address": "上海",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "5ed0460f-0fe0-490a-8cd8-d3bb21b86895",
+    "code": "WH007",
+    "name": "成都拓普壹仓库",
+    "type": "三方",
+    "address": "四川成都",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "48b78936-6ea5-476f-b32f-1f22decc648b",
+    "code": "WH008",
+    "name": "上海飞通仓库",
+    "type": "三方",
+    "address": "上海",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "c16bd7b5-ec9d-4e3e-9899-d6d3b53081b0",
+    "code": "WH009",
+    "name": "张家港米盛仓库",
+    "type": "三方",
+    "address": "江苏张家港",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "2c3ec2c6-4e3d-42fd-aff3-be338456626b",
+    "code": "WH010",
+    "name": "3.23杭州怡霖",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "d5528fe9-a81c-4024-8a80-193d067d32d4",
+    "code": "WH011",
+    "name": "2.25常州梁业",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "976dc1dc-77a9-4e6f-ba88-c22f41e5f33c",
+    "code": "WH012",
+    "name": "3.23北京国泰昌荣",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "2d5a96e6-8931-4923-82e3-59a8ef71e464",
+    "code": "WH013",
+    "name": "3.16江苏金舜源",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "8f8d528a-3994-41d4-9df6-8fffd0f253ab",
+    "code": "WH014",
+    "name": "3.26佛山多品",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "e571525e-440d-47b4-a7bf-00cd8970d3f1",
+    "code": "WH015",
+    "name": "3.17红紫金",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "fbedbdad-f511-459a-b59e-78a64ac2ea8d",
+    "code": "WH016",
+    "name": "3.23深圳碧然晨",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "eb3dd62b-1ad4-4b0e-81de-8bf8723cd835",
+    "code": "WH017",
+    "name": "3.23安徽艾森格",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "f8b74d05-6ee8-4ffa-a862-5b05e90bcef9",
+    "code": "WH018",
+    "name": "3.22山东新瑞",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "caa6724e-b44a-4110-9bf6-b7515d318390",
+    "code": "WH019",
+    "name": "3.23苏泊尔电商-海淮",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "7f4f9a30-1f1f-4045-ba14-fe92947db068",
+    "code": "WH020",
+    "name": "3.16昆明浩帆",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "88bbdae5-b547-4cfc-a7ce-dfa3fcbd86e8",
+    "code": "WH021",
+    "name": "3.23福建翼盛",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "3551ac54-37d0-4175-bf27-66e9ac8ecb41",
+    "code": "WH022",
+    "name": "3.23广州威泽",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "9bb57aee-0a34-4e03-828e-92f632c8520b",
+    "code": "WH023",
+    "name": "12.26深圳苏泊尔",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "1f468925-186b-4189-a67b-77abbf3421dc",
+    "code": "WH024",
+    "name": "2.28武汉沃克尔-六安",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "c354edb3-eeba-4c3a-90de-96e6f174b1a0",
+    "code": "WH025",
+    "name": "1.10江苏新合纵",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "d6307d8b-1e71-4d24-aac0-226b9461e1d6",
+    "code": "WH026",
+    "name": "3.4刘志峰",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "3631855e-dba7-4d59-9e51-ef225eece3d4",
+    "code": "WH027",
+    "name": "3.23电商工厂库存",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "ed7463f4-8514-48d5-92f1-8f2b412fd52c",
+    "code": "WH028",
+    "name": "2.7飞通京东",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "b56533db-a333-454e-a51e-659be0748431",
+    "code": "WH029",
+    "name": "1.16苏泊尔不接团单品",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "a7c53be7-d67f-437c-ad79-2418ae94f549",
+    "code": "WH030",
+    "name": "3.25武汉杯壶苏泊尔工厂",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "ece70502-aab9-46ac-84fd-554e85d8f705",
+    "code": "WH031",
+    "name": "3.3九阳商用豆浆机",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "180f1ad9-b1ea-4e6c-af3b-7980337fd4e7",
+    "code": "WH032",
+    "name": "九阳新渠道管控型号",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "00f61d06-f816-4d50-881e-d1033a36feda",
+    "code": "WH033",
+    "name": "3.26九阳工厂库存",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "a5d7091f-0f4f-45cd-9353-dd7fac5fd4bc",
+    "code": "WH034",
+    "name": "3.23兰瑞基",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "a55b5c7b-53a8-4b97-9b10-42897229ed03",
+    "code": "WH035",
+    "name": "3.23慈溪腾杰",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "c099fb92-0ee2-41ec-af89-4e0c6917793c",
+    "code": "WH036",
+    "name": "3.23苏州合则盛",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "9933b0f3-5011-44fd-8edf-3814311fd333",
+    "code": "WH037",
+    "name": "3.16沈阳旺得福",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "dead1d62-b76e-47e6-bba5-2f2144c218d4",
+    "code": "WH038",
+    "name": "3.5上海毅道",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "58f6194a-d771-4160-80d6-638663265136",
+    "code": "WH039",
+    "name": "2.24中山合利和",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "f316dd6f-6cdc-486a-97b5-255d82e1228d",
+    "code": "WH040",
+    "name": "3.18九阳益庆丰",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "30da098d-8c9e-4831-baf8-5f4d3093b609",
+    "code": "WH041",
+    "name": "12.1金鼎越胜",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "3d8c3dbf-63d1-4792-a6e4-160755f1fdb3",
+    "code": "WH042",
+    "name": "1.8深圳西贝阳光",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "2545a7b1-aee2-48dd-9ff3-375d4476fb8d",
+    "code": "WH043",
+    "name": "先锋夏季",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "36c45a4e-bbdc-4001-a29b-4d99819527a4",
+    "code": "WH044",
+    "name": "12.11先锋冬季",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "7919b288-e057-40b2-baba-55afb63e3b5f",
+    "code": "WH045",
+    "name": "3.24九阳2C",
+    "type": "三方",
+    "address": "未知",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "fa0ea2b2-b341-42bd-8c7f-eb5704ac9de0",
+    "code": "WH046",
+    "name": "中山奔和仓库",
+    "type": "三方",
+    "address": "广东中山",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  },
+  {
+    "id": "8ec18d5f-e821-4231-90f4-49b49229acc8",
+    "code": "WH047",
+    "name": "利仁仓库",
+    "type": "三方",
+    "address": "北京",
+    "contact": "",
+    "phone": "",
+    "status": "active"
+  }
+]
