@@ -93,7 +93,7 @@ const COLUMN_OPTIONS = [
   { value: 'customer_product_name', label: '客户商品名称', group: '商品信息' },
   { value: 'product_code', label: '商品编码', group: '商品信息' },
   { value: 'product_spec', label: '规格型号', group: '商品信息' },
-  { value: 'customer_product_spec', label: '客户规格型号', group: '商品信息' },
+  { value: 'customer_product_spec', label: '客户规格型号(旧)', group: '商品信息(废弃)' },
   { value: 'quantity', label: '数量', group: '商品信息' },
   { value: 'price', label: '单价', group: '商品信息' },
   { value: 'amount', label: '价税合计', group: '商品信息' },
