@@ -115,7 +115,7 @@ function transformOrder(dbOrder: Record<string, unknown>, options?: {
   };
 }
 
-// 生成系统订单号: SYS-YYYYMMDD-XXXX (基于数据库当日计数)
+// 生成系统订单号: SYS-YYYYMMDD-XXXX + 随机后缀 (确保高并发唯一性)
 async function generateSysOrderNo(client: ReturnType<typeof getSupabaseClient>): Promise<string> {
   const today = new Date();
   const dateStr = today.getFullYear().toString() +
@@ -129,8 +129,11 @@ async function generateSysOrderNo(client: ReturnType<typeof getSupabaseClient>):
     .select('*', { count: 'exact', head: true })
     .gte('created_at', startOfDay);
   
+  // 使用微秒时间戳 + 随机数确保唯一性
+  const timestamp = Date.now().toString(36).toUpperCase();
+  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
   const seq = (count || 0) + 1;
-  return `SYS-${dateStr}-${String(seq).padStart(4, '0')}`;
+  return `SYS-${dateStr}-${String(seq).padStart(4, '0')}-${timestamp}${random}`;
 }
 
 // 获取当前用户信息（从请求头）
