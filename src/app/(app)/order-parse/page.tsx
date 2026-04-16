@@ -880,20 +880,24 @@ export default function OrderParsePage() {
 
         // 同时生成兼容的简单格式用于提交
         const simpleOrders: ParsedOrder[] = detailOrders.flatMap((order: ParsedOrderDetail) => {
+          // 兼容后端驼峰和前端下划线两种命名
+          const getOrderField = (field: string): string => {
+            return (order as Record<string, unknown>)[field] as string || '';
+          };
           return order.items.map((item: Record<string, unknown>) => ({
             id: item.id as string,
             orderNo: order.orderNo || '',
             billNo: order.billNo || '',
-            customerOrderNo: (order as unknown as Record<string, unknown>).customerOrderNo as string || '',
+            customerOrderNo: getOrderField('customerOrderNo') || getOrderField('customer_order_no') || '',
             supplierOrderNo: order.supplierOrderNo || '',
             supplierName: (item.supplierName as string) || '',
-            customer_code: order.customer_code || selectedCustomer,
-            receiver_name: order.receiver_name || '',
-            receiver_phone: order.receiver_phone || '',
-            receiver_address: order.receiver_address || '',
-            province: order.province || '',
-            city: order.city || '',
-            district: order.district || '',
+            customer_code: getOrderField('customerCode') || getOrderField('customer_code') || selectedCustomer,
+            receiver_name: getOrderField('receiverName') || getOrderField('receiver_name') || '',
+            receiver_phone: getOrderField('receiverPhone') || getOrderField('receiver_phone') || '',
+            receiver_address: getOrderField('receiverAddress') || getOrderField('receiver_address') || '',
+            province: getOrderField('province') || '',
+            city: getOrderField('city') || '',
+            district: getOrderField('district') || '',
             product_name: (item.customerProductName as string) || '',
             product_code: (item.customerProductCode as string) || '',
             product_spec: (item.customerProductSpec as string) || (item.product_spec as string) || '',
