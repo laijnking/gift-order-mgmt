@@ -855,6 +855,14 @@ export default function OrderParsePage() {
       });
 
       const data = await res.json();
+      
+      console.log('解析API返回:', {
+        success: data.success,
+        hasOrders: !!data.data?.orders,
+        ordersLength: data.data?.orders?.length,
+        firstOrder: data.data?.orders?.[0],
+        message: data.message,
+      });
 
       if (data.success) {
         // 设置解析统计信息
@@ -904,6 +912,12 @@ export default function OrderParsePage() {
             selected: true,
             expanded: true,
           }));
+        });
+        
+        console.log('转换后的订单:', {
+          detailOrdersCount: detailOrders.length,
+          simpleOrdersCount: simpleOrders.length,
+          firstSimpleOrder: simpleOrders[0],
         });
 
         setParsedOrderDetails(detailOrders);
