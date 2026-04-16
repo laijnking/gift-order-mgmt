@@ -197,6 +197,7 @@ interface ParsedOrder {
   mappedProductName?: string;
   mappedProductSpec?: string;
   mappedProductBrand?: string;
+  systemProductId?: string;
   customerSku?: string;
   customerPrice?: number;
   supplierId?: string;
@@ -1137,9 +1138,16 @@ export default function OrderParsePage() {
           billNo: o.billNo || '',
           billDate: o.billDate || '',
           supplierOrderNo: o.supplierOrderNo || '',
-          productName: o.product_name,
-          productCode: o.product_code || '',
-          productSpec: o.product_spec || '',
+          // 客户商品信息
+          productName: o.product_name,           // 客户商品名称
+          productCode: o.product_code || '',    // 客户商品编码
+          productSpec: o.product_spec || '',     // 客户规格型号
+          // 系统商品信息（自动匹配）
+          systemProductCode: o.mappedProductCode || '',  // 系统商品编码
+          systemProductName: o.mappedProductName || '',  // 系统商品名称
+          systemProductSpec: o.mappedProductSpec || '',   // 系统规格型号
+          systemProductBrand: o.mappedProductBrand || '',  // 系统商品品牌
+          systemProductId: o.systemProductId || '',      // 系统商品ID
           quantity: o.quantity,
           price: o.price || o.customerPrice || 0,
           amount: o.amount,

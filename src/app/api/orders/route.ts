@@ -44,16 +44,17 @@ function transformOrder(dbOrder: Record<string, unknown>, options?: {
   // 转换items，处理新旧两种格式
   const rawItems = typeof dbOrder.items === 'string' ? JSON.parse(dbOrder.items as string) : (dbOrder.items || []);
   const items = rawItems.map((item: Record<string, unknown>) => ({
-    // 系统商品档案信息
-    productId: item.product_id || null,
-    productName: item.product_name as string || '',
-    productSpec: item.product_spec as string || '',
-    productCode: item.product_code as string || '',
-    unitPrice: item.unit_price as number | null || null,
-    // 客户原始商品信息
+    // 客户原始商品信息（从Excel映射获取）
     cuProductName: item.cu_product_name as string || item.product_name as string || '',
     cuProductCode: item.cu_product_code as string || '',
     cuProductSpec: item.cu_product_spec as string || '',
+    // 系统商品档案信息（自动匹配或手动指定）
+    productId: item.product_id as string || item.systemProductId as string || null,
+    productName: item.product_name as string || item.systemProductName as string || '',
+    productSpec: item.product_spec as string || item.systemProductSpec as string || '',
+    productCode: item.product_code as string || item.systemProductCode as string || '',
+    productBrand: item.product_brand as string || item.systemProductBrand as string || '',
+    unitPrice: item.unit_price as number | null || null,
     // 订单商品信息
     quantity: item.quantity as number || 1,
     price: item.price as number | null || null,
