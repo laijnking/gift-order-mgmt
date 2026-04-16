@@ -4,21 +4,22 @@ import { getSupabaseClient } from '@/storage/database/supabase-client';
 // 中文列名自动映射配置（按长度降序排列，优先匹配长名称）
 const CHINESE_COLUMN_MAPPING: Record<string, string[]> = {
   // 优先匹配长名称的字段
-  product_spec: ['商品规格', '规格型号', '规格名称', '型号规格', '商品型号'],
-  product_name: ['商品名称', 'SKU商品名称', '全部商品名称', '商品名称/商品规格/客户SKU', '商品名', '商品'],
-  product_code: ['SKU编号', 'SKUID', 'ERP编号', '商品单号', '商品编码'],
+  product_spec: ['商品规格', '规格型号', '规格名称', '型号规格', '商品型号', '规格'],
+  product_name: ['商品名称', '商品名', 'SKU商品名称', '全部商品名称', '商品名称/商品规格/客户SKU', '货品名称', '品名', '产品名称', '商品'],
+  product_code: ['SKU编号', 'SKUID', 'ERP编号', '商品单号', '商品编码', '货号'],
   barcode: ['商品69码', '69码', '条码'],
   brand: ['品牌名称', '商品品牌', '品牌'],
   receiver_name: ['收件人姓名', '收货人姓名', '收货人', '收件人', '会员昵称', '客户名称'],
   receiver_phone: ['收件人手机', '收货人手机号', '收货人电话', '收件人电话', '手机号', '电话'],
-  receiver_address: ['收件人地址', '收货详细地址', '收货地址', '详细地址', '收货地址-省'],
-  order_no: ['商户订单号', '用户订单号', '商品订单号', '订单编号', '单据编号', '序列'],
-  bill_date: ['订单创建日期', '订单日期', '下单时间', '创建日期', '日期'],
-  quantity: ['商品数量', '下单数量', '数量'],
+  receiver_address: ['收件人地址', '收货详细地址', '收货人地址', '收货地址', '详细地址', '收货地址-省'],
+  order_no: ['商户订单号', '用户订单号', '商品订单号', '客户订单号', '订单编号', '订单号', '单据编号', '序列'],
+  customer_order_no: ['客户单据编号', '客户单号'],
+  bill_date: ['订单创建日期', '订单日期', '下单时间', '创建日期', '单据日期', '日期'],
+  quantity: ['商品数量', '下单数量', '数量', '件数', '台数', '份数'],
   price: ['商品单价', '单价'],
-  amount: ['订单合计', '金额', '总金额'],
+  amount: ['订单合计', '价税合计', '含税金额', '金额', '总金额'],
   express_company: ['物流公司', '快递公司', '物流方'],
-  tracking_no: ['物流单号', '快递单号', '快递号'],
+  tracking_no: ['物流单号', '快递单号', '快递号', '运单号', '运单'],
   remark: ['客户备注', '客服备注', '备注'],
 };
 
@@ -171,30 +172,34 @@ async function matchSystemProduct(
     matchType: null as string | null,
     matchHint: null as string | null,
   };
-  
+
   // 1. 先查找客户商品映射
   const { data: mappings } = await client
     .from('product_mappings')
     .select('*')
     .eq('is_active', true)
     .or(`customer_code.eq.${customerCode},source_id.eq.${customerCode}`);
-  
-  // 按优先级匹配
+
+  // 按优先级匹配（精确匹配 > 包含匹配 > 模糊匹配）
   const matchOrder = [
     { type: 'code', value: productCode, field: 'source_product_code' },
     { type: 'spec', value: productSpec, field: 'source_product_spec' },
     { type: 'barcode', value: barcode, field: 'source_product_barcode' },
     { type: 'name', value: productName, field: 'source_product_name' },
   ];
-  
+
   for (const match of matchOrder) {
     if (!match.value) continue;
-    
+
     const mapping = mappings?.find((m: Record<string, unknown>) => {
       const fieldValue = m[match.field] as string;
-      return fieldValue && (fieldValue === match.value || fieldValue.includes(match.value) || match.value.includes(fieldValue));
+      if (!fieldValue) return false;
+      // 精确匹配或包含匹配
+      return fieldValue === match.value ||
+             fieldValue.includes(match.value) ||
+             match.value.includes(fieldValue);
     });
-    
+
     if (mapping) {
       result.productId = mapping.product_id as string;
       result.productName = mapping.system_product_name as string;
@@ -202,44 +207,105 @@ async function matchSystemProduct(
       result.productCode = mapping.system_product_code as string;
       result.price = mapping.price as number;
       result.matchType = 'mapping';
-      result.matchHint = `通过客户SKU映射匹配 (${match.type})`;
+      result.matchHint = `通过SKU映射匹配 (${match.type})`;
       break;
     }
   }
-  
+
   // 2. 如果没有找到映射，直接在商品档案中匹配
   if (!result.productId) {
-    for (const match of matchOrder) {
-      if (!match.value) continue;
-      
-      let query = client.from('products').select('*').eq('status', 'active');
-      
-      if (match.type === 'spec') {
-        query = query.eq('spec', match.value);
-      } else if (match.type === 'code') {
-        query = query.eq('code', match.value);
-      } else if (match.type === 'barcode') {
-        query = query.eq('barcode', match.value);
-      } else if (match.type === 'name') {
-        query = query.ilike('name', `%${match.value}%`);
+    // 获取所有活跃商品
+    const { data: products } = await client
+      .from('products')
+      .select('*')
+      .eq('is_active', true)
+      .limit(1000);
+
+    if (!products || products.length === 0) {
+      return result;
+    }
+
+    // 智能匹配算法
+    let bestMatch: { product: Record<string, unknown>; score: number; matchType: string } | null = null;
+
+    for (const product of products) {
+      const pName = (product.name as string) || '';
+      const pSpec = (product.spec as string) || '';
+      const pCode = (product.code as string) || '';
+      const pBarcode = (product.barcode as string) || '';
+
+      let score = 0;
+      let matchType = '';
+
+      // 1. 条码精确匹配（最高优先级）
+      if (barcode && pBarcode && (barcode === pBarcode || pBarcode.includes(barcode) || barcode.includes(pBarcode))) {
+        score = 100;
+        matchType = 'barcode';
       }
-      
-      const { data: products } = await query;
-      
-      if (products && products.length > 0) {
-        result.productId = products[0].id;
-        result.productName = products[0].name;
-        result.productSpec = products[0].spec;
-        result.productCode = products[0].code;
-        result.brand = products[0].brand;
-        result.price = products[0].unit_price;
-        result.matchType = match.type;
-        result.matchHint = `通过商品档案匹配 (${match.type})`;
-        break;
+      // 2. 商品编码精确匹配
+      else if (productCode && pCode && (productCode === pCode || pCode.includes(productCode) || productCode.includes(pCode))) {
+        score = 95;
+        matchType = 'code';
+      }
+      // 3. 规格型号精确匹配
+      else if (productSpec && pSpec && (productSpec === pSpec || pSpec.includes(productSpec) || productSpec.includes(pSpec))) {
+        score = 90;
+        matchType = 'spec';
+      }
+      // 4. 商品名称精确匹配
+      else if (productName && pName && (productName === pName)) {
+        score = 85;
+        matchType = 'name';
+      }
+      // 5. 商品名称包含匹配
+      else if (productName && pName && (pName.includes(productName) || productName.includes(pName))) {
+        score = 75;
+        matchType = 'name';
+      }
+      // 6. 规格型号关键词匹配（提取规格中的关键部分）
+      else if (productSpec && pSpec) {
+        // 提取规格中的型号代码进行匹配
+        const specMatch = pSpec.includes(productSpec) || productSpec.includes(pSpec);
+        if (specMatch) {
+          score = 65;
+          matchType = 'spec';
+        }
+      }
+      // 7. 商品编码部分匹配
+      else if (productCode && pCode && (pCode.includes(productCode) || productCode.includes(pCode))) {
+        score = 60;
+        matchType = 'code';
+      }
+      // 8. 品牌+品类关键词匹配
+      else if (productName && pName) {
+        // 提取前4个字符作为关键词
+        const key1 = productName.slice(0, Math.min(4, productName.length));
+        const key2 = pName.slice(0, Math.min(4, pName.length));
+        if (key1 && key2 && (pName.includes(key1) || productName.includes(key2))) {
+          score = 40;
+          matchType = 'keyword';
+        }
+      }
+
+      if (score > (bestMatch?.score || 0)) {
+        bestMatch = { product, score, matchType };
       }
     }
+
+    // 只有匹配分数超过阈值才采用
+    if (bestMatch && bestMatch.score >= 40) {
+      const p = bestMatch.product;
+      result.productId = p.id as string;
+      result.productName = p.name as string;
+      result.productSpec = p.spec as string;
+      result.productCode = p.code as string;
+      result.brand = p.brand as string;
+      result.price = p.retail_price as number;
+      result.matchType = bestMatch.matchType;
+      result.matchHint = `通过商品档案${bestMatch.matchType}匹配 (${bestMatch.score}%)`;
+    }
   }
-  
+
   return result;
 }
 

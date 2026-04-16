@@ -376,15 +376,19 @@ export default function OrderParsePage() {
         { regex: /^单据日期$/, exact: true, priority: 10 },
         { regex: /^订单日期$/, exact: true, priority: 9 },
         { regex: /^订单创建日期$/, exact: true, priority: 9 },
+        { regex: /^创建日期$/, exact: true, priority: 8 },
+        { regex: /^下单时间$/, exact: true, priority: 8 },
         { regex: /日期$/, priority: 3 },
         { regex: /date/i, priority: 1 },
       ],
       order_no: [
         { regex: /^客户订单号$/, exact: true, priority: 10 },
-        { regex: /^订单号$/, exact: true, priority: 9 },
+        { regex: /^商户订单号$/, exact: true, priority: 10 },
+        { regex: /^用户订单号$/, exact: true, priority: 10 },
+        { regex: /^商品订单号$/, exact: true, priority: 10 },
         { regex: /^订单编号$/, exact: true, priority: 9 },
+        { regex: /^订单号$/, exact: true, priority: 9 },
         { regex: /^单号$/, exact: true, priority: 7 },
-        { regex: /^序号$/, exact: true, priority: 3 },
         { regex: /订单.*号$/, priority: 4 },
         { regex: /order.*no/i, priority: 1 },
       ],
@@ -442,6 +446,7 @@ export default function OrderParsePage() {
         { regex: /^颜色$/, exact: true, priority: 6 },
         { regex: /^尺寸$/, exact: true, priority: 6 },
         { regex: /^容量$/, exact: true, priority: 6 },
+        { regex: /规格.*型号|型号.*规格/, priority: 6 },
         { regex: /spec/i, priority: 1 },
       ],
       quantity: [
@@ -556,10 +561,25 @@ export default function OrderParsePage() {
       ],
     };
 
+    // 需要自动忽略的字段模式（序号、行号等）
+    const ignorePatterns = [
+      /^序号$/, /^行号$/, /^编号$/, /^#$/, /^NO\.?$/i,
+      /^index$/i, /^id$/i, /^idx$/i, /^no$/i,
+      /^选择$/, /^操作$/, /^勾选$/, /^checkbox$/i,
+    ];
+
     // 第一轮：按优先级匹配已知字段
     headers.forEach((header, idx) => {
       const key = String(idx);
       const h = header.trim();
+      
+      // 检查是否应该忽略
+      const shouldIgnore = ignorePatterns.some(p => p.test(h));
+      if (shouldIgnore) {
+        mapping[key] = 'ignore';
+        return;
+      }
+      
       let bestMatch: { field: string; priority: number } | null = null;
 
       for (const [field, regexList] of Object.entries(patterns)) {
