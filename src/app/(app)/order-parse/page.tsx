@@ -364,12 +364,11 @@ export default function OrderParsePage() {
     const mapping: Record<string, string> = {};
     const usedFields = new Set<string>();
 
-    // 优化的匹配规则 - 更精确的匹配模式，避免过于宽泛的匹配
-    // 使用精确匹配 + 模糊匹配的组合，高优先级精确匹配，低优先级模糊匹配
+    // 简化的匹配规则 - 只保留最常用、最精确的匹配
+    // 避免多个目标字段竞争同一个列名
     const patterns: Record<string, Array<{ regex: RegExp; exact?: boolean; priority: number }>> = {
       bill_no: [
         { regex: /^单据编号$/, exact: true, priority: 10 },
-        { regex: /单据号$/, priority: 6 },
         { regex: /billno/i, priority: 2 },
       ],
       bill_date: [
@@ -378,8 +377,6 @@ export default function OrderParsePage() {
         { regex: /^订单创建日期$/, exact: true, priority: 9 },
         { regex: /^创建日期$/, exact: true, priority: 8 },
         { regex: /^下单时间$/, exact: true, priority: 8 },
-        { regex: /日期$/, priority: 3 },
-        { regex: /date/i, priority: 1 },
       ],
       order_no: [
         { regex: /^客户订单号$/, exact: true, priority: 10 },
@@ -388,37 +385,25 @@ export default function OrderParsePage() {
         { regex: /^商品订单号$/, exact: true, priority: 10 },
         { regex: /^订单编号$/, exact: true, priority: 9 },
         { regex: /^订单号$/, exact: true, priority: 9 },
-        { regex: /^单号$/, exact: true, priority: 7 },
-        { regex: /订单.*号$/, priority: 4 },
-        { regex: /order.*no/i, priority: 1 },
       ],
       supplier_order_no: [
         { regex: /^供应商单据号$/, exact: true, priority: 10 },
         { regex: /^供应商订单号$/, exact: true, priority: 9 },
-        { regex: /supplier.*no/i, priority: 2 },
       ],
       customer_code: [
         { regex: /^客户代码$/, exact: true, priority: 10 },
         { regex: /^客户编码$/, exact: true, priority: 9 },
-        { regex: /customer.*code/i, priority: 2 },
       ],
       customer_name: [
         { regex: /^客户名称$/, exact: true, priority: 10 },
         { regex: /^客户姓名$/, exact: true, priority: 9 },
-        { regex: /客户.*名称$/, priority: 5 },
-        { regex: /customer.*name/i, priority: 2 },
       ],
       salesperson: [
         { regex: /^业务员$/, exact: true, priority: 10 },
-        { regex: /^业务员名称$/, exact: true, priority: 9 },
         { regex: /^销售员$/, exact: true, priority: 8 },
-        { regex: /saler/i, priority: 1 },
       ],
       operator: [
         { regex: /^跟单员$/, exact: true, priority: 10 },
-        { regex: /^跟单员名称$/, exact: true, priority: 9 },
-        { regex: /跟单.*员$/, priority: 5 },
-        { regex: /operator/i, priority: 1 },
       ],
       product_name: [
         { regex: /^商品名称$/, exact: true, priority: 10 },
@@ -426,28 +411,16 @@ export default function OrderParsePage() {
         { regex: /^货品名称$/, exact: true, priority: 9 },
         { regex: /^品名$/, exact: true, priority: 9 },
         { regex: /^产品名称$/, exact: true, priority: 8 },
-        { regex: /商品.*名称$/, priority: 5 },
-        { regex: /materialid\.name/, priority: 4 },
       ],
       product_code: [
         { regex: /^商品编码$/, exact: true, priority: 10 },
         { regex: /^商品代码$/, exact: true, priority: 9 },
         { regex: /^货号$/, exact: true, priority: 8 },
-        { regex: /^型号$/, exact: true, priority: 7 },
-        { regex: /materialid\.number/, priority: 4 },
-        { regex: /sku/i, priority: 3 },
       ],
       product_spec: [
         { regex: /^商品规格$/, exact: true, priority: 10 },
         { regex: /^规格型号$/, exact: true, priority: 10 },
         { regex: /^型号规格$/, exact: true, priority: 9 },
-        { regex: /^规格$/, exact: true, priority: 7 },
-        { regex: /^型号$/, exact: true, priority: 7 },
-        { regex: /^颜色$/, exact: true, priority: 6 },
-        { regex: /^尺寸$/, exact: true, priority: 6 },
-        { regex: /^容量$/, exact: true, priority: 6 },
-        { regex: /规格.*型号|型号.*规格/, priority: 6 },
-        { regex: /spec/i, priority: 1 },
       ],
       quantity: [
         { regex: /^商品数量$/, exact: true, priority: 10 },
@@ -455,42 +428,30 @@ export default function OrderParsePage() {
         { regex: /^数量$/, exact: true, priority: 9 },
         { regex: /^件数$/, exact: true, priority: 9 },
         { regex: /^台数$/, exact: true, priority: 9 },
-        { regex: /^份数$/, exact: true, priority: 8 },
-        { regex: /qty/i, priority: 2 },
       ],
       price: [
         { regex: /^单价$/, exact: true, priority: 10 },
         { regex: /^售价$/, exact: true, priority: 9 },
-        { regex: /^单.*价$/, priority: 4 },
-        { regex: /unit.*price/i, priority: 2 },
       ],
       amount: [
         { regex: /^价税合计$/, exact: true, priority: 10 },
         { regex: /^含税金额$/, exact: true, priority: 9 },
         { regex: /^金额$/, priority: 4 },
-        { regex: /allamount/i, priority: 2 },
-        { regex: /total.*amount/i, priority: 1 },
       ],
       discount: [
         { regex: /^单台折让$/, exact: true, priority: 10 },
-        { regex: /^折让$/, priority: 5 },
         { regex: /^每台折让$/, exact: true, priority: 9 },
-        { regex: /discount/i, priority: 1 },
       ],
       tax_rate: [
         { regex: /^增值税税率$/, exact: true, priority: 10 },
-        { regex: /^税率$/, priority: 4 },
-        { regex: /cess/i, priority: 2 },
       ],
       warehouse: [
         { regex: /^仓库$/, exact: true, priority: 10 },
         { regex: /^仓库名称$/, exact: true, priority: 9 },
-        { regex: /stockid\.name/i, priority: 3 },
       ],
       remark: [
         { regex: /^备注$/, exact: true, priority: 10 },
         { regex: /^商品行备注$/, exact: true, priority: 9 },
-        { regex: /remark/i, priority: 1 },
       ],
       receiver_name: [
         { regex: /^收件人姓名$/, exact: true, priority: 10 },
@@ -498,10 +459,6 @@ export default function OrderParsePage() {
         { regex: /^收货人$/, exact: true, priority: 9 },
         { regex: /^收件人$/, exact: true, priority: 9 },
         { regex: /^会员昵称$/, exact: true, priority: 8 },
-        { regex: /^客户名称$/, exact: true, priority: 7 },
-        { regex: /^姓名$/, priority: 3 },  // 降低优先级，避免与客户姓名混淆
-        { regex: /^名字$/, priority: 2 },
-        { regex: /receiver/i, priority: 1 },
       ],
       receiver_phone: [
         { regex: /^收件人手机$/, exact: true, priority: 10 },
@@ -512,10 +469,6 @@ export default function OrderParsePage() {
         { regex: /^收件电话$/, exact: true, priority: 8 },
         { regex: /^手机号码$/, priority: 5 },
         { regex: /^联系电话$/, priority: 4 },
-        { regex: /^手机$/, priority: 3 },
-        { regex: /^电话$/, priority: 2 },
-        { regex: /tel/i, priority: 1 },
-        { regex: /mobile/i, priority: 1 },
       ],
       receiver_address: [
         { regex: /^收件人地址$/, exact: true, priority: 10 },
@@ -524,40 +477,27 @@ export default function OrderParsePage() {
         { regex: /^收货地址$/, exact: true, priority: 9 },
         { regex: /^收件地址$/, exact: true, priority: 8 },
         { regex: /^详细地址$/, exact: true, priority: 7 },
-        { regex: /^地址$/, priority: 3 },
-        { regex: /addr/i, priority: 1 },
       ],
       express_company: [
         { regex: /^物流公司$/, exact: true, priority: 10 },
         { regex: /^快递公司$/, exact: true, priority: 10 },
-        { regex: /^快递$/, exact: true, priority: 8 },
         { regex: /^承运商$/, exact: true, priority: 8 },
-        { regex: /^物流$/, exact: true, priority: 7 },
-        { regex: /express/i, priority: 2 },
       ],
       tracking_no: [
         { regex: /^物流单号$/, exact: true, priority: 10 },
         { regex: /^快递单号$/, exact: true, priority: 10 },
         { regex: /^运单号$/, exact: true, priority: 9 },
         { regex: /^快递号$/, exact: true, priority: 8 },
-        { regex: /^运单$/, priority: 4 },
-        { regex: /^单号$/, priority: 2 },  // 降低优先级，避免与订单号混淆
-        { regex: /tracking.*no/i, priority: 2 },
-        { regex: /waybill/i, priority: 2 },
       ],
       invoice_required: [
         { regex: /^需要开票$/, exact: true, priority: 10 },
-        { regex: /^开票$/, priority: 3 },
-        { regex: /invoice/i, priority: 1 },
       ],
       income_name: [
         { regex: /^收入名称$/, exact: true, priority: 10 },
-        { regex: /income.*name/i, priority: 2 },
       ],
       income_amount: [
         { regex: /^应收金额$/, exact: true, priority: 10 },
         { regex: /^收入金额$/, exact: true, priority: 8 },
-        { regex: /income.*amount/i, priority: 2 },
       ],
     };
 
