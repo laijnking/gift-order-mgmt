@@ -4,16 +4,16 @@ import { getSupabaseClient } from '@/storage/database/supabase-client';
 // 中文列名自动映射配置（简化为最常用的精确匹配，避免冲突）
 const CHINESE_COLUMN_MAPPING: Record<string, string[]> = {
   // 基础信息
-  order_no: ['客户订单号', '商户订单号', '用户订单号', '商品订单号', '订单编号', '订单号'],
+  order_no: ['客户订单号', '商户订单号', '来源订单', '订单编号', '订单号'],
   bill_date: ['单据日期', '订单日期', '订单创建日期', '创建日期', '下单时间'],
   bill_no: ['单据编号'],
   supplier_order_no: ['供应商单据号', '供应商订单号'],
   customer_code: ['客户代码', '客户编码'],
   customer_name: ['客户名称', '客户姓名'],
-  // 商品信息
-  product_name: ['商品名称', '商品名', '货品名称', '品名', '产品名称'],
+  // 客户商品信息
+  product_name: ['商品名称', '商品名', '货品名称', '品名'],
   product_code: ['商品编码', '商品代码', '货号'],
-  product_spec: ['商品规格', '规格型号', '型号规格'],
+  product_spec: ['商品规格', '规格型号', '型号规格', '规格', '型号'],
   quantity: ['商品数量', '下单数量', '数量', '件数', '台数'],
   price: ['单价', '售价'],
   amount: ['价税合计', '含税金额', '金额'],

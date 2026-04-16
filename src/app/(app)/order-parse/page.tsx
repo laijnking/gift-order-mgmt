@@ -369,7 +369,6 @@ export default function OrderParsePage() {
     const patterns: Record<string, Array<{ regex: RegExp; exact?: boolean; priority: number }>> = {
       bill_no: [
         { regex: /^单据编号$/, exact: true, priority: 10 },
-        { regex: /billno/i, priority: 2 },
       ],
       bill_date: [
         { regex: /^单据日期$/, exact: true, priority: 10 },
@@ -381,8 +380,7 @@ export default function OrderParsePage() {
       order_no: [
         { regex: /^客户订单号$/, exact: true, priority: 10 },
         { regex: /^商户订单号$/, exact: true, priority: 10 },
-        { regex: /^用户订单号$/, exact: true, priority: 10 },
-        { regex: /^商品订单号$/, exact: true, priority: 10 },
+        { regex: /^来源订单$/, exact: true, priority: 10 },
         { regex: /^订单编号$/, exact: true, priority: 9 },
         { regex: /^订单号$/, exact: true, priority: 9 },
       ],
@@ -405,22 +403,26 @@ export default function OrderParsePage() {
       operator: [
         { regex: /^跟单员$/, exact: true, priority: 10 },
       ],
+      // 客户商品名称
       product_name: [
         { regex: /^商品名称$/, exact: true, priority: 10 },
         { regex: /^商品名$/, exact: true, priority: 10 },
         { regex: /^货品名称$/, exact: true, priority: 9 },
         { regex: /^品名$/, exact: true, priority: 9 },
-        { regex: /^产品名称$/, exact: true, priority: 8 },
       ],
+      // 客户商品编码
       product_code: [
         { regex: /^商品编码$/, exact: true, priority: 10 },
         { regex: /^商品代码$/, exact: true, priority: 9 },
         { regex: /^货号$/, exact: true, priority: 8 },
       ],
+      // 客户规格型号
       product_spec: [
         { regex: /^商品规格$/, exact: true, priority: 10 },
         { regex: /^规格型号$/, exact: true, priority: 10 },
         { regex: /^型号规格$/, exact: true, priority: 9 },
+        { regex: /^规格$/, exact: true, priority: 7 },
+        { regex: /^型号$/, exact: true, priority: 7 },
       ],
       quantity: [
         { regex: /^商品数量$/, exact: true, priority: 10 },
