@@ -229,7 +229,10 @@ interface ParsedOrderDetail {
   supplierOrderNo?: string;
   customer_code?: string;
   customer_name?: string;
-  // 收货信息
+  // 收货信息（兼容驼峰和下划线两种命名）
+  receiverName?: string;
+  receiverPhone?: string;
+  receiverAddress?: string;
   receiver_name?: string;
   receiver_phone?: string;
   receiver_address?: string;
@@ -270,7 +273,9 @@ interface ParsedOrderDetail {
     price: number | null | undefined;
     remark: string;
   }[];
-  // 订单级别字段
+  // 订单级别字段（兼容驼峰和下划线）
+  expressCompany?: string;
+  trackingNo?: string;
   express_company?: string;
   tracking_no?: string;
   remark?: string;
@@ -903,9 +908,9 @@ export default function OrderParsePage() {
             product_spec: (item.customerProductSpec as string) || (item.product_spec as string) || '',
             quantity: (item.quantity as number) || 1,
             price: (item.price as number | undefined) ?? undefined,
-            express_company: order.express_company || '',
-            tracking_no: order.tracking_no || '',
-            remark: order.remark || '',
+            express_company: getOrderField('expressCompany') || getOrderField('express_company') || '',
+            tracking_no: getOrderField('trackingNo') || getOrderField('tracking_no') || '',
+            remark: order.remark || getOrderField('remark') || '',
             mappedProductCode: item.systemProductCode as string,
             mappedProductName: item.systemProductName as string,
             mappedProductSpec: item.systemProductSpec as string,
