@@ -786,6 +786,8 @@ export default function OrderParsePage() {
       });
 
       const data = await res.json();
+      
+      console.log('【前端】API返回:', data);
 
       if (data.success) {
         const orders = (data.data.orders || []).map((o: Record<string, unknown>, i: number) => ({
@@ -885,7 +887,7 @@ export default function OrderParsePage() {
             city: order.city || '',
             district: order.district || '',
             product_name: (item.customerProductName as string) || '',
-            product_code: (item.systemProductCode as string) || '',
+            product_code: (item.customerProductCode as string) || '',
             product_spec: (item.customerProductSpec as string) || (item.product_spec as string) || '',
             quantity: (item.quantity as number) || 1,
             price: (item.price as number | undefined) ?? undefined,

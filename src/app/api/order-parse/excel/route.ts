@@ -497,6 +497,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { rows, columnMapping, customerCode } = body;
     
+    // 调试日志
+    console.log('【API】接收请求:', {
+      rowsCount: rows?.length,
+      columnMapping,
+      customerCode,
+    });
+    
     if (!Array.isArray(rows) || rows.length === 0) {
       return NextResponse.json({
         success: false,
@@ -506,9 +513,11 @@ export async function POST(request: NextRequest) {
     
     // 如果没有提供列映射，自动检测
     const mapping = columnMapping || autoDetectColumnMapping(Object.keys(rows[0] || {}));
+    console.log('【API】使用的映射:', mapping);
     
     // 解析数据
     const orders = await parseExcelData(client, rows, mapping, customerCode || '');
+    console.log('【API】解析结果:', { ordersCount: orders.length, itemsCount: orders.reduce((s, o) => s + o.items.length, 0) });
     
     // 统计匹配结果
     const stats = {
