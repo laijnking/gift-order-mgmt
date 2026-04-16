@@ -514,10 +514,21 @@ export async function POST(request: NextRequest) {
     // 如果没有提供列映射，自动检测
     const mapping = columnMapping || autoDetectColumnMapping(Object.keys(rows[0] || {}));
     console.log('【API】使用的映射:', mapping);
+    console.log('【API】Excel表头:', Object.keys(rows[0] || {}));
     
     // 解析数据
     const orders = await parseExcelData(client, rows, mapping, customerCode || '');
     console.log('【API】解析结果:', { ordersCount: orders.length, itemsCount: orders.reduce((s, o) => s + o.items.length, 0) });
+    
+    // 如果解析结果为0，输出每行的调试信息
+    if (orders.length === 0 && rows.length > 0) {
+      for (let i = 0; i < Math.min(3, rows.length); i++) {
+        const row = rows[i];
+        const productName = mapping ? Object.entries(mapping).find(([k, v]) => v === 'product_name')?.[0] : null;
+        const productNameValue = productName ? row[parseInt(productName)] : null;
+        console.log(`【API】第${i}行原始数据:`, row, '-> 商品名称值:', productNameValue);
+      }
+    }
     
     // 统计匹配结果
     const stats = {
