@@ -96,11 +96,16 @@ COZE_PROJECT_ENV=PROD
 #### Step 4: 数据库初始化
 
 ```bash
-# 连接到 Supabase 数据库执行建表脚本
-# 脚本位置: data/schema.sql (如果存在)
+# 方式A: Supabase SQL Editor
+# 1. 登录 https://supabase.com/dashboard
+# 2. 选择项目 → SQL Editor
+# 3. 复制粘贴 schema.sql 内容并执行
 
-# 或者使用 psql 导入
+# 方式B: psql 命令行
 psql "postgresql://postgres:[PASSWORD]@db.[PROJECT].supabase.co:5432/postgres" -f data/schema.sql
+
+# 方式C: 导入测试数据（如需要）
+psql "postgresql://postgres:[PASSWORD]@db.[PROJECT].supabase.co:5432/postgres" -f data/import_data.sql
 ```
 
 #### Step 5: 构建并启动
@@ -162,7 +167,19 @@ pm2 delete gift-order # 删除
 
 ## 四、数据迁移
 
-### 4.1 数据库迁移
+### 4.1 数据库建表（全新部署）
+
+```bash
+# 执行建表脚本
+psql "postgresql://postgres:[PASSWORD]@db.[PROJECT].supabase.co:5432/postgres" -f data/schema.sql
+```
+
+建表脚本包含：
+- 32张表的完整DDL（CREATE TABLE）
+- 预设用户、角色、预警规则、发货通知模板
+- RLS策略配置
+
+### 4.2 数据库迁移（数据迁移）
 
 如果需要迁移 Supabase 数据：
 
@@ -182,19 +199,22 @@ pg_dump "postgresql://postgres:[PASSWORD]@db.OLD-PROJECT.supabase.co:5432/postgr
 psql "postgresql://postgres:[PASSWORD]@db.NEW-PROJECT.supabase.co:5432/postgres" < backup.sql
 ```
 
-### 4.2 迁移数据表清单
+### 4.3 迁移数据表清单
 
-| 表名 | 说明 | 优先级 |
-|------|------|--------|
-| customers | 客户档案 | 高 |
-| products | 商品档案 | 高 |
-| shippers / suppliers | 发货方/供应商 | 高 |
-| warehouses | 仓库档案 | 中 |
-| orders / order_items | 订单 | 高 |
-| stocks | 库存 | 高 |
-| users | 用户 | 高 |
-| templates | 模板配置 | 中 |
-| product_mappings | SKU映射 | 中 |
+| 序号 | 表名 | 说明 | 优先级 |
+|------|------|------|--------|
+| 1 | customers | 客户档案 | 高 |
+| 2 | products | 商品档案 | 高 |
+| 3 | shippers | 发货方档案 | 高 |
+| 4 | suppliers | 供应商 | 高 |
+| 5 | warehouses | 仓库档案 | 中 |
+| 6 | orders | 订单 | 高 |
+| 7 | stocks | 库存 | 高 |
+| 8 | users | 用户 | 高 |
+| 9 | templates | 模板配置 | 中 |
+| 10 | product_mappings | SKU映射 | 中 |
+| 11 | alert_rules | 预警规则 | 中 |
+| 12 | roles | 角色配置 | 低 |
 
 ### 4.3 历史数据文件
 
@@ -327,8 +347,9 @@ pnpm build
 ### 建表脚本位置
 
 ```
+data/schema.sql            # 完整建表脚本（32张表 + 预设数据 + RLS策略）
+data/import_data.sql       # 商品档案数据
 data/import_all_data.sql   # 完整数据导入
-data/schema.sql            # 表结构（如果存在）
 ```
 
 ---
