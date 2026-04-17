@@ -279,7 +279,39 @@ git reset --hard HEAD~1
 
 ---
 
-## 11. 运维清单
+## 11. 服务器迁移
+
+### 11.1 迁移文档
+
+详细的服务器迁移步骤请参考：[MIGRATION.md](./MIGRATION.md)
+
+包含：
+- 新服务器环境配置
+- 代码拉取与依赖安装
+- 数据库迁移
+- 环境变量配置
+- 验证与测试
+
+### 11.2 快速迁移命令
+
+```bash
+# 1. 拉取代码
+git clone <仓库> /path/to/projects
+cd /path/to/projects
+
+# 2. 安装依赖（必须使用 pnpm）
+pnpm install
+
+# 3. 配置环境变量
+vi .env.local
+
+# 4. 构建并启动
+pnpm build && pnpm start
+```
+
+---
+
+## 12. 运维清单
 
 ### 部署前检查
 
