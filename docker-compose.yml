@@ -1,0 +1,51 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: gift-order-mgmt-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+      POSTGRES_DB: gift_order
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./supabase/migrations:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gift-order-mgmt
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:postgres123@db:5432/gift_order
+      - NEXT_PUBLIC_SUPABASE_URL=http://166.108.203.24:3001
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=local-anon-key
+      - NEXT_PUBLIC_SUPABASE_DB_URL=postgresql://postgres:postgres123@db:5432/gift_order
+      - COZE_SUPABASE_URL=http://166.108.203.24:3001
+      - COZE_SUPABASE_ANON_KEY=local-anon-key
+      - COZE_SUPABASE_SERVICE_ROLE_KEY=local-service-role-key
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+
+networks:
+  app-network:
+    driver: bridge

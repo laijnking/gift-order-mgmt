@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { PageGuard } from '@/components/auth/page-guard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -149,8 +150,8 @@ const SYSTEM_FIELDS = [
 ];
 
 const TEMPLATE_TYPES = [
-  { value: 'customer', label: '客户模板', desc: '客户确认单', color: 'bg-blue-500' },
-  { value: 'supplier', label: '供应商模板', desc: '发货通知单', color: 'bg-green-500' },
+  { value: 'shipping', label: '发货通知模板', desc: '供应商发货通知单', color: 'bg-green-500' },
+  { value: 'customer_feedback', label: '客户反馈模板', desc: '客户回传反馈单', color: 'bg-blue-500' },
   { value: 'common', label: '通用模板', desc: '通用导出', color: 'bg-purple-500' },
 ];
 
@@ -173,6 +174,7 @@ export default function TemplatesPage() {
   const [editingTemplate, setEditingTemplate] = useState<ExportTemplate | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [previewTemplate, setPreviewTemplate] = useState<ExportTemplate | null>(null);
+  const [importingTemplate, setImportingTemplate] = useState(false);
   
   // 表单状态
   const [formData, setFormData] = useState({
@@ -190,6 +192,7 @@ export default function TemplatesPage() {
   // 映射配置
   const [mappings, setMappings] = useState<{ excelColumn: string; systemField: string }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const importFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadData();
@@ -252,7 +255,8 @@ export default function TemplatesPage() {
     // 类型筛选
     if (typeFilter && template.type !== typeFilter) return false;
     // 关联对象筛选
-    if (targetTypeFilter && template.targetType !== targetTypeFilter) return false;
+    if (targetTypeFilter === 'none' && template.targetType) return false;
+    if (targetTypeFilter && targetTypeFilter !== 'none' && template.targetType !== targetTypeFilter) return false;
     // 状态筛选
     if (statusFilter === 'active' && !template.isActive) return false;
     if (statusFilter === 'inactive' && template.isActive) return false;
@@ -266,7 +270,7 @@ export default function TemplatesPage() {
       name: '',
       code: '',
       description: '',
-      type: 'common',
+      type: 'shipping',
       targetType: '',
       targetId: '',
       targetName: '',
@@ -346,14 +350,73 @@ export default function TemplatesPage() {
       description: template.description,
       type: template.type,
       targetType: template.targetType,
+      targetId: template.targetId,
       targetName: template.targetName,
       fieldMappings: template.fieldMappings,
+      isDefault: template.isDefault,
+      isActive: template.isActive,
     };
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet([exportData]);
-    XLSX.utils.book_append_sheet(wb, ws, '模板配置');
-    XLSX.writeFile(wb, `${template.name}_模板配置.json`);
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${template.name}_模板配置.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
     toast.success('模板配置已导出');
+  };
+
+  const handleImportTemplateFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportingTemplate(true);
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text) as Partial<ExportTemplate>;
+
+      if (!parsed.name || !parsed.type || !parsed.fieldMappings) {
+        toast.error('模板文件格式不正确');
+        return;
+      }
+
+      const res = await fetch('/api/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: parsed.name,
+          code: parsed.code ? `${parsed.code}-IMPORT-${Date.now()}` : '',
+          description: parsed.description || '',
+          type: parsed.type,
+          targetType: parsed.targetType || '',
+          targetId: parsed.targetId || '',
+          targetName: parsed.targetName || '',
+          fieldMappings: parsed.fieldMappings,
+          isDefault: false,
+          isActive: parsed.isActive !== false,
+        }),
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        toast.error(data.error || '导入失败');
+        return;
+      }
+
+      toast.success('模板导入成功');
+      setImportDialogOpen(false);
+      loadTemplates();
+    } catch (error) {
+      console.error('导入模板失败:', error);
+      toast.error('模板文件解析失败');
+    } finally {
+      setImportingTemplate(false);
+      e.target.value = '';
+    }
   };
 
   const handleSubmit = async () => {
@@ -505,7 +568,8 @@ export default function TemplatesPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <PageGuard permission="settings:view" title="无法访问模板配置">
+      <div className="space-y-6">
       {/* 头部 */}
       <div className="flex items-center justify-between">
         <div>
@@ -644,8 +708,8 @@ export default function TemplatesPage() {
                     </TableCell>
                     <TableCell>
                       <Badge className={
-                        template.type === 'customer' ? 'bg-blue-100 text-blue-800' :
-                        template.type === 'supplier' ? 'bg-green-100 text-green-800' :
+                        template.type === 'customer_feedback' ? 'bg-blue-100 text-blue-800' :
+                        template.type === 'shipping' ? 'bg-green-100 text-green-800' :
                         'bg-purple-100 text-purple-800'
                       }>
                         {TEMPLATE_TYPES.find(t => t.value === template.type)?.label || template.type}
@@ -776,11 +840,12 @@ export default function TemplatesPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>关联对象</Label>
-                  <Select value={formData.targetType} onValueChange={(v) => setFormData({...formData, targetType: v, targetId: '', targetName: ''})}>
+                  <Select value={formData.targetType || 'none'} onValueChange={(v) => setFormData({...formData, targetType: v === 'none' ? '' : v, targetId: '', targetName: ''})}>
                     <SelectTrigger>
                       <SelectValue placeholder="选择关联类型" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="none">不关联特定对象</SelectItem>
                       <SelectItem value="customer">
                         <div className="flex items-center gap-2">
                           <Users className="h-4 w-4" />
@@ -1052,8 +1117,8 @@ export default function TemplatesPage() {
             <div className="py-4">
               <div className="mb-4 flex items-center gap-2">
                 <Badge className={
-                  previewTemplate.type === 'customer' ? 'bg-blue-100 text-blue-800' :
-                  previewTemplate.type === 'supplier' ? 'bg-green-100 text-green-800' :
+                  previewTemplate.type === 'customer_feedback' ? 'bg-blue-100 text-blue-800' :
+                  previewTemplate.type === 'shipping' ? 'bg-green-100 text-green-800' :
                   'bg-purple-100 text-purple-800'
                 }>
                   {TEMPLATE_TYPES.find(t => t.value === previewTemplate.type)?.label}
@@ -1101,15 +1166,29 @@ export default function TemplatesPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
+            <input
+              type="file"
+              accept=".json"
+              ref={importFileInputRef}
+              className="hidden"
+              onChange={handleImportTemplateFile}
+            />
             <p className="text-sm text-muted-foreground">
               支持从之前导出的模板配置文件(.json)导入。
             </p>
           </div>
           <DialogFooter>
+            <Button
+              onClick={() => importFileInputRef.current?.click()}
+              disabled={importingTemplate}
+            >
+              {importingTemplate ? '导入中...' : '选择 JSON 文件'}
+            </Button>
             <Button variant="outline" onClick={() => setImportDialogOpen(false)}>关闭</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </PageGuard>
   );
 }

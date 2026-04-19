@@ -1329,7 +1329,7 @@ export default function ProductMappingsPage() {
               <div className="bg-muted/50 p-3 rounded-lg text-sm">
                 <p className="font-medium">导入说明：</p>
                 <ul className="list-disc list-inside mt-1 space-y-1 text-muted-foreground">
-                  <li>系统将根据Excel中的"客户名称"列自动匹配客户档案</li>
+                  <li>系统将根据 Excel 中的 &quot;客户名称&quot; 列自动匹配客户档案</li>
                   <li>如果客户名称在系统中不存在，该行数据将被跳过</li>
                   <li>客户商品名称和系统商品编码为必填项</li>
                 </ul>

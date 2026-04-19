@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     }
 
     let matchedCount = 0;
-    let updatedOrderIds: string[] = [];
+    const updatedOrderIds: string[] = [];
 
     // 获取回单明细
     const { data: receipts, error: receiptsError } = await client

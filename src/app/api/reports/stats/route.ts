@@ -47,6 +47,7 @@ export async function GET(request: NextRequest) {
       assigned: allOrders.filter(o => o.status === 'assigned').length,
       partial_returned: allOrders.filter(o => o.status === 'partial_returned').length,
       returned: allOrders.filter(o => o.status === 'returned').length,
+      feedbacked: allOrders.filter(o => o.status === 'feedbacked').length,
       completed: allOrders.filter(o => o.status === 'completed').length,
       cancelled: allOrders.filter(o => o.status === 'cancelled').length,
     };

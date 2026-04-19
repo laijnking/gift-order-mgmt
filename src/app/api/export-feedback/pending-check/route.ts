@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { CUSTOMER_FEEDBACK_SOURCE_STATUSES } from '@/lib/order-status';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 // 导出前校验订单回单状态
@@ -16,12 +17,12 @@ export async function POST(request: NextRequest) {
     const results = [];
 
     for (const customerId of customerIds) {
-      // 获取客户已发货订单
+      // 获取可用于客户反馈导出的订单
       const { data: orders, error: ordersError } = await client
         .from('orders')
-        .select('id, order_no, customer_order_no, tracking_no, shipped_at')
+        .select('id, order_no, customer_order_no, tracking_no, assigned_at, returned_at, completed_at, status')
         .eq('customer_id', customerId)
-        .eq('status', 'shipped');
+        .in('status', CUSTOMER_FEEDBACK_SOURCE_STATUSES);
 
       if (ordersError) throw new Error(`查询订单失败: ${ordersError.message}`);
 

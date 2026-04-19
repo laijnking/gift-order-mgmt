@@ -1,5 +1,104 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { CUSTOMER_FEEDBACK_SOURCE_STATUSES } from '@/lib/order-status';
+import { parseTemplateFieldMappings, resolvePreferredTemplate, type TemplateRecord } from '@/lib/template-utils';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import * as XLSX from 'xlsx';
+import JSZip from 'jszip';
+
+type OrderItem = Record<string, unknown>;
+
+const DEFAULT_CUSTOMER_FEEDBACK_MAPPINGS: Record<string, string> = {
+  客户订单号: 'order_no',
+  客户单据编号: 'customer_order_no',
+  收货人: 'receiver_name',
+  收货电话: 'receiver_phone',
+  收货地址: 'receiver_address',
+  商品名称: 'product_name',
+  商品编码: 'product_code',
+  规格型号: 'product_spec',
+  数量: 'quantity',
+  单价: 'price',
+  快递公司: 'express_company',
+  物流单号: 'tracking_no',
+  业务员: 'salesperson',
+  跟单员: 'operator',
+  备注: 'remark',
+};
+
+function parseItems(value: unknown): OrderItem[] {
+  if (Array.isArray(value)) return value as OrderItem[];
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function toNumber(value: unknown, fallback = 0): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function itemText(item: OrderItem, ...keys: string[]) {
+  for (const key of keys) {
+    const value = item[key];
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      return String(value).trim();
+    }
+  }
+  return '';
+}
+
+function buildFeedbackRows(
+  orders: Record<string, unknown>[],
+  fieldMappings: Record<string, string>
+) {
+  const normalizedMappings = Object.keys(fieldMappings).length > 0 ? fieldMappings : DEFAULT_CUSTOMER_FEEDBACK_MAPPINGS;
+
+  return orders.flatMap((order) => {
+    const items = parseItems(order.items);
+    const rowItems = items.length > 0
+      ? items
+      : [{ product_name: '', product_code: '', product_spec: '', quantity: 1, price: null }];
+
+    return rowItems.map((item) => {
+      const context: Record<string, unknown> = {
+        bill_no: order.sys_order_no || '',
+        bill_date: order.created_at || '',
+        order_no: order.order_no || '',
+        customer_order_no: order.customer_order_no || '',
+        supplier_order_no: order.supplier_order_no || '',
+        customer_code: order.customer_code || '',
+        customer_name: order.customer_name || '',
+        supplier_name: order.supplier_name || '',
+        salesperson: order.salesperson || '',
+        operator: order.operator_name || '',
+        product_name: itemText(item, 'product_name', 'productName', 'cu_product_name', 'cuProductName'),
+        customer_product_name: itemText(item, 'cu_product_name', 'cuProductName', 'product_name', 'productName'),
+        product_code: itemText(item, 'product_code', 'productCode', 'cu_product_code', 'cuProductCode'),
+        product_spec: itemText(item, 'product_spec', 'productSpec', 'cu_product_spec', 'cuProductSpec'),
+        quantity: toNumber(item.quantity, 1),
+        price: item.price ?? item.unit_price ?? '',
+        amount: toNumber(item.quantity, 1) * toNumber(item.price ?? item.unit_price, 0),
+        warehouse: itemText(item, 'warehouse', 'warehouseName'),
+        remark: order.remark || itemText(item, 'remark'),
+        receiver_name: order.receiver_name || '',
+        receiver_phone: order.receiver_phone || '',
+        receiver_address: order.receiver_address || '',
+        express_company: order.express_company || '',
+        tracking_no: order.tracking_no || '',
+      };
+
+      return Object.fromEntries(
+        Object.entries(normalizedMappings).map(([header, fieldKey]) => [header, context[fieldKey] ?? ''])
+      );
+    });
+  });
+}
 
 // 批量导出客户反馈单
 export async function POST(request: NextRequest) {
@@ -14,30 +113,35 @@ export async function POST(request: NextRequest) {
     }
 
     const results = [];
+    const zip = new JSZip();
     const batchId = crypto.randomUUID();
     let totalOrderCount = 0;
     let totalShippedCount = 0;
     let totalPendingReceiptCount = 0;
 
-    // 获取模板信息
+    let resolvedTemplateId = templateId || null;
+    let resolvedTemplate: TemplateRecord | null = null;
     let templateName = '默认客户反馈模板';
-    if (templateId) {
+    if (resolvedTemplateId) {
       const { data: template } = await client
         .from('templates')
-        .select('name')
-        .eq('id', templateId)
+        .select('*')
+        .eq('id', resolvedTemplateId)
         .single();
-      if (template) templateName = template.name;
+      if (template) {
+        resolvedTemplate = template as TemplateRecord;
+        templateName = template.name;
+      }
     }
 
     // 按客户分别处理
     for (const customerId of customerIds) {
-      // 获取客户已发货订单（状态为shipped）
+      // 获取可用于客户反馈导出的订单
       const { data: orders, error: ordersError } = await client
         .from('orders')
         .select('*')
-        .eq('customer_code', customerId)
-        .eq('status', 'shipped');
+        .eq('customer_id', customerId)
+        .in('status', CUSTOMER_FEEDBACK_SOURCE_STATUSES);
 
       if (ordersError) throw new Error(`查询订单失败: ${ordersError.message}`);
 
@@ -68,10 +172,51 @@ export async function POST(request: NextRequest) {
         .single();
 
       const customerName = customer?.name || '未知客户';
+      const { data: customerMapping } = await client
+        .from('column_mappings')
+        .select('id, version, mapping_config')
+        .eq('customer_code', orders[0]?.customer_code || '')
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+
+      let exportFieldMappings = customerMapping?.mapping_config || {};
+      let exportTemplateName = customerMapping
+        ? `客户导入映射(v${customerMapping.version})`
+        : templateName;
+      let exportTemplateId = resolvedTemplateId;
+
+      if (!customerMapping) {
+        let customerScopedTemplate = resolvedTemplate;
+        if (!customerScopedTemplate) {
+          const { template } = await resolvePreferredTemplate(client, {
+            type: 'customer_feedback',
+            targetType: 'customer',
+            targetId: customerId,
+          });
+          if (template) {
+            customerScopedTemplate = template;
+            if (!resolvedTemplateId && template.id) resolvedTemplateId = template.id;
+          }
+        }
+
+        if (customerScopedTemplate) {
+          exportTemplateId = customerScopedTemplate.id || exportTemplateId;
+          exportTemplateName = String(customerScopedTemplate.name || exportTemplateName);
+          exportFieldMappings = parseTemplateFieldMappings(customerScopedTemplate);
+        }
+      }
 
       // 生成文件名: 客户名称+订单反馈+日期
       const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
       const fileName = `${customerName}+订单反馈+${today}.xlsx`;
+      const exportRows = buildFeedbackRows(orders as Record<string, unknown>[], exportFieldMappings);
+      const worksheet = XLSX.utils.json_to_sheet(exportRows);
+      const headers = Object.keys(exportRows[0] || exportFieldMappings || DEFAULT_CUSTOMER_FEEDBACK_MAPPINGS);
+      worksheet['!cols'] = headers.map((header) => ({ wch: Math.max(12, Math.min(40, header.length * 2 + 4)) }));
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, '客户反馈');
+      zip.file(fileName, XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }));
 
       // 记录导出详情
       const detailResult = {
@@ -80,12 +225,13 @@ export async function POST(request: NextRequest) {
         orderCount: orders.length,
         shippedOrderCount: shippedCount,
         pendingReceiptCount,
-        templateId: templateId || null,
-        templateName,
+        templateId: exportTemplateId,
+        templateName: exportTemplateName,
         fileName,
-        fileUrl: `/exports/${fileName}`, // TODO: 实际生成Excel并上传
+        fileUrl: `/exports/${fileName}`,
         hasPendingReceipts: pendingReceiptCount > 0,
         status: 'success',
+        mappingSource: customerMapping ? 'column_mapping' : 'template',
       };
 
       results.push(detailResult);
@@ -97,6 +243,7 @@ export async function POST(request: NextRequest) {
     // 生成ZIP文件名
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const zipFileName = `客户反馈批量导出+${today}.zip`;
+    const zipBase64 = (await zip.generateAsync({ type: 'nodebuffer' })).toString('base64');
 
     // 保存批量导出记录
     const { error: recordError } = await client
@@ -104,10 +251,12 @@ export async function POST(request: NextRequest) {
       .insert({
         export_type: 'customer_feedback',
         customer_id: customerIds.length === 1 ? customerIds[0] : null,
-        template_id: templateId || null,
+        template_id: resolvedTemplateId,
         template_name: templateName,
         file_url: `/exports/${zipFileName}`,
         file_name: zipFileName,
+        zip_file_url: `/exports/${zipFileName}`,
+        zip_file_name: zipFileName,
         total_count: totalOrderCount,
         exported_by: exportedBy || 'system',
         metadata: {
@@ -128,6 +277,7 @@ export async function POST(request: NextRequest) {
         batchId,
         zipFileName,
         zipFileUrl: `/exports/${zipFileName}`,
+        zipBase64,
         totalCustomerCount: results.length,
         totalOrderCount,
         shippedOrderCount: totalShippedCount,

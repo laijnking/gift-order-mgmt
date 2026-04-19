@@ -1,23 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
-
-// 数据库字段转前端格式
-function transformTemplate(dbTemplate: Record<string, unknown>) {
-  return {
-    id: dbTemplate.id,
-    code: dbTemplate.code,
-    name: dbTemplate.name,
-    description: dbTemplate.description as string || '',
-    type: dbTemplate.type as string || 'dispatch',
-    fieldMappings: typeof dbTemplate.field_mappings === 'string' 
-      ? JSON.parse(dbTemplate.field_mappings) 
-      : (dbTemplate.field_mappings as Record<string, string> || {}),
-    isDefault: dbTemplate.is_default ?? false,
-    isActive: dbTemplate.is_active ?? true,
-    createdAt: dbTemplate.created_at,
-    updatedAt: dbTemplate.updated_at as string | undefined,
-  };
-}
+import { normalizeTemplateType, syncTemplateTargetLink, transformTemplateRecord, type TemplateRecord } from '@/lib/template-utils';
 
 // 获取单个模板
 export async function GET(
@@ -44,7 +27,7 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      data: transformTemplate(data as Record<string, unknown>),
+      data: transformTemplateRecord(data as TemplateRecord),
     });
   } catch (error) {
     console.error('获取模板失败:', error);
@@ -71,15 +54,22 @@ export async function PUT(
       await client
         .from('templates')
         .update({ is_default: false })
-        .eq('type', body.type)
+        .eq('type', normalizeTemplateType(body.type))
         .eq('is_default', true);
     }
 
     const templateData: Record<string, unknown> = {
       name: body.name,
+      code: body.code,
       description: body.description,
-      type: body.type,
+      type: normalizeTemplateType(body.type),
+      target_type: body.targetType || null,
+      target_id: body.targetId || null,
+      target_name: body.targetName || null,
       field_mappings: body.fieldMappings ? JSON.stringify(body.fieldMappings) : '{}',
+      config: {
+        fieldMappings: body.fieldMappings || {},
+      },
       is_default: body.isDefault ?? false,
       is_active: body.isActive,
       updated_at: new Date().toISOString(),
@@ -94,9 +84,16 @@ export async function PUT(
     
     if (error) throw new Error(`更新模板失败: ${error.message}`);
 
+    await syncTemplateTargetLink(client, {
+      templateId: id,
+      targetType: body.targetType || null,
+      targetId: body.targetId || null,
+      targetName: body.targetName || null,
+    });
+
     return NextResponse.json({
       success: true,
-      data: transformTemplate(data as Record<string, unknown>),
+      data: transformTemplateRecord(data as TemplateRecord),
       message: '模板更新成功'
     });
   } catch (error) {
@@ -117,6 +114,8 @@ export async function DELETE(
   const { id } = await params;
   
   try {
+    await client.from('template_links').delete().eq('template_id', id);
+
     const { error } = await client
       .from('templates')
       .update({ is_active: false, updated_at: new Date().toISOString() })

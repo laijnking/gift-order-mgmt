@@ -16,6 +16,7 @@ interface MenuItem {
   href?: string;
   icon: React.ComponentType<{ className?: string }>;
   roles?: string[];
+  permissions?: string[];
   children?: MenuItem[];
 }
 
@@ -45,10 +46,10 @@ const menuItems: MenuItem[] = [
     label: '系统设置',
     href: '/users',
     icon: Settings,
-    roles: ['admin'],
+    permissions: ['settings:view'],
     children: [
       { label: '用户管理', href: '/users', icon: Users },
-      { label: '权限管理', href: '/roles', icon: Settings },
+      { label: '角色与权限', href: '/roles', icon: Settings },
       { label: '预警设置', href: '/alerts', icon: Bell },
       { label: '模板配置', href: '/templates', icon: Settings },
     ]
@@ -61,7 +62,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set(['档案管理', '系统设置']));
   const pathname = usePathname();
   const router = useRouter();
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, logout } = useAuth();
 
   // 公开路径
   const publicPaths = ['/login'];
@@ -100,8 +101,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   const visibleMenuItems = menuItems.filter(item => {
-    if (!item.roles) return true;
-    return item.roles.includes(user.role);
+    const roleAllowed = !item.roles || item.roles.includes(user.role);
+    const permissionAllowed = !item.permissions || item.permissions.some(permission => user.permissions.includes(permission));
+    return roleAllowed && permissionAllowed;
   });
 
   const renderMenuItem = (item: MenuItem) => {
@@ -270,15 +272,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-sidebar-foreground truncate">{user.realName || user.username}</p>
                 <p className="text-xs text-sidebar-foreground/60 truncate">
-                  {user.role === 'admin' ? '管理员' : user.role === 'salesperson' ? '业务员' : '跟单员'}
+                  {user.roleName || user.role}
                 </p>
               </div>
             )}
             {!collapsed && (
-              <Button variant="ghost" size="icon" onClick={() => {
-                localStorage.removeItem('gift_order_user');
-                router.push('/login');
-              }} className="text-sidebar-foreground/60 hover:text-sidebar-foreground">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={logout}
+                className="text-sidebar-foreground/60 hover:text-sidebar-foreground"
+              >
                 <LogOut className="w-4 h-4" />
               </Button>
             )}

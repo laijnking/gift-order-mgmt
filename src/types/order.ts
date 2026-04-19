@@ -4,7 +4,8 @@ export type OrderStatus =
   | 'assigned'     // 已派发
   | 'partial_returned'  // 部分回单
   | 'returned'     // 已回单
-  | 'completed'    // 已完成
+  | 'feedbacked'   // 已反馈客户
+  | 'completed'    // 已导出金蝶/归档
   | 'cancelled';  // 已取消
 
 // 订单来源

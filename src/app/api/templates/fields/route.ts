@@ -1,6 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
+interface TemplateFieldInput {
+  fieldId: string;
+  fieldName: string;
+  sourceTable?: string | null;
+  sourceField?: string | null;
+  isRequired?: boolean;
+  order?: number;
+  width?: number;
+  format?: string | null;
+}
+
 // 获取模板字段列表
 export async function GET(request: NextRequest) {
   const client = getSupabaseClient();
@@ -50,7 +61,7 @@ export async function POST(request: NextRequest) {
     await client.from('template_fields').delete().eq('template_id', templateId);
 
     // 插入新字段
-    const fieldsData = fields.map((field: any, index: number) => ({
+    const fieldsData = (fields as TemplateFieldInput[]).map((field, index) => ({
       template_id: templateId,
       field_id: field.fieldId,
       field_name: field.fieldName,

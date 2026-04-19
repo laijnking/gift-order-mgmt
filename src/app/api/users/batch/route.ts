@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { getSupabaseClient } from '@/storage/database/supabase-client';
 import crypto from 'crypto';
 
 // 简单的密码哈希函数

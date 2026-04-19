@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { PageGuard } from '@/components/auth/page-guard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -456,16 +457,14 @@ export default function UsersPage() {
     })),
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <RefreshCw className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
-    <>
+    <PageGuard permission="settings:view" title="无法访问用户管理">
+      {loading ? (
+        <div className="flex items-center justify-center h-96">
+          <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      ) : (
+        <>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -721,7 +720,7 @@ export default function UsersPage() {
           <DialogHeader>
             <DialogTitle>导入用户数据预览</DialogTitle>
             <DialogDescription>
-              共 {excelImportData.length} 条数据，请确认后点击"确认导入"按钮
+              共 {excelImportData.length} 条数据，请确认后点击 &quot;确认导入&quot; 按钮
             </DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-auto">
@@ -765,6 +764,8 @@ export default function UsersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+        </>
+      )}
+    </PageGuard>
   );
 }

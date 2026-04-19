@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
+interface RecordReceiptMatch {
+  id: string;
+  match_status?: string;
+}
+
 // 获取回单导入记录详情
 export async function GET(request: NextRequest) {
   const client = getSupabaseClient();
@@ -89,10 +94,10 @@ export async function PATCH(request: NextRequest) {
     if (receipt) {
       const { data: allReceipts } = await client
         .from('return_receipts')
-        .select('id')
+        .select('id, match_status')
         .eq('record_id', receipt.record_id);
 
-      const matchedCount = allReceipts?.filter((r: any) => 
+      const matchedCount = (allReceipts as RecordReceiptMatch[] | null)?.filter((r) => 
         r.id !== receiptId && 
         (r.match_status === 'auto_matched' || r.match_status === 'manual_matched')
       ).length || 0;

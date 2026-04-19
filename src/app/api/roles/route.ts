@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   const includePermissions = searchParams.get('includePermissions') === 'true';
 
   try {
-    let query = client.from('roles').select('*');
+    const query = client.from('roles').select('*');
 
     const { data, error } = await query.order('is_system', { ascending: false }).order('created_at', { ascending: true });
 

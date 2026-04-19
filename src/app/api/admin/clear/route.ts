@@ -16,7 +16,7 @@ export async function DELETE(request: NextRequest) {
 
     const supabase = getSupabaseClient();
 
-    let result = { orders: 0, costHistory: 0 };
+    const result = { orders: 0, costHistory: 0 };
 
     // 清空订单
     if (type === 'all' || type === 'orders') {

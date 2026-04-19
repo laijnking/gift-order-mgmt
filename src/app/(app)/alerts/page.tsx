@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { PageGuard } from '@/components/auth/page-guard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -340,16 +341,14 @@ export default function AlertsPage() {
     return true;
   });
 
-  if (loadingRecords && records.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <RefreshCw className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
+    <PageGuard permission="settings:view" title="无法访问预警设置">
+      {loadingRecords && records.length === 0 ? (
+        <div className="flex items-center justify-center h-96">
+          <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      ) : (
+        <div className="space-y-6">
       {/* 页面标题 */}
       <div className="flex items-center justify-between">
         <div>
@@ -860,6 +859,8 @@ export default function AlertsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+        </div>
+      )}
+    </PageGuard>
   );
 }

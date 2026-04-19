@@ -344,7 +344,7 @@ async function matchProduct(
           productName: p.name as string,
           productSpec: p.spec as string || '',
           productCode: p.code as string || '',
-          unitPrice: p.unit_price as number || null,
+          unitPrice: Number(p.cost_price || p.retail_price || 0) || null,
           matchType: 'mapping',
           matchHint: `通过SKU映射匹配：${customerProductName} → ${p.name}`,
         };
@@ -368,7 +368,7 @@ async function matchProduct(
         productName: p.name as string,
         productSpec: p.spec as string || '',
         productCode: p.code as string || '',
-        unitPrice: p.unit_price as number || null,
+        unitPrice: Number(p.cost_price || p.retail_price || 0) || null,
         matchType: 'spec',
         matchHint: `通过规格型号精确匹配：${customerProductSpec}`,
       };
@@ -584,9 +584,14 @@ export async function POST(request: NextRequest) {
           supplier_order_no: item.supplierOrderNo || null,
           status: itemSupplierInfo?.id ? 'assigned' : 'pending',
           items: [{
-            product_name: item.productName,
-            product_spec: item.productSpec || '',
-            product_code: item.productCode || '',
+            product_id: item.systemProductId || item.productId || null,
+            product_name: item.systemProductName || item.mappedProductName || item.productName,
+            product_spec: item.systemProductSpec || item.mappedProductSpec || item.productSpec || '',
+            product_code: item.systemProductCode || item.mappedProductCode || item.productCode || '',
+            product_brand: item.systemProductBrand || item.mappedProductBrand || '',
+            cu_product_name: item.productName,
+            cu_product_spec: item.productSpec || '',
+            cu_product_code: item.productCode || '',
             quantity: item.quantity || 1,
             price: item.price || undefined,
             amount: item.amount || undefined,
@@ -891,6 +896,9 @@ export async function PATCH(request: NextRequest) {
       if (status === 'assigned') {
         updateData.assigned_at = new Date().toISOString();
       }
+      if (status === 'completed') {
+        updateData.completed_at = new Date().toISOString();
+      }
     }
     
     // 供应商信息
@@ -986,8 +994,8 @@ export async function DELETE(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // 检查订单状态约束：已派发、已完成、部分回单的订单不能删除
-    let checkIds = id ? [id] : ids!.split(',');
+    // 检查订单状态约束：进入业务闭环后的订单不能删除
+    const checkIds = id ? [id] : ids!.split(',');
     
     const { data: ordersToDelete, error: queryError } = await client
       .from('orders')
@@ -1005,7 +1013,7 @@ export async function DELETE(request: NextRequest) {
 
     // 检查是否有不能删除的订单
     const protectedOrders = ordersToDelete.filter(order => 
-      ['assigned', 'partial_returned', 'completed'].includes(order.status)
+      ['assigned', 'partial_returned', 'returned', 'feedbacked', 'completed'].includes(order.status)
     );
 
     if (protectedOrders.length > 0) {

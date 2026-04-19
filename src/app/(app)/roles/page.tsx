@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { PageGuard } from '@/components/auth/page-guard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -19,16 +20,12 @@ import {
   Search,
   Users,
   Check,
-  X,
   RefreshCw,
   ShieldCheck,
-  ShieldAlert,
-  ChevronRight,
   FileText,
   Package,
   Truck,
   Warehouse,
-  BarChart3,
   Settings,
 } from 'lucide-react';
 
@@ -86,17 +83,7 @@ export default function RolesPage() {
     permissions: [] as string[],
   });
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    setLoading(true);
-    await Promise.all([loadRoles(), loadPermissions()]);
-    setLoading(false);
-  };
-
-  const loadRoles = async () => {
+  const loadRoles = useCallback(async () => {
     try {
       const res = await fetch('/api/roles?includePermissions=true');
       const data = await res.json();
@@ -106,9 +93,9 @@ export default function RolesPage() {
     } catch (error) {
       console.error('获取角色失败:', error);
     }
-  };
+  }, []);
 
-  const loadPermissions = async () => {
+  const loadPermissions = useCallback(async () => {
     try {
       const res = await fetch('/api/permissions');
       const data = await res.json();
@@ -118,7 +105,17 @@ export default function RolesPage() {
     } catch (error) {
       console.error('获取权限失败:', error);
     }
-  };
+  }, []);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    await Promise.all([loadRoles(), loadPermissions()]);
+    setLoading(false);
+  }, [loadPermissions, loadRoles]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const filteredRoles = roles.filter(role => {
     if (!searchTerm) return true;
@@ -225,7 +222,7 @@ export default function RolesPage() {
       } else {
         toast.error(data.error || '删除失败');
       }
-    } catch (error) {
+    } catch {
       toast.error('删除失败');
     }
   };
@@ -279,16 +276,17 @@ export default function RolesPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <PageGuard permission="settings:view" title="无法访问角色与权限">
+      <div className="space-y-6">
       {/* 头部 */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <Shield className="h-8 w-8" />
-            角色管理
+            角色与权限
           </h1>
           <p className="text-muted-foreground">
-            管理系统角色和权限配置
+            管理系统角色、数据权限和功能权限配置
           </p>
         </div>
         <Button onClick={() => handleOpenDialog()}>
@@ -676,6 +674,7 @@ export default function RolesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </PageGuard>
   );
 }

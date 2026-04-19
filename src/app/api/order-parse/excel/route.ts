@@ -184,12 +184,24 @@ async function matchSystemProduct(
     matchHint: null as string | null,
   };
 
-  // 1. 先查找客户商品映射
-  const { data: mappings } = await client
-    .from('product_mappings')
-    .select('*')
-    .eq('is_active', true)
-    .or(`customer_code.eq.${customerCode},source_id.eq.${customerCode}`);
+  // 1. 先查找客户商品映射。当前真实库按 customer_id 关联，不再查询旧字段 customer_code/source_id。
+  let mappings: Record<string, unknown>[] = [];
+  if (customerCode) {
+    const { data: customer } = await client
+      .from('customers')
+      .select('id')
+      .eq('code', customerCode)
+      .maybeSingle();
+
+    if (customer?.id) {
+      const { data } = await client
+        .from('product_mappings')
+        .select('*')
+        .eq('customer_id', customer.id)
+        .eq('is_active', true);
+      mappings = (data || []) as Record<string, unknown>[];
+    }
+  }
 
   // 按优先级匹配（精确匹配 > 包含匹配 > 模糊匹配）
   const matchOrder = [
@@ -202,7 +214,7 @@ async function matchSystemProduct(
   for (const match of matchOrder) {
     if (!match.value) continue;
 
-    const mapping = mappings?.find((m: Record<string, unknown>) => {
+    const mapping = mappings.find((m: Record<string, unknown>) => {
       const fieldValue = m[match.field] as string;
       if (!fieldValue) return false;
       // 精确匹配或包含匹配
@@ -212,7 +224,7 @@ async function matchSystemProduct(
     });
 
     if (mapping) {
-      result.productId = mapping.product_id as string;
+      result.productId = mapping.system_product_id as string;
       result.productName = mapping.system_product_name as string;
       result.productSpec = mapping.system_product_spec as string;
       result.productCode = mapping.system_product_code as string;
@@ -337,16 +349,16 @@ async function matchSupplierStocks(
 }[]> {
   let query = client
     .from('stocks')
-    .select('*, warehouses(name)')
+    .select('*')
     .gt('quantity', 0)
-    .eq('is_active', true);
+    .eq('status', 'active');
   
   if (productId) {
-    query = query.eq('system_product_id', productId);
+    query = query.eq('product_id', productId);
   } else if (productCode) {
-    query = query.eq('system_product_code', productCode);
+    query = query.eq('product_code', productCode);
   } else if (productSpec) {
-    query = query.eq('system_product_spec', productSpec);
+    query = query.ilike('product_name', `%${productSpec}%`);
   } else {
     return [];
   }
@@ -361,9 +373,9 @@ async function matchSupplierStocks(
       supplierId: s.supplier_id as string,
       supplierName: s.supplier_name as string,
       stockQuantity: s.quantity as number,
-      stockPrice: s.price as number,
-      warehouseName: ((s.warehouses as Record<string, unknown>)?.name as string) || '',
-      matchType: s.match_type as string || 'unknown',
+      stockPrice: Number(s.unit_price || 0),
+      warehouseName: (s.warehouse_name as string) || '',
+      matchType: productId ? 'product_id' : productCode ? 'product_code' : 'product_name',
       isSameProvince: (s.supplier_name as string)?.includes(province) || false,
     }))
     .sort((a, b) => {

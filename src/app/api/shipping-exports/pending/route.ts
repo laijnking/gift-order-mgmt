@@ -28,12 +28,12 @@ export async function GET(request: NextRequest) {
     const results = [];
 
     for (const supplier of (suppliers || [])) {
-      // 查询已派发但未发货的订单
+      // 查询待发货订单：已选供应商但尚未回单/完成的 pending、assigned 都应该出现在这里。
       const { data: orders, error: ordersError } = await client
         .from('orders')
         .select('id, order_no, status, assigned_at')
         .eq('supplier_id', supplier.id)
-        .eq('status', 'assigned');
+        .in('status', ['pending', 'assigned']);
 
       if (ordersError) {
         console.error(`查询供应商 ${supplier.id} 订单失败:`, ordersError);
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
         .from('export_records')
         .select('created_at')
         .eq('supplier_id', supplier.id)
-        .eq('export_type', 'shipping')
+        .eq('export_type', 'shipping_notice')
         .order('created_at', { ascending: false })
         .limit(1)
         .single();

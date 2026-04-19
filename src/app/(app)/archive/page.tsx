@@ -152,7 +152,7 @@ export default function ArchiveManagementPage() {
     const config = IMPORT_CONFIG[moduleKey as keyof typeof IMPORT_CONFIG];
     if (!config) return;
     
-    const templates: Record<string, any[]> = {
+    const templates: Record<string, Record<string, string>[]> = {
       customers: [
         { code: 'KH-001', name: '示例客户公司', shortName: '示例', contactPerson: '张三', contactPhone: '13800138000', address: '深圳市南山区科技园', salespersonName: '李四', orderTakerName: '王五', customerLevel: 'A', paymentStatus: '月结', remark: '备注' },
       ],

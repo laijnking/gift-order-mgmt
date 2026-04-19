@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 
 // 创建指向 public schema 的 client
@@ -84,8 +85,6 @@ export async function PUT(
 
     // 如果提供了新密码，则更新
     if (body.password) {
-      // 简单的密码哈希
-      const crypto = require('crypto');
       updateData.password_hash = crypto.createHash('sha256').update(body.password).digest('hex');
     }
 

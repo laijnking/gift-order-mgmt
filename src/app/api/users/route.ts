@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 // 数据库字段转前端格式
@@ -14,6 +15,10 @@ function transformUser(dbUser: Record<string, unknown>) {
     createdAt: dbUser.created_at,
     updatedAt: dbUser.updated_at,
   };
+}
+
+function hashPassword(password: string) {
+  return crypto.createHash('sha256').update(password).digest('hex');
 }
 
 // 获取用户列表
@@ -165,7 +170,7 @@ export async function POST(request: NextRequest) {
     
     const userData = {
       username: body.username,
-      password_hash: body.password || 'password123',
+      password_hash: hashPassword(body.password || '123456'),
       real_name: body.realName,
       role: body.role || 'operator',
       department: body.department,

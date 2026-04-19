@@ -185,7 +185,7 @@ function parseOrdersByRules(text: string): Array<Record<string, unknown>> {
 
 // 应用SKU映射
 async function applySkuMappings(
-  client: SupabaseClient<any, any, any>,
+  client: SupabaseClient,
   orders: Array<Record<string, unknown>>,
   customerCode: string
 ): Promise<Array<Record<string, unknown>>> {

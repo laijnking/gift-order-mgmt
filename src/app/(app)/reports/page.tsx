@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { getOrderStatusBadgeClass, getOrderStatusLabel } from '@/lib/order-status';
 import { toast } from 'sonner';
 import {
   BarChart3,
@@ -34,6 +35,7 @@ interface OrderStatusStats {
   assigned: number;
   partial_returned: number;
   returned: number;
+  feedbacked: number;
   completed: number;
   cancelled: number;
 }
@@ -244,8 +246,9 @@ export default function ReportsPage() {
         ['待派发', reportData.orderStatus.pending],
         ['已派发', reportData.orderStatus.assigned],
         ['部分回单', reportData.orderStatus.partial_returned],
-        ['已回传', reportData.orderStatus.returned],
-        ['已完成', reportData.orderStatus.completed],
+        ['已回单', reportData.orderStatus.returned],
+        ['已反馈', reportData.orderStatus.feedbacked],
+        ['已导金蝶', reportData.orderStatus.completed],
         ['已取消', reportData.orderStatus.cancelled],
       ]
         .map(row => row.map(cell => `"${cell}"`).join(','))
@@ -318,25 +321,9 @@ export default function ReportsPage() {
   };
 
   const getStatusBadge = (status: string, count: number) => {
-    const colors: Record<string, string> = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      assigned: 'bg-blue-100 text-blue-800',
-      partial_returned: 'bg-orange-100 text-orange-800',
-      returned: 'bg-green-100 text-green-800',
-      completed: 'bg-gray-100 text-gray-800',
-      cancelled: 'bg-red-100 text-red-800',
-    };
-    const labels: Record<string, string> = {
-      pending: '待派发',
-      assigned: '已派发',
-      partial_returned: '部分回单',
-      returned: '已回传',
-      completed: '已完成',
-      cancelled: '已取消',
-    };
     return (
-      <Badge className={colors[status] || 'bg-gray-100'}>
-        {labels[status] || status}: {count}
+      <Badge className={status === 'total' ? 'bg-gray-100 text-gray-800' : getOrderStatusBadgeClass(status)}>
+        {(status === 'total' ? '总计' : getOrderStatusLabel(status)) || status}: {count}
       </Badge>
     );
   };
@@ -460,6 +447,7 @@ export default function ReportsPage() {
                     {getStatusBadge('assigned', reportData.orderStatus.assigned)}
                     {getStatusBadge('partial_returned', reportData.orderStatus.partial_returned)}
                     {getStatusBadge('returned', reportData.orderStatus.returned)}
+                    {getStatusBadge('feedbacked', reportData.orderStatus.feedbacked)}
                     {getStatusBadge('completed', reportData.orderStatus.completed)}
                     {getStatusBadge('cancelled', reportData.orderStatus.cancelled)}
                   </>
@@ -492,6 +480,12 @@ export default function ReportsPage() {
                       <div
                         className="bg-green-400"
                         style={{ width: `${(reportData.orderStatus.returned / reportData.orderStatus.total) * 100}%` }}
+                      />
+                    )}
+                    {reportData.orderStatus.feedbacked > 0 && (
+                      <div
+                        className="bg-teal-400"
+                        style={{ width: `${(reportData.orderStatus.feedbacked / reportData.orderStatus.total) * 100}%` }}
                       />
                     )}
                     {reportData.orderStatus.completed > 0 && (

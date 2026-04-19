@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
 
     // 3. 如果SKU映射表没有匹配，尝试直接查询系统商品档案
     // 使用模糊匹配（商品名包含搜索词，或规格型号包含搜索词）
-    let productsQuery = client.from('products').select('*').eq('is_active', true);
+    const productsQuery = client.from('products').select('*').eq('is_active', true);
     
     const { data: products, error: productsError } = await productsQuery;
     if (productsError) {
@@ -226,7 +226,7 @@ export async function PUT(request: NextRequest) {
       if (mappings && mappings.length > 0) {
         let matchedMapping = mappings.find((m: Record<string, unknown>) => {
           const mappedName = (m.customer_product_name as string) || '';
-          return mappedName === productName || mappedName.includes(productName) || productName.includes(mappedName);
+          return mappedName === productName || mappedName.includes(productName || '') || (productName || '').includes(mappedName);
         });
 
         if (!matchedMapping && productSpec) {

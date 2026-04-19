@@ -70,6 +70,12 @@ interface ExportResult {
   status: string;
 }
 
+interface TemplateOption {
+  id: string;
+  name: string;
+  isDefault?: boolean;
+}
+
 export default function ShippingExportPage() {
   const router = useRouter();
 
@@ -81,7 +87,7 @@ export default function ShippingExportPage() {
   const [exporting, setExporting] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [templateId, setTemplateId] = useState<string>('');
-  const [templates, setTemplates] = useState<any[]>([]);
+  const [templates, setTemplates] = useState<TemplateOption[]>([]);
   const [exportResults, setExportResults] = useState<ExportResult[]>([]);
 
   // 加载供应商待发货统计
@@ -110,10 +116,19 @@ export default function ShippingExportPage() {
 
   const loadTemplates = async () => {
     try {
-      const response = await fetch('/api/templates?type=shipping');
-      const data = await response.json();
-      if (data.success) {
-        setTemplates(data.data || []);
+      const [listResponse, defaultResponse] = await Promise.all([
+        fetch('/api/templates?type=shipping'),
+        fetch('/api/templates/default/shipping'),
+      ]);
+      const [listData, defaultData] = await Promise.all([
+        listResponse.json(),
+        defaultResponse.json(),
+      ]);
+      if (listData.success) {
+        setTemplates(listData.data || []);
+      }
+      if (defaultData.success && defaultData.data?.id) {
+        setTemplateId(defaultData.data.id);
       }
     } catch (error) {
       console.error('加载模板失败:', error);
@@ -278,6 +293,19 @@ export default function ShippingExportPage() {
                 className="pl-10"
               />
             </div>
+            <Select value={templateId || 'none'} onValueChange={(value) => setTemplateId(value === 'none' ? '' : value)}>
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder="选择导出模板" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">使用系统默认模板</SelectItem>
+                {templates.map((template) => (
+                  <SelectItem key={template.id} value={template.id}>
+                    {template.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {/* 状态筛选 */}
             <div className="flex items-center gap-2">
               <Button

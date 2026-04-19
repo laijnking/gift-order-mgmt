@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { validateLogin } from '@/lib/auth';
+import { useAuth } from '@/lib/auth';
 import { Package, Lock, User, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 
@@ -16,6 +16,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,16 +24,14 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const user = await validateLogin(username, password);
-      if (user) {
-        // 保存用户信息到 localStorage
-        localStorage.setItem('gift_order_user', JSON.stringify(user));
-        // 强制刷新页面以确保 AuthProvider 读取到最新状态
-        window.location.href = '/';
+      const success = await login(username, password);
+      if (success) {
+        router.replace('/');
+        router.refresh();
       } else {
         setError('用户名或密码错误');
       }
-    } catch (err) {
+    } catch {
       setError('登录失败，请重试');
     } finally {
       setIsLoading(false);

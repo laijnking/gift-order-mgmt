@@ -44,7 +44,13 @@ interface ExportRecord {
   file_name: string;
   total_count: number;
   exported_by: string;
-  metadata: any;
+  metadata: {
+    batch_id?: string;
+    customer_ids?: string[];
+    details?: ExportDetail[];
+    shipped_order_count?: number;
+    pending_receipt_count?: number;
+  } | null;
   created_at: string;
 }
 

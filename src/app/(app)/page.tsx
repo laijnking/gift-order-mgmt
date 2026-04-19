@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { getOrderStatusBadgeClass, getOrderStatusLabel } from '@/lib/order-status';
 import {
   Select,
   SelectContent,
@@ -35,6 +36,7 @@ interface OrderStats {
   pending: number;
   assigned: number;
   returned: number;
+  feedbacked: number;
   completed: number;
   cancelled: number;
 }
@@ -125,6 +127,7 @@ export default function HomePage() {
         pending: orders.filter((o: Record<string, unknown>) => o.status === 'pending').length,
         assigned: orders.filter((o: Record<string, unknown>) => o.status === 'assigned').length,
         returned: orders.filter((o: Record<string, unknown>) => o.status === 'returned' || o.status === 'partial_returned').length,
+        feedbacked: orders.filter((o: Record<string, unknown>) => o.status === 'feedbacked').length,
         completed: orders.filter((o: Record<string, unknown>) => o.status === 'completed').length,
         cancelled: orders.filter((o: Record<string, unknown>) => o.status === 'cancelled').length,
       };
@@ -203,17 +206,19 @@ export default function HomePage() {
   const getStatusConfig = (status: string) => {
     switch (status) {
       case 'pending':
-        return { label: '待派发', color: 'bg-yellow-100 text-yellow-800', icon: Clock };
+        return { label: getOrderStatusLabel(status), color: getOrderStatusBadgeClass(status), icon: Clock };
       case 'assigned':
-        return { label: '已派发', color: 'bg-blue-100 text-blue-800', icon: Truck };
+        return { label: getOrderStatusLabel(status), color: getOrderStatusBadgeClass(status), icon: Truck };
       case 'partial_returned':
-        return { label: '部分回单', color: 'bg-orange-100 text-orange-800', icon: Truck };
+        return { label: getOrderStatusLabel(status), color: getOrderStatusBadgeClass(status), icon: Truck };
       case 'returned':
-        return { label: '已回传', color: 'bg-green-100 text-green-800', icon: CheckCircle };
+        return { label: getOrderStatusLabel(status), color: getOrderStatusBadgeClass(status), icon: CheckCircle };
+      case 'feedbacked':
+        return { label: getOrderStatusLabel(status), color: getOrderStatusBadgeClass(status), icon: CheckCircle };
       case 'completed':
-        return { label: '已完成', color: 'bg-gray-100 text-gray-800', icon: CheckCircle };
+        return { label: getOrderStatusLabel(status), color: getOrderStatusBadgeClass(status), icon: CheckCircle };
       case 'cancelled':
-        return { label: '已取消', color: 'bg-red-100 text-red-800', icon: AlertTriangle };
+        return { label: getOrderStatusLabel(status), color: getOrderStatusBadgeClass(status), icon: AlertTriangle };
       default:
         return { label: status, color: 'bg-gray-100', icon: Package };
     }
@@ -231,8 +236,9 @@ export default function HomePage() {
       ['总订单数', data.orders.total],
       ['待派发', data.orders.pending],
       ['已派发', data.orders.assigned],
-      ['已回传', data.orders.returned],
-      ['已完成', data.orders.completed],
+      ['已回单', data.orders.returned],
+      ['已反馈', data.orders.feedbacked],
+      ['已导金蝶', data.orders.completed],
       ['已取消', data.orders.cancelled],
       [],
       ['客户统计'],
@@ -349,7 +355,7 @@ export default function HomePage() {
                 </div>
                 <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-400 text-green-900 text-xs font-bold shadow-sm">
                   <CheckCircle className="h-3 w-3" />
-                  {data.orders.returned} 已回传
+                  {data.orders.returned} 已回单
                 </div>
               </div>
             </div>
@@ -492,8 +498,9 @@ export default function HomePage() {
                 {([
                   { key: 'pending', label: '待派发', color: 'bg-yellow-400' },
                   { key: 'assigned', label: '已派发', color: 'bg-blue-500' },
-                  { key: 'returned', label: '已回传', color: 'bg-emerald-500' },
-                  { key: 'completed', label: '已完成', color: 'bg-gray-400' },
+                  { key: 'returned', label: '已回单', color: 'bg-emerald-500' },
+                  { key: 'feedbacked', label: '已反馈', color: 'bg-teal-400' },
+                  { key: 'completed', label: '已导金蝶', color: 'bg-gray-400' },
                   { key: 'cancelled', label: '已取消', color: 'bg-red-400' },
                 ] as const).map(({ key, label, color }) => {
                   const count = data.orders[key];

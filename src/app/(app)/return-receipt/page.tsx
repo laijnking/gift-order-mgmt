@@ -64,10 +64,42 @@ interface Order {
   supplierName: string;
 }
 
+interface SupplierOption {
+  id: string;
+  name: string;
+}
+
+interface ImportedReceiptRow {
+  customerOrderNo?: string;
+  orderNo?: string;
+  supplierOrderNo?: string;
+  expressCompany?: string;
+  trackingNo?: string;
+  shipDate?: string | null;
+  quantity?: number | string;
+  price?: number | string | null;
+  warehouse?: string;
+  remark?: string;
+  ['客户订单号']?: string;
+  ['订单号']?: string;
+  ['单据编号']?: string;
+  ['供应商单据号']?: string;
+  ['快递公司']?: string;
+  ['快递单号']?: string;
+  ['物流单号']?: string;
+  ['发货日期']?: string | null;
+  ['日期']?: string | null;
+  ['数量']?: number | string;
+  ['价格']?: number | string | null;
+  ['单价']?: number | string | null;
+  ['仓库']?: string;
+  ['备注']?: string;
+}
+
 export default function ReturnReceiptPage() {
 
   const [loading, setLoading] = useState(false);
-  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
   const [selectedSupplier, setSelectedSupplier] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [records, setRecords] = useState<ReceiptRecord[]>([]);
@@ -131,7 +163,7 @@ export default function ReturnReceiptPage() {
       const workbook = XLSX.read(data);
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+      const jsonData = XLSX.utils.sheet_to_json<ImportedReceiptRow>(worksheet);
 
       // 验证数据格式
       if (jsonData.length === 0) {
@@ -139,7 +171,7 @@ export default function ReturnReceiptPage() {
       }
 
       // 提取回单数据 - 增强支持更多字段
-      const receipts = jsonData.map((row: any) => ({
+      const receipts = jsonData.map((row) => ({
         customerOrderNo: row['客户订单号'] || row['订单号'] || row.customerOrderNo || row.orderNo || row['单据编号'] || '',
         supplierOrderNo: row['供应商单据号'] || row.supplierOrderNo || '',
         expressCompany: row['快递公司'] || row.expressCompany || '',
@@ -179,7 +211,17 @@ export default function ReturnReceiptPage() {
         
         // 询问是否自动匹配
         if (result.data.recordId) {
-          setCurrentRecord({ ...result.data, id: result.data.recordId, supplierId: selectedSupplier, supplierName: supplier?.name || '', fileName: file.name, importedAt: new Date().toISOString(), importedBy: 'current_user' } as any);
+          setCurrentRecord({
+            id: result.data.recordId,
+            supplierId: selectedSupplier,
+            supplierName: supplier?.name || '',
+            fileName: file.name,
+            totalCount: result.data.totalCount || receipts.length,
+            matchedCount: 0,
+            unmatchedCount: result.data.totalCount || receipts.length,
+            importedAt: new Date().toISOString(),
+            importedBy: 'current_user',
+          });
           setShowMatchDialog(true);
         }
       } else {
@@ -699,7 +741,7 @@ export default function ReturnReceiptPage() {
           <DialogHeader>
             <DialogTitle>选择关联订单</DialogTitle>
             <DialogDescription>
-              为回单 "{currentReceipt?.customerOrderNo}" 选择关联的订单
+              为回单 &quot;{currentReceipt?.customerOrderNo}&quot; 选择关联的订单
             </DialogDescription>
           </DialogHeader>
           

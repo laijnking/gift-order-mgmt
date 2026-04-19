@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { isOperatorAssignableRole, isSalesAssignableRole } from '@/lib/roles';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { Upload, Download, ArrowLeft, Search, Plus, Edit, Trash2, Users, AlertTriangle, Check, UsersRound, Filter, Loader2, X } from 'lucide-react';
@@ -153,12 +154,8 @@ export default function CustomersPage() {
     return true;
   });
 
-  const salesUsers = users.filter(u => 
-    ['sales', 'salesperson', 'salesman', 'sales_manager'].includes(u.role) || u.role === 'admin'
-  );
-  const operatorUsers = users.filter(u => 
-    ['operator', 'order_taker'].includes(u.role) || u.role === 'admin'
-  );
+  const salesUsers = users.filter((user) => isSalesAssignableRole(user.role));
+  const operatorUsers = users.filter((user) => isOperatorAssignableRole(user.role));
 
   const resetForm = () => {
     setFormData({

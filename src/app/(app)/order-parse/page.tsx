@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { findUserByIdOrName, getUserDisplayName, isOperatorAssignableRole, isSalesAssignableRole } from '@/lib/roles';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
@@ -341,6 +342,8 @@ export default function OrderParsePage() {
   const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
   const [customerSearch, setCustomerSearch] = useState('');
   const [textInputCollapsed, setTextInputCollapsed] = useState(true);
+  const salesUsers = users.filter((user) => isSalesAssignableRole(user.role));
+  const operatorUsers = users.filter((user) => isOperatorAssignableRole(user.role));
   
   // 供应商匹配状态
   const [supplierMatchResults, setSupplierMatchResults] = useState<Record<string, {
@@ -887,7 +890,7 @@ export default function OrderParsePage() {
         const simpleOrders: ParsedOrder[] = detailOrders.flatMap((order: ParsedOrderDetail) => {
           // 兼容后端驼峰和前端下划线两种命名
           const getOrderField = (field: string): string => {
-            return (order as Record<string, unknown>)[field] as string || '';
+            return (order as unknown as Record<string, unknown>)[field] as string || '';
           };
           return order.items.map((item: Record<string, unknown>) => ({
             id: item.id as string,
@@ -1048,7 +1051,9 @@ export default function OrderParsePage() {
       const res = await fetch('/api/match', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderIds: [orderId] }),
+        body: JSON.stringify({
+          orders: parsedOrders.filter(o => o.id === orderId),
+        }),
       });
       const data = await res.json();
       
@@ -1087,8 +1092,8 @@ export default function OrderParsePage() {
 
   // 批量智能匹配
   const handleMatchAllSuppliers = async () => {
-    const selectedIds = parsedOrders.filter(o => o.selected && o.product_name).map(o => o.id);
-    if (selectedIds.length === 0) {
+    const selectedParsedOrders = parsedOrders.filter(o => o.selected && o.product_name);
+    if (selectedParsedOrders.length === 0) {
       toast.error('请至少选择一条有效的订单');
       return;
     }
@@ -1098,7 +1103,7 @@ export default function OrderParsePage() {
       const res = await fetch('/api/match', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderIds: selectedIds }),
+        body: JSON.stringify({ orders: selectedParsedOrders }),
       });
       const data = await res.json();
       
@@ -1340,29 +1345,19 @@ export default function OrderParsePage() {
                                     setCustomerSearchOpen(false);
                                     if (selectedCode) {
                                       const customer = customers.find(cc => cc.code === selectedCode);
-                                      const name = customer?.salesUserName || '';
-                                      setSalespersonName(name);
-                                      setOperatorName(customer?.operatorUserName || '');
-                                      
-                                      // 尝试通过姓名匹配用户ID
-                                      if (name) {
-                                        const matchedUser = users.find(u => 
-                                          u.realName === name || u.username === name || u.name === name
-                                        );
-                                        setSalespersonId(matchedUser?.id || '');
-                                      } else {
-                                        setSalespersonId('');
-                                      }
-                                      
-                                      const opName = customer?.operatorUserName || '';
-                                      if (opName) {
-                                        const matchedOp = users.find(u => 
-                                          u.realName === opName || u.username === opName || u.name === opName
-                                        );
-                                        setOperatorId(matchedOp?.id || '');
-                                      } else {
-                                        setOperatorId('');
-                                      }
+                                      const matchedSalesUser = findUserByIdOrName(users, {
+                                        id: customer?.salesUserId,
+                                        name: customer?.salesUserName,
+                                      });
+                                      const matchedOperatorUser = findUserByIdOrName(users, {
+                                        id: customer?.operatorUserId,
+                                        name: customer?.operatorUserName,
+                                      });
+
+                                      setSalespersonId(matchedSalesUser?.id || customer?.salesUserId || '');
+                                      setSalespersonName(customer?.salesUserName || getUserDisplayName(matchedSalesUser));
+                                      setOperatorId(matchedOperatorUser?.id || customer?.operatorUserId || '');
+                                      setOperatorName(customer?.operatorUserName || getUserDisplayName(matchedOperatorUser));
                                     } else {
                                       setSalespersonId('');
                                       setOperatorId('');
@@ -1398,7 +1393,7 @@ export default function OrderParsePage() {
                             } else {
                               setSalespersonId(v);
                               const user = users.find(u => u.id === v);
-                              setSalespersonName(user?.realName || user?.username || '');
+                              setSalespersonName(getUserDisplayName(user));
                             }
                           }}
                         >
@@ -1407,9 +1402,9 @@ export default function OrderParsePage() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="__empty__">-- 不选择 --</SelectItem>
-                            {users.filter(u => u.role === 'salesperson').map((u) => (
+                            {salesUsers.map((u) => (
                               <SelectItem key={u.id} value={u.id}>
-                                {u.realName || u.username}
+                                {getUserDisplayName(u)}
                               </SelectItem>
                             ))}
                             {salespersonName && !users.find(u => u.id === salespersonId || u.realName === salespersonName || u.username === salespersonName) && (
@@ -1434,7 +1429,7 @@ export default function OrderParsePage() {
                             } else {
                               setOperatorId(v);
                               const user = users.find(u => u.id === v);
-                              setOperatorName(user?.realName || user?.username || '');
+                              setOperatorName(getUserDisplayName(user));
                             }
                           }}
                         >
@@ -1443,9 +1438,9 @@ export default function OrderParsePage() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="__empty__">-- 不选择 --</SelectItem>
-                            {users.filter(u => u.role === 'order_taker').map((u) => (
+                            {operatorUsers.map((u) => (
                               <SelectItem key={u.id} value={u.id}>
-                                {u.realName || u.username}
+                                {getUserDisplayName(u)}
                               </SelectItem>
                             ))}
                             {operatorName && !users.find(u => u.id === operatorId || u.realName === operatorName || u.username === operatorName) && (

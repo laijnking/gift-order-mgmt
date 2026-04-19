@@ -134,7 +134,7 @@ export async function DELETE(
     // 检查是否为系统角色
     const { data: existing } = await client
       .from('roles')
-      .select('is_system')
+      .select('code, is_system')
       .eq('id', id)
       .single();
     
@@ -149,7 +149,7 @@ export async function DELETE(
     const { data: users } = await client
       .from('users')
       .select('id')
-      .eq('role', id)
+      .eq('role', existing?.code || '')
       .limit(1);
 
     if (users && users.length > 0) {

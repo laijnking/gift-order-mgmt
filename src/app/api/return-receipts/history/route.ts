@@ -1,6 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
+interface ImportedReceiptInput {
+  customerOrderNo?: string;
+  customer_order_no?: string;
+  supplierOrderNo?: string;
+  supplier_order_no?: string;
+  expressCompany?: string;
+  express_company?: string;
+  trackingNo?: string;
+  tracking_no?: string;
+  shipDate?: string | null;
+  ship_date?: string | null;
+  warehouse?: string;
+  quantity?: number;
+  price?: number | null;
+  remark?: string;
+  ['客户订单号']?: string;
+  ['供应商单据号']?: string;
+  ['快递公司']?: string;
+  ['快递单号']?: string;
+  ['物流单号']?: string;
+  ['发货日期']?: string | null;
+  ['日期']?: string | null;
+}
+
 // 获取回单导入历史
 export async function GET(request: NextRequest) {
   const client = getSupabaseClient();
@@ -85,7 +109,7 @@ export async function POST(request: NextRequest) {
     if (recordError) throw new Error(`创建导入记录失败: ${recordError.message}`);
 
     // 批量插入回单明细
-    const receiptData = receipts.map((r: any) => ({
+    const receiptData = (receipts as ImportedReceiptInput[]).map((r) => ({
       record_id: record.id,
       supplier_id: supplierId,
       supplier_name: supplierName,

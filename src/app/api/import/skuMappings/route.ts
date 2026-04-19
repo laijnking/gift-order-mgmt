@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+interface ProductLookup {
+  id: string;
+  barcode: string | null;
+  name: string | null;
+}
+
 // 创建指向 public schema 的 client
 function getPublicSupabaseClient() {
   const url = process.env.COZE_SUPABASE_URL;
@@ -51,7 +57,7 @@ export async function POST(request: NextRequest) {
         let productId = customerSku ? productMap.get(customerSku) : null;
         
         if (!productId && item.internalProductName) {
-          const found = (products || []).find((p: any) => p.name === item.internalProductName);
+          const found = (products as ProductLookup[] | null)?.find((product) => product.name === item.internalProductName);
           if (found) productId = found.id;
         }
 

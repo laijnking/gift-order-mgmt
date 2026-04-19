@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
     }));
 
     // 获取当前价格（从stocks表）
-    let currentPrices: Record<string, number> = {};
+    const currentPrices: Record<string, number> = {};
     if (productCode) {
       const { data: stocks } = await client
         .from('stocks')

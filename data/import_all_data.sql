@@ -483,329 +483,329 @@ ON CONFLICT (name) DO UPDATE SET
 -- 导入仓库档案
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('ec64bb4c-cd4b-4c64-96d9-0f5f7738fa21', 'WH001', '首映礼省内仓', '', '自有', '', '', '广东', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('1397cc82-bf0a-4b07-9092-29f1a760b265', 'WH002', '广东云海仓库', '', '三方', '', '', '广东', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('f3af7a7d-e229-4d8a-aa9c-d3d8e27be32a', 'WH003', '山东怡坤仓库', '', '三方', '', '', '山东', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('820773b1-086f-4532-ad8f-b5585b2b2314', 'WH004', '天津倾心仓库', '', '三方', '', '', '天津', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('65fede50-a884-45f4-bb7a-cc514ab8adeb', 'WH005', '杭州舟亢仓库', '', '三方', '', '', '浙江杭州', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('4ab6920a-37d1-4bd1-8af2-5b8b353090a1', 'WH006', '上海至梵仓库', '', '三方', '', '', '上海', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('5ed0460f-0fe0-490a-8cd8-d3bb21b86895', 'WH007', '成都拓普壹仓库', '', '三方', '', '', '四川成都', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('48b78936-6ea5-476f-b32f-1f22decc648b', 'WH008', '上海飞通仓库', '', '三方', '', '', '上海', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('c16bd7b5-ec9d-4e3e-9899-d6d3b53081b0', 'WH009', '张家港米盛仓库', '', '三方', '', '', '江苏张家港', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('2c3ec2c6-4e3d-42fd-aff3-be338456626b', 'WH010', '3.23杭州怡霖', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('d5528fe9-a81c-4024-8a80-193d067d32d4', 'WH011', '2.25常州梁业', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('976dc1dc-77a9-4e6f-ba88-c22f41e5f33c', 'WH012', '3.23北京国泰昌荣', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('2d5a96e6-8931-4923-82e3-59a8ef71e464', 'WH013', '3.16江苏金舜源', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('8f8d528a-3994-41d4-9df6-8fffd0f253ab', 'WH014', '3.26佛山多品', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('e571525e-440d-47b4-a7bf-00cd8970d3f1', 'WH015', '3.17红紫金', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('fbedbdad-f511-459a-b59e-78a64ac2ea8d', 'WH016', '3.23深圳碧然晨', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('eb3dd62b-1ad4-4b0e-81de-8bf8723cd835', 'WH017', '3.23安徽艾森格', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('f8b74d05-6ee8-4ffa-a862-5b05e90bcef9', 'WH018', '3.22山东新瑞', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('caa6724e-b44a-4110-9bf6-b7515d318390', 'WH019', '3.23苏泊尔电商-海淮', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('7f4f9a30-1f1f-4045-ba14-fe92947db068', 'WH020', '3.16昆明浩帆', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('88bbdae5-b547-4cfc-a7ce-dfa3fcbd86e8', 'WH021', '3.23福建翼盛', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('3551ac54-37d0-4175-bf27-66e9ac8ecb41', 'WH022', '3.23广州威泽', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('9bb57aee-0a34-4e03-828e-92f632c8520b', 'WH023', '12.26深圳苏泊尔', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('1f468925-186b-4189-a67b-77abbf3421dc', 'WH024', '2.28武汉沃克尔-六安', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('c354edb3-eeba-4c3a-90de-96e6f174b1a0', 'WH025', '1.10江苏新合纵', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('d6307d8b-1e71-4d24-aac0-226b9461e1d6', 'WH026', '3.4刘志峰', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('3631855e-dba7-4d59-9e51-ef225eece3d4', 'WH027', '3.23电商工厂库存', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('ed7463f4-8514-48d5-92f1-8f2b412fd52c', 'WH028', '2.7飞通京东', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('b56533db-a333-454e-a51e-659be0748431', 'WH029', '1.16苏泊尔不接团单品', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('a7c53be7-d67f-437c-ad79-2418ae94f549', 'WH030', '3.25武汉杯壶苏泊尔工厂', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('ece70502-aab9-46ac-84fd-554e85d8f705', 'WH031', '3.3九阳商用豆浆机', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('180f1ad9-b1ea-4e6c-af3b-7980337fd4e7', 'WH032', '九阳新渠道管控型号', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('00f61d06-f816-4d50-881e-d1033a36feda', 'WH033', '3.26九阳工厂库存', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('a5d7091f-0f4f-45cd-9353-dd7fac5fd4bc', 'WH034', '3.23兰瑞基', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('a55b5c7b-53a8-4b97-9b10-42897229ed03', 'WH035', '3.23慈溪腾杰', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('c099fb92-0ee2-41ec-af89-4e0c6917793c', 'WH036', '3.23苏州合则盛', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('9933b0f3-5011-44fd-8edf-3814311fd333', 'WH037', '3.16沈阳旺得福', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('dead1d62-b76e-47e6-bba5-2f2144c218d4', 'WH038', '3.5上海毅道', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('58f6194a-d771-4160-80d6-638663265136', 'WH039', '2.24中山合利和', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('f316dd6f-6cdc-486a-97b5-255d82e1228d', 'WH040', '3.18九阳益庆丰', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('30da098d-8c9e-4831-baf8-5f4d3093b609', 'WH041', '12.1金鼎越胜', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('3d8c3dbf-63d1-4792-a6e4-160755f1fdb3', 'WH042', '1.8深圳西贝阳光', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('2545a7b1-aee2-48dd-9ff3-375d4476fb8d', 'WH043', '先锋夏季', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('36c45a4e-bbdc-4001-a29b-4d99819527a4', 'WH044', '12.11先锋冬季', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('7919b288-e057-40b2-baba-55afb63e3b5f', 'WH045', '3.24九阳2C', '', '三方', '', '', '未知', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('fa0ea2b2-b341-42bd-8c7f-eb5704ac9de0', 'WH046', '中山奔和仓库', '', '三方', '', '', '广东中山', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
     updated_at = NOW();
 INSERT INTO warehouses (id, code, name, short_name, type, contact_person, contact_phone, address, province, city, is_active, created_at, updated_at)
 VALUES ('8ec18d5f-e821-4231-90f4-49b49229acc8', 'WH047', '利仁仓库', '', '三方', '', '', '北京', '', '', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     type = EXCLUDED.type,
     address = EXCLUDED.address,
@@ -3814,1601 +3814,1601 @@ VALUES ('2f2f761b-07d9-467d-860f-06ed4be0e71c', '4ab6920a-37d1-4bd1-8af2-5b8b353
 ON CONFLICT DO NOTHING;
 
 -- 导入商品档案
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('4b6f6d07-8c7e-438a-b549-5b8fea4b174e', '03S57-AP', '', '苏泊尔手持式吸尘器', '苏泊尔小家电', '吸尘器', '03S57-AP', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('284116a4-37a4-462f-8c4d-dfb08165774c', '0J38A805', '', '苏泊尔电烤箱', '苏泊尔小家电', '电烤箱', '0J38A805', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('170c9c30-17b0-4adb-998a-05a5bce0f260', '10000mAh(Max22.5W SE)', '', '华为超级快充移动电源/充电宝', '其他', '日杂', '10000mAh(Max22.5W SE)', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('3030714f-0a0a-4d16-be43-8fa7f40fbd9f', '108ET', '', '格来德泡茶壶', '格来德', '其他', '108ET', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('ab3f4717-d6dc-461f-9732-ad573fb9b2cf', '108ET1', '', '格来德泡茶壶', '格来德', '其他', '108ET1', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('882adc0b-f6ae-4153-af3f-8045d56dd110', '108S', '', '格来德电水壶', '格来德', '电水壶', '108S', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('e909cfbb-9eb2-4b16-b38a-53541b313557', '119939', '', '大卫小木马旋转拖把', '大卫', '日杂', '119939', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('25b6fb29-be3b-4fee-ab47-93b063d82358', '119939小木马', '', '大卫旋转拖把', '大卫', '日杂', '119939', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('d3b76eef-f23e-41cc-9fc1-b4d4d976ee94', '1201S', '', '格来德电水壶', '格来德', '电水壶', '9301', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('e97dc193-4142-4f3b-9a29-44aa4a56e1e7', '120R01', '', '美的消毒柜', '美的', '消毒柜', '120R01', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('db64d900-e28b-41c8-8569-84177a3321e3', '150M', '', '格来德电水壶', '格来德', '电水壶', '150M', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('baed3bcd-c6ea-4623-be62-3cf7f485800a', '150MK', '', '格来德电水壶', '格来德', '电水壶', '150MK', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('d04ac41f-78d9-4567-a82b-4205682d2415', '15L商用豆浆机滤网组件', '', '商用豆浆机配件', '九阳原磨坊', '配件', '15L商用豆浆机滤网组件', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('84be516e-b776-4ffd-aa5e-f31bd926f629', '15WY1J(office)', '', '九阳养生壶', '九阳', '养生壶', '15WY1J', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('c3277987-85ae-4a6d-963e-e14fb07fc4b2', '15WY2J', '', '九阳养生壶', '九阳', '养生壶', '15WY2J', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('c2b03056-0024-4de1-b0bc-139108c0f17e', '15Y05', '', '苏泊尔养生壶', '苏泊尔小家电', '养生壶', '15Y05', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('04156347-cec5-4c03-af20-c4bffc3707a1', '15Z605B', '', '九阳电饭煲', '九阳', '电饭煲', '15Z605B', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('8f2044b3-3a5e-42df-a728-5af0fc3378ab', '160S', '', '格来德电水壶', '格来德', '电水壶', '160S', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('73d8a1d8-cf4e-45b3-a251-eee278e25b5e', '1742S', '', '格来德电水壶', '格来德', '电水壶', '1742S', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('36a0d887-21bf-456d-a0ac-f6dcd0e8682a', '17WU1', '', '九阳电热水壶', '九阳', '电水壶', '17WU1', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('91567d31-c3f9-48ab-9291-cc9603329243', '17WU1B', '', '九阳电水壶', '九阳', '电水壶', '17WU1B', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('934c7d60-77e7-4057-b49a-73fa805a06d4', '17WU2', '', '九阳开水煲', '', '', '17WU2', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('9ed980de-35c7-49ca-875e-a63da933c67e', '17WU2T', '', '九阳开水煲', '九阳', '开水煲', '17WU2T', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('1d8710ca-fd83-4e6a-8bac-32c2a55781cf', '17WU2W', '', '九阳开水煲', '九阳', '开水煲', '17WU2W', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('59d63468-1fa6-4572-95d3-5c5e6c68a88c', '18P161-C', '', '九阳破壁料理机', '九阳', '破壁料理机', '18P161-C', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('545112f9-13ec-40f3-bc51-e8d85860ba92', '18WY20R', '', '九阳养生壶', '九阳', '养生壶', '18WY20R', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('4ea4bc1d-fcfe-4b09-86bf-3e6dbdecfc35', '18WY2R', '', '九阳养生壶', '九阳', '养生壶', '18WY2R', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('881097c0-4202-4b59-ac2c-022f0bc1b364', '1926Q', '', '苏泊尔套装锅', '苏泊尔烹饪用具', '套装锅', '1926Q', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('1f2cf963-4414-4870-8981-7c515bb8cf77', '1G1036', '', '芳草地钢丝球', '芳草地', '日杂', '1G1036', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('bd3c3dc8-3007-4e03-bd75-7d18d584b849', '1G1077', '', '芳草地百洁块', '芳草地', '日杂', '1G1077', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('073df9d0-5dc7-4254-886f-7ea4a773b29a', '1G1113*2', '', '芳草地百洁布', '芳草地', '日杂', '1G1113*2', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('97c3b42a-7417-405d-9c56-52e07fbab94f', '1G1133', '', '芳草地蒸笼布', '芳草地', '日杂', '1G1133', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('d2b8296e-ea5e-46b3-a119-66124f65346e', '1G3561', '', '芳草地吸油棉', '芳草地', '日杂', '1G3561', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('d1ce62dc-b54b-40ec-9dc3-bd5b8c9e8886', '1G3571', '', '芳草地吸油棉', '芳草地', '日杂', '1G3571', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('259b7618-bb29-4fca-bee0-0f0e7143a74e', '1G3762', '', '芳草地手套', '芳草地', '日杂', '1G3762', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('9b3e62e7-872b-4168-a167-918fd60e3178', '1G3763', '', '芳草地粘尘器', '芳草地', '日杂', '1G3763', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('c86c89b7-a735-4da1-bfbc-f0c04af85db5', '1G3765', '', '芳草地粘尘器', '芳草地', '日杂', '1G3765', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('6480ac15-448b-40ac-bc4f-8f5aca3aee75', '1G3777', '', '芳草地水槽垃圾过滤网', '芳草地', '日杂', '1G3777', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('da1bc250-ea1f-43d5-9be4-0b791f9d7288', '1G5302', '', '芳草地神奇抹布', '芳草地', '日杂', '1G5302', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('fbebf0f8-f086-4f4a-bfa2-04bb80451365', '1G5387', '', '芳草地一次性袖套', '芳草地', '日杂', '1G5387', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('b2fc9719-0a15-4d9b-a18c-3b119c1248c3', '1G5453', '', '芳草地手套', '芳草地', '日杂', '1G5453', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('1f1c603a-9040-4c49-b3c1-971593efe4b0', '1G5663*3', '', '芳草地蒸笼布', '芳草地', '日杂', '1G5663*3', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('59882099-02c3-480b-9243-f5faf9e1a045', '1G5821', '', '芳草地百洁布', '芳草地', '日杂', '1G5821', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('fd924629-3fb4-4ffa-9a3d-e7fb77e5d28f', '1G5852', '', '芳草地手套', '芳草地', '日杂', '1G5852', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('53cdd831-fe4d-4c95-9090-a179526b3304', '1G5871*2', '', '芳草地百洁布', '芳草地', '日杂', '1G5871*2', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('e537a0e9-47aa-4e38-9e7c-b425d65ab470', '1G5905', '', '芳草地围裙', '', '', '1G5905', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('152311e8-13da-4690-bc4b-6b0f890d876a', '1G6031', '', '芳草地手套', '', '', '1G6031', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('e29e7a1d-43c3-485d-a33b-edca6b5f5b1e', '1G6048', '', '芳草地手套', '芳草地', '日杂', '1G6048', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('8f87a7c2-23d1-41c5-813e-059361f3dd5a', '2001-C', '', '新思特奶锅', '新思特', '奶锅', '2001-C', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('6518f03d-0976-487f-bea8-052c7a6698f1', '20LA320-A', '', '九阳绞肉机', '', '', '20LA320', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('1848e2e8-acdc-4c2d-83fb-b5ab67a2be73', '20L白色单核', '', '百事车载冰箱', '其他', '日杂', '20L白色单核', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('5d890fc5-039c-4de5-be38-6e8b322bc7a4', '20L白色双核', '', '百事车载冰箱', '百事', '其他', '20L白色双核', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('7a79444e-47cf-4c60-a407-295d53685716', '20N1', '', '九阳电饭煲', '九阳', '电饭煲', '20N1', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('fea3751e-fa2c-4fc1-b1da-c5a33b231c94', '20N1F', '', '九阳电饭煲', '九阳', '电饭煲', '20N1F', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('fd2f9b79-c289-460f-89bc-0f0c0771032c', '20N6U', '', '九阳电饭煲', '九阳', '电饭煲', '20N6U', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('03904941-7b63-407a-9b88-0314624b1595', '20N7', '', '九阳电饭煲', '九阳', '电饭煲', '20N7', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('f08e88dd-6153-4baa-a79a-36a0cbf93d66', '20N7U', '', '九阳0涂层电饭煲', '九阳', '电饭煲', '20N7U', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('22c4039a-61c6-410f-b79a-6e66f51e65f0', '20WU3B', '', '九阳电水壶', '九阳', '电水壶', '20WU3B', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('1d665a9c-e562-447c-9fbe-f33bbf1b12ba', '20WU3T', '', '九阳电水壶', '九阳', '电水壶', '20WU3T', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('fec2a83a-20c0-4c13-bb6d-252f55a8e414', '20WY3J', '', '九阳养生壶', '九阳', '养生壶', '20WY3J', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('22ce0e9b-a114-455b-afbd-a6a077b8ca71', '21EV10芬妮鹿', '', '苏泊尔学饮杯', '苏泊尔餐饮具', '学饮杯', '21EV10', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('f1e6a6c8-c161-401a-b5b2-6e45af81168e', '220*240cm', '', '梦洁被芯', '梦洁', '日杂', '220*240cm', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('9af03b88-94cb-4e1e-83f4-7ba2bd4aa67a', '23FK930', '', '苏泊尔电蒸锅', '苏泊尔小家电', '电蒸锅', '23FK930', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('f5446643-aa20-4fb6-8100-097e11d13b14', '2401-C', '', '新思特汤锅', '新思特', '汤锅', '2401-C', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('1faca32f-6eb3-46af-999e-de13cc394100', '2808-C', '', '新思特汤锅', '新思特', '汤锅', '2808-C', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('c8476788-6e8a-44e1-ac75-6435e1530eaf', '30FC789', '', '苏泊尔电饭煲', '苏泊尔小家电', '电饭煲', '30FC789', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('625b7f52-cb1c-4fa5-9181-b0efd0423d73', '30FC996', '', '苏泊尔电饭煲', '苏泊尔小家电', '电饭煲', '30FC996', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('6744f653-2fd5-4f67-ade9-ef9c6adfd6ba', '30FK606', '', '苏泊尔电烤箱', '苏泊尔小家电', '电烤箱', '30FK606', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('0595c714-d9d8-4654-be9e-a9c4b7e23784', '30N1', '', '九阳电饭煲', '九阳', '电饭煲', '30N1', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('fdb6d314-0226-4d01-ad83-5b64662adc49', '30N1-B', '', '九阳电饭煲', '九阳', '电饭煲', '30N1-B', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('26de2509-2ddb-44a2-b60d-962e7f1550e1', '30N1S', '', '九阳电饭煲', '九阳', '电饭煲', '30N1S', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('d5ca33fd-4d0a-41bb-8d70-ace500f597b0', '30N1U', '', '九阳电饭煲', '九阳', '电饭煲', '30N1U', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('c323f41d-2532-4955-afaa-339f12526ed8', '30N2', '', '九阳电饭煲', '九阳', '电饭煲', '30N2', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('ddf58747-588e-4dd3-bbe3-b1facaa5f8b8', '30N5S', '', '九阳电饭煲', '九阳', '电饭煲', '30N5S', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('d3481c2d-c24f-48ad-820b-20068b7b8263', '30N6', '', '九阳电饭煲', '九阳', '电饭煲', '30N6', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('1a13678e-cbf2-4d60-befa-126928e6fafb', '30N6S', '', '九阳电饭煲', '九阳', '电饭煲', '30N6S', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('b38f29fd-230f-4a42-bb57-61904792bace', '30N7S', '', '九阳电饭煲', '九阳', '电饭煲', '30N7S', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('5648a8e9-ffc4-4d6c-b2a2-062803e73201', '30NS1', '', '九阳电压力锅', '九阳', '电压力锅', '30NS1', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('8534428b-f162-44c2-afc1-5542957556f8', '318K', '', '格来德电水壶', '格来德', '电水壶', '318K', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('5a5d1d7f-fc4e-4fe3-bb88-62dcf17c7304', '3201-C', '', '九阳炒锅', '九阳', '炒锅', '3201-C', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('ea16c347-0930-430b-bebe-226cc845dfaa', '3213-C', '', '新思特炒锅', '新思特', '炒锅', '3213-C', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('993dfeeb-9b16-42c8-b0ad-c0a0d80d3d10', '325S', '', '格来德电水壶', '格来德', '电水壶', '325S', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('ebab4dac-6f52-4098-8e31-8d6b14df02da', '32cm锅盖', '', '苏泊尔32cm锅盖', '苏泊尔烹饪用具', '配件', '32cm锅盖', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('8abc6bd4-b67e-45e3-aeaa-ec8d749a2250', '3G3107', '', '芳草地塑料杯', '芳草地', '塑料杯', '3G3107', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('44450efd-9e74-4c06-be26-fcaabc08467a', '3G3122单包', '', '芳草地塑料碗', '芳草地', '日杂', '3G3122', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('df119345-bc1b-4175-83db-f51a13f91a9c', '3G3126', '', '芳草地保鲜袋', '芳草地', '日杂', '3G3126', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('6288d137-2d73-45bf-9899-a9a07713c486', '3G3127', '', '芳草地保鲜袋', '芳草地', '日杂', '3G3127', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('c73b64c0-597a-4f11-8e30-a9afa5d6a36c', '3G3129', '', '芳草地棉签', '芳草地', '日杂', '3G3129', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('fb86dbfa-75b3-420f-9cd1-0ebd48bb1297', '3G3138*2', '', '芳草地牙签', '芳草地', '日杂', '3G3138*2', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('9fe82986-3605-447c-9243-eef2f3cf554a', '3G3155*4', '', '芳草地蒸笼布', '芳草地', '日杂', '3G3155*4', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('9e23eebd-8579-4adc-a048-bec936b943c6', '3G3156*3', '', '芳草地蒸笼布', '芳草地', '日杂', '3G3156*3', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('3452189f-e0ef-4623-8682-95169c0efe77', '3G3171', '', '芳草地垃圾袋', '', '', '3G3171', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('6a48a966-a13b-487e-8fe8-21b84b588058', '3G3191*2（新货号：3G6107)', '', '芳草地水果叉', '芳草地', '日杂', '3G3191*2', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('4bfdd135-7cac-4e0c-8e15-70d2fe4e8fb6', '3G3207*2（新货号：3G6106)', '', '芳草地一次性筷子', '芳草地', '日杂', '3G3207*2', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('84109637-87c2-4084-8500-0139c612db6a', '3G3227', '', '芳草地手套', '芳草地', '日杂', '3G3227', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('31546c28-0a03-4a46-a9af-672cc2d067ad', '3G3244', '', '芳草地塑料杯', '芳草地', '塑料杯', '3G3244', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('42f14f73-2641-43b3-af80-8c63d3cc5f78', '3G3244*2', '', '芳草地塑料杯', '芳草地', '塑料杯', '3G3244*2', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('f1a1cca6-ba32-4a5d-a6cf-8c69f45d90fd', '3G3246', '', '芳草地纸碗', '芳草地', '日杂', '3G3246', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('93180e24-43a4-4e38-8792-5c8d193336fd', '3G3253', '', '芳草地吸管', '芳草地', '日杂', '3G3253', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('21d8d3a4-1352-4cf6-9225-c32c3002c8e5', '3G3253*5', '', '芳草地吸管', '芳草地', '日杂', '3G3253*5', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('1ba31507-88c6-40d3-811c-95182abe32c4', '3G3256*5', '', '芳草地垃圾袋', '芳草地', '日杂', '3G3256*5', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('143df292-4370-4d43-a1ec-d61e4241e934', '3G3257*4', '', '芳草地垃圾袋', '芳草地', '日杂', '3G3257*4', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('2cfa0a81-560f-4ce6-9a22-b636546b91f3', '3G3258', '', '芳草地垃圾袋', '', '', '3G3258', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('b85cf592-5ad6-4847-91a1-5221ef943eac', '3G3270', '', '芳草地蒸笼纸', '芳草地', '日杂', '3G3270', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('0287af44-b237-4102-9046-3d19914eda62', '3G3336*2', '', '芳草地蒸笼纸', '芳草地', '日杂', '3G3336*2', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('0ee77b59-78d8-41e6-9dd6-f30d8135be7d', '3G3337', '', '芳草地蒸笼纸', '芳草地', '日杂', '3G3337', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('0f4e63e1-20e8-4004-baaa-c2dd12de750f', '3G3338', '', '芳草地一次性筷子', '芳草地', '日杂', '3G3338', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('f6057618-2416-4e1c-aa16-a86eff9357a9', '3G3372', '', '芳草地牙签牙线组合', '芳草地', '日杂', '3G3372', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('0d8551ef-bca9-4f49-bab6-43eff76c7eca', '3G3389', '', '芳草地手套', '芳草地', '日杂', '3G3389', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('5a98af69-5d83-4e97-938b-db9d0520c18a', '3G3389*2', '', '芳草地手套', '芳草地', '日杂', '3G3389*2', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('5177a2f0-8fca-4da4-b101-a8e6de0a0b39', '3G3390', '', '芳草地手套', '芳草地', '日杂', '3G3390', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('0f971495-6edf-4dc6-be19-d83067e801e0', '3G3398', '', '芳草地蛋挞托', '芳草地', '日杂', '3G3398', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('592cc2bd-a12b-490e-9eba-b64b2c61c27e', '3G3500', '', '芳草地锡纸盘', '芳草地', '日杂', '3G3500', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('944e1506-d634-4b0a-b49a-3618ff6aa76c', '3G3501', '', '芳草地锡纸盘', '芳草地', '日杂', '3G3501', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('3d68fb2b-6e07-44a6-8a23-84583c282f8f', '3G3503', '', '芳草地垃圾袋', '芳草地', '日杂', '3G3503', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('9a68a1ba-48b4-4b72-b3cf-09db8178126d', '3G3506', '', '芳草地塑料杯', '芳草地', '塑料杯', '3G3506', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('8332ea91-185a-4742-9abe-e0c006f1855d', '3G3507', '', '芳草地塑料杯', '芳草地', '塑料杯', '3G3507', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('29d78fb7-6d60-4df5-b5c3-5908ccbd417d', '3G3508', '', '芳草地压缩洗脸巾', '芳草地', '日杂', '3G3508', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('88ac52b4-821f-4eac-ad23-8fb3eb75a6b4', '3G3510', '', '芳草地浴巾', '芳草地', '日杂', '3G3510', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('1792b2ad-be61-4e5a-92fd-eeed2a8bc5b9', '3G3511', '', '芳草地压缩浴巾', '芳草地', '日杂', '3G3511', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('c14e3f93-a964-47a3-bf4a-3c11a806ad1f', '3G3522', '', '芳草地一次性围裙', '芳草地', '日杂', '3G3522', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('b3f95d95-5e22-46bd-9aeb-4d4834efc497', '3G3542', '', '芳草地一次性马桶套', '芳草地', '日杂', '3G3542', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('d2f1a60c-7b00-4b1d-94db-e7134adad79c', '3G3545*2', '', '芳草地牙签', '芳草地', '日杂', '3G3545*2', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('06ff9b8c-6278-4140-9cae-1708bb291d3a', '3G3547*2', '', '芳草地瓶装牙签', '芳草地', '日杂', '3G3547*2', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('4c9092f0-d43a-45c4-b2ca-c8304984add6', '3G3556', '', '芳草地背心保鲜袋', '芳草地', '日杂', '3G3556', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('f116c7a2-d439-42d2-905d-ea41fd1b1630', '3G3558', '', '芳草地纸杯', '芳草地', '日杂', '3G3558', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('fd752c3b-0157-4bfd-ba6f-24859d3fd750', '3G3563*2', '', '芳草地防尘罩', '芳草地', '日杂', '3G3563*2', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('f7acbce3-a2b3-4ef3-8c0c-c09c155512ac', '3G3580', '', '芳草地保鲜膜套', '芳草地', '日杂', '3G3580', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('a11dc756-dc71-4fac-8c99-8ec405093ff2', '3G3590', '', '芳草地桌布罩', '芳草地', '日杂', '3G3590', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('73948348-3692-4e1e-835b-a0842caf8c8b', '3G3591', '', '芳草地桌布罩', '芳草地', '日杂', '3G3591', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('9e520c27-3b08-472c-abbe-10c63e2dfe00', '3G3591H', '', '芳草地桌布罩', '芳草地', '日杂', '3G3591H', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('31860a19-0841-4421-943d-001bd5a2175f', '3G3592H', '', '芳草地桌布罩', '芳草地', '日杂', '3G3592H', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('dec512d5-88b6-4541-9230-f3370f439d55', '3G3593H', '', '芳草地桌布罩', '芳草地', '日杂', '3G3593H', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('fd3903b8-fdb4-4b95-aeae-90d9b6992761', '3G3595', '', '芳草地桌布罩', '芳草地', '日杂', '3G3595', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('ddccd48f-0693-4d3b-82c8-d05924908203', '3G3751', '', '芳草地一次性筷子', '芳草地', '日杂', '3G3751', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('8e04a9b4-e323-4a83-89d2-c76d039e7daa', '3G3760', '', '芳草地保鲜膜套', '芳草地', '日杂', '3G3760', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('f2195f61-6632-4ba8-aa02-d52e1ca8c90a', '3G3761', '', '芳草地纸碗', '芳草地', '日杂', '3G3761', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('972651ac-c98d-495e-8b56-91c4589b6d72', '3G3767', '', '芳草地纸碗', '芳草地', '日杂', '3G3767', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('3a7171ea-e6f4-4232-9b60-435afd505363', '3G3769', '', '芳草地儿童手套', '芳草地', '日杂', '3G3769', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('151fe180-f5ad-4d92-9106-c9c3ef508ff2', '3G3771', '', '芳草地纸杯', '芳草地', '日杂', '3G3771', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('4e50d398-637d-486f-b0eb-d981858e754c', '3G3775', '', '芳草地纸杯', '芳草地', '日杂', '3G3775', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('70ba43de-e541-41e6-9d82-41a32f3f107d', '3G5389', '', '芳草地勺子', '芳草地', '日杂', '3G5389', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('fdc3dd42-f0c0-4d67-b126-38e45bc68d17', '3G5390', '', '芳草地勺子', '芳草地', '日杂', '3G5390', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('5a61573e-851d-4b21-8d91-998b4927a8cf', '3G5426', '', '芳草地塑料杯', '芳草地', '塑料杯', '3G5426', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('6623e2c0-8469-468f-bece-cf60b7af3c0a', '3G5433', '', '芳草地塑料杯', '芳草地', '塑料杯', '3G5433', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('d413f217-5814-4d49-8895-d0dc6e75e73b', '3G5443', '', '芳草地塑料杯', '芳草地', '塑料杯', '3G5443', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('ba285826-ad21-4a1f-a502-09e730626649', '3G5445', '', '芳草地塑料杯', '芳草地', '塑料杯', '3G5445', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('ddba523a-b5cb-40d9-805a-b6d2c5fd47f6', '3G5446', '', '芳草地塑料杯', '芳草地', '塑料杯', '3G5446', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('78558717-f60e-40c1-b27e-a7eaf7bb1ed3', '3G5448', '', '芳草地塑料碗', '芳草地', '日杂', '3G5448', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('213e9d55-e497-487b-8bf7-37bde417ec3a', '3G5458-200', '', '芳草地打包餐盒', '芳草地', '日杂', '3G5458', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('e27abb45-cb9d-4b0e-8d9a-ab408d7926e8', '3G5459', '', '芳草地勺子', '芳草地', '日杂', '3G5459', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('f8f2a37b-7077-4534-a55c-8b662b78913f', '3G5462', '', '芳草地塑料碗', '芳草地', '日杂', '3G5462', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('80971463-985e-40be-ab84-716ecbbf87c9', '3G5464', '', '芳草地纸碗', '芳草地', '日杂', '3G5464', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('3bf7bb7e-b6a2-4a0c-a3ee-3d535e199f09', '3G5480', '', '芳草地纸碗', '芳草地', '日杂', '3G5480', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('bb0ffbac-253d-4214-894f-fc3230fe9922', '3G5481', '', '芳草地纸碗', '芳草地', '日杂', '3G5481', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('082eb58c-95ca-4726-b557-1bf3098eb691', '3G5485', '', '芳草地叉子', '芳草地', '日杂', '3G5485', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('ed82f9be-ddbd-4e1e-b87b-7143e78e0939', '3G5495', '', '芳草地勺子', '芳草地', '日杂', '3G5495', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('bd8878d1-b880-4bde-abbb-b84e78ccb27a', '3G5595', '', '芳草地勺子', '芳草地', '日杂', '3G5595', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('4c6f888b-c8f6-4bb0-8bf1-c38efd6cc3b2', '3G5597', '', '芳草地吸油纸', '芳草地', '日杂', '3G5597', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('7fbf0067-ef74-496c-8d92-1108bef73d28', '3G5669', '', '芳草地一次性鞋套', '芳草地', '日杂', '3G5669', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('b5e5b29d-a062-4e5e-b637-8c66fe90074d', '3G5670*5', '', '芳草地儿童手套', '芳草地', '日杂', '3G5670*5', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('6e6d7f29-3a89-4b14-98ec-64d89e7fd118', '3G5691*20', '', '芳草地一次性筷子', '芳草地', '日杂', '3G5691*20', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('4337141d-73fb-459c-a8a1-2a0353affd30', '3G5691*36', '', '芳草地一次性筷子', '芳草地', '日杂', '3G5691*36', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('abbb09d5-b27e-4cb3-860d-0a2531317612', '3G5691*4', '', '芳草地一次性筷子', '芳草地', '日杂', '3G5691*4', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('4481859d-c183-4264-bbf7-a75cef0692e4', '3G5692', '', '芳草地烧烤竹签', '芳草地', '日杂', '3G5692', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('95fd1765-ecb5-4f48-90ae-7ef898fb5398', '3G5692+3G5777*2', '', '芳草地烧烤竹签', '芳草地', '日杂', '3G5692+3G5777*2', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('d9c53019-b826-4ce7-971e-41c653d09dca', '3G5733*2', '', '芳草地保鲜膜', '芳草地', '日杂', '3G5733*2', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('8e795c7e-bc6d-409b-a1d1-2ec52d0b183b', '3G5734*2', '', '芳草地保鲜膜', '芳草地', '日杂', '3G5734*2', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('6ed239a2-f8bb-43c0-8c8d-c0a1ff7f9565', '3G5736', '', '芳草地塑料盘', '芳草地', '日杂', '3G5736', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('28ad9f2c-c9e4-4c3a-bc92-86efa6d51573', '3G5742*6', '', '芳草地吸管', '芳草地', '日杂', '3G5742*6', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('fc94e5ce-0ab6-4fdf-81f6-3f974d7d87fb', '3G5743*5', '', '芳草地叉子', '芳草地', '日杂', '3G5743*5', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('937b9cbe-9c8b-4f89-99b8-9753f8614240', '3G5744*5', '', '芳草地勺子', '芳草地', '日杂', '3G5744*5', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('8d2de2be-7c9b-4152-bc35-f16de72c34e1', '3G5764', '', '芳草地纸杯', '芳草地', '日杂', '3G5764', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('f8c16120-ecef-4a0b-9069-ed8e23e9a9c2', '3G5767', '', '芳草地保鲜袋', '芳草地', '日杂', '3G5767', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('ada73aa7-63f3-4c63-bbe0-bbc00a6d1b6f', '3G5769', '', '芳草地纸杯', '芳草地', '日杂', '3G5769', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('72e2f38b-c281-488b-915e-12c98671ddb2', '3G5776', '', '芳草地纸杯', '芳草地', '日杂', '3G5776', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('6a2f4e6f-3a34-49ab-b73c-b30bb53bada5', '3G5777*2', '', '芳草地烧烤竹签', '芳草地', '日杂', '3G5777*2', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('bec40eeb-20f2-4356-a48b-1dd6edccfcda', '3G5778', '', '芳草地烧烤竹签', '芳草地', '日杂', '3G5778', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('5b9ef5d8-c5fa-4393-8362-45aeb2cd006a', '3G5830*2', '', '芳草地清洁刷', '', '', '3G5830*2', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('6abc05af-8969-4ea1-af9b-9f45a29cca6b', '3G5892*6', '', '芳草地棉签', '芳草地', '日杂', '3G5892*6', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('78085347-aeb9-492f-96e0-f8eaf15f3040', '3G5955厂直', '', '芳草地手套', '芳草地', '日杂', '3G5955', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('2f5a825f-c02c-4f2f-b972-15fa714a2db3', '3G5961', '', '芳草地桌布', '芳草地', '日杂', '3G5961', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('01ec5f71-32a9-402a-b1e9-8ca23ec0d946', '3G5961H', '', '芳草地桌布', '芳草地', '日杂', '3G5961H', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('a194acde-3a67-45bb-81ad-6f0fdea9ed0b', '3G5962', '', '芳草地桌布', '芳草地', '日杂', '3G5962', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('ef09a36a-3751-4dd3-8206-01cd2024b7e7', '3G5962H', '', '芳草地桌布', '芳草地', '日杂', '3G5962H', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('a398a5ee-74f3-453d-8a5c-1a848ef40120', '3G5963', '', '芳草地桌布', '芳草地', '日杂', '3G5963', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('03f4fc44-10df-44a4-a57b-b1b6519f77ad', '3G5963H', '', '芳草地桌布', '芳草地', '日杂', '3G5963H', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('861a74a0-252c-4834-844c-d64da174c0c8', '3G6000', '', '芳草地纸碗', '芳草地', '日杂', '3G6000', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('17383a3d-6a23-46b7-9a68-7f74aacc7b9a', '3G6001', '', '芳草地纸碗', '芳草地', '日杂', '3G6001', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('9f5220d6-5481-4af8-b330-ce5da95001fb', '3G6002', '', '芳草地纸碗', '芳草地', '日杂', '3G6002', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('9f3ff05f-38e0-4c87-8518-a0a0c88ae852', '3G6003', '', '芳草地纸碗', '芳草地', '日杂', '3G6003', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('f2abe4c4-adab-461d-928f-a713cbeba871', '3G6004', '', '芳草地纸碗', '芳草地', '日杂', '3G6004', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('8087700f-0182-4e8a-a5b0-dff0ae99a4ac', '3G6005', '', '芳草地纸碗', '芳草地', '日杂', '3G6005', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('6821cc2b-87a3-47e5-865e-f1fcac51821f', '3G6007', '', '芳草地塑料碗', '芳草地', '日杂', '3G6007', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('67a00bbd-9c56-4293-a278-29df4c1048eb', '3G6008', '', '芳草地打包塑料餐盒', '芳草地', '日杂', '3G6008', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('e486c0bd-61b2-4c87-89e8-979484309c24', '3G6009', '', '芳草地塑料碗', '芳草地', '日杂', '3G6009', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('8e618830-bcd3-450c-80e3-4078b3bf0f1e', '3G6010', '', '芳草地塑料碗', '芳草地', '日杂', '3G6010', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('ee3a814b-8796-4e58-8bef-fdac1da36092', '3G6011', '', '芳草地塑料碗', '芳草地', '日杂', '3G6011', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('5a641b0b-77a2-4e5d-8567-47d28574c6a3', '3G6013', '', '芳草地打包餐盒', '芳草地', '日杂', '3G6013', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,
     spec = EXCLUDED.spec,
     updated_at = NOW();
-INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
+INSERT INTO products (id, sku, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('93596a1e-fddb-4331-bed4-4af139e537a9', '3G6014', '', '芳草地打包塑料餐盒', '芳草地', '日杂', '3G6014', 'pcs', 0, 0, '在售', true, NOW(), NOW())
-ON CONFLICT (code) DO UPDATE SET 
+ON CONFLICT (sku) DO UPDATE SET 
     name = EXCLUDED.name,
     brand = EXCLUDED.brand,
     category = EXCLUDED.category,

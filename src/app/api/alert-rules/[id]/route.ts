@@ -61,13 +61,14 @@ export async function PUT(
 
   try {
     const body = await request.json();
-    const { name, config, priority, isEnabled, notificationChannels, description } = body;
+    const { name, type, config, priority, isEnabled, notificationChannels, description } = body;
 
     const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
     };
 
     if (name !== undefined) updateData.name = name;
+    if (type !== undefined) updateData.type = type;
     if (config !== undefined) updateData.config = config;
     if (priority !== undefined) updateData.priority = priority;
     if (isEnabled !== undefined) updateData.is_enabled = isEnabled;

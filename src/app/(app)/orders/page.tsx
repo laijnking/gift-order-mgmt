@@ -32,6 +32,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
+import { getOrderStatusBadgeClass, getOrderStatusLabel, ORDER_STATUS_OPTIONS } from '@/lib/order-status';
 import { toast } from 'sonner';
 import {
   Package,
@@ -120,10 +121,12 @@ interface Order {
   };
   customerCode?: string;
   customerName?: string;
+  salesperson?: string;
   salespersonName?: string;
   operatorName?: string;
   supplierId?: string;
   supplierName?: string;
+  assignedBatch?: string;
   expressCompany?: string;
   trackingNo?: string;
   warehouse?: string;
@@ -165,16 +168,6 @@ interface AlertRecord {
   isResolved: boolean;
   createdAt: string;
 }
-
-const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  pending: { label: '待派发', color: 'bg-yellow-100 text-yellow-800' },
-  assigned: { label: '已分派', color: 'bg-blue-100 text-blue-800' },
-  notified: { label: '通知发货', color: 'bg-purple-100 text-purple-800' },
-  partial_returned: { label: '部分回单', color: 'bg-orange-100 text-orange-800' },
-  returned: { label: '已回传', color: 'bg-green-100 text-green-800' },
-  completed: { label: '已完成', color: 'bg-gray-100 text-gray-800' },
-  cancelled: { label: '已取消', color: 'bg-red-100 text-red-800' },
-};
 
 // 预警级别配置
 const ALERT_LEVEL_CONFIG: Record<string, { label: string; color: string; bgColor: string }> = {
@@ -751,13 +744,16 @@ useEffect(() => {
   const getDeleteDisabledReason = (order: Order): string | null => {
     if (order.status === 'assigned') return '订单已派发供应商，无法删除';
     if (order.status === 'partial_returned') return '订单正在回单处理中，无法删除';
-    if (order.status === 'completed') return '订单已完成归档，无法删除';
+    if (order.status === 'returned') return '订单已回单，需先完成客户反馈/财务处理，无法删除';
+    if (order.status === 'feedbacked') return '订单已反馈客户，等待导出金蝶，无法删除';
+    if (order.status === 'completed') return '订单已导出金蝶归档，无法删除';
     return null;
   };
 
   // 获取订单不可编辑的原因
   const getEditDisabledReason = (order: Order): string | null => {
-    if (order.status === 'completed') return '订单已完成归档，无法编辑';
+    if (order.status === 'completed') return '订单已导出金蝶归档，无法编辑';
+    if (order.status === 'feedbacked') return '订单已反馈客户，建议仅做财务归档处理';
     if (order.status === 'partial_returned') return '订单正在回单处理中，编辑功能受限';
     return null;
   };
@@ -766,17 +762,19 @@ useEffect(() => {
   const getEditableFieldsHint = (order: Order): string => {
     if (order.status === 'pending') return '可编辑所有信息';
     if (order.status === 'assigned') return '仅可编辑收货人、电话、地址、备注';
+    if (order.status === 'returned') return '可修正快递信息、收货信息、备注';
+    if (order.status === 'feedbacked') return '已反馈客户，建议不再修改业务信息';
     if (order.status === 'partial_returned') return '仅可编辑收货人、电话、地址、备注';
     if (order.status === 'cancelled') return '可编辑所有信息';
     return '';
   };
 
-  // 检查订单是否可以删除（已派发、已完成、部分回单不能删除）
+  // 检查订单是否可以删除（进入业务闭环后的订单不能直接删除）
   const canDeleteOrder = (order: Order): boolean => {
-    return !['assigned', 'partial_returned', 'completed'].includes(order.status);
+    return !['assigned', 'partial_returned', 'returned', 'feedbacked', 'completed'].includes(order.status);
   };
 
-  // 检查订单是否可以编辑（已完成不能编辑）
+  // 检查订单是否可以编辑（已导出金蝶归档后不能编辑）
   const canEditOrder = (order: Order): boolean => {
     return order.status !== 'completed';
   };
@@ -1043,7 +1041,7 @@ useEffect(() => {
   const handleSmartMatch = async () => {
     const targetOrderIds = assigningOrderId 
       ? [assigningOrderId]
-      : Array.from(selectedOrders);
+      : Array.from(selectedOrders).map(order => order.id);
     
     if (targetOrderIds.length === 0) {
       toast.error('请选择要分配的订单');
@@ -1261,18 +1259,45 @@ useEffect(() => {
     toast.info('请通过"物流回单"功能录入快递单号完成发货');
   };
 
-  // --- Archive orders (订单归档) ---
-  const handleBatchArchive = async () => {
+  // --- Export to Kingdee and archive (导出金蝶并归档) ---
+  const handleExportKingdee = async () => {
     const targetIds: string[] = selectedOrders.size > 0
       ? Array.from(selectedOrders).map(o => o.id)
-      : filteredOrders.filter((o) => o.status === 'returned').map((o) => o.id);
+      : filteredOrders.filter((o) => o.status === 'feedbacked').map((o) => o.id);
 
     if (targetIds.length === 0) {
-      toast.error('没有可归档的订单（需已回单状态）');
+      toast.error('没有可导出金蝶的订单（需已反馈状态）');
       return;
     }
 
     try {
+      const targetOrders = orders.filter((o) => targetIds.includes(o.id) && o.status === 'feedbacked');
+      const header = '系统单号\t客户单号\t客户\t收货人\t电话\t地址\t商品\t数量\t供应商\t快递公司\t快递单号\t业务员\t跟单员\t派发批次';
+      const rows = targetOrders.map((o) => [
+        o.sysOrderNo || '',
+        o.orderNo || '',
+        o.customerName || '',
+        o.receiver.name || '',
+        o.receiver.phone || '',
+        o.receiver.address || '',
+        o.items.map((i) => i.productName || i.cuProductName || '').join('; '),
+        o.items.reduce((sum, item) => sum + (item.quantity || 0), 0),
+        o.supplierName || '',
+        o.expressCompany || '',
+        o.trackingNo || '',
+        o.salespersonName || o.salesperson || '',
+        o.operatorName || '',
+        o.assignedBatch || '',
+      ].join('\t'));
+
+      const blob = new Blob(['﻿' + header + '\n' + rows.join('\n')], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `金蝶导出_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+
       const promises = targetIds.map((id) =>
         fetch('/api/orders', {
           method: 'PATCH',
@@ -1283,64 +1308,65 @@ useEffect(() => {
       const results = await Promise.all(promises);
       const dataArr = await Promise.all(results.map((r) => r.json()));
       const successCount = dataArr.filter((d) => d.success).length;
-      toast.success(`成功归档 ${successCount} 条订单`);
+      toast.success(`已导出金蝶并归档 ${successCount} 条订单`);
       setSelectedOrders(new Set());
       fetchOrders();
     } catch (error) {
-      toast.error('归档失败');
+      toast.error('导出金蝶失败');
     }
   };
 
   // --- Ship notice (发货通知) ---
   const handleShipNotice = async () => {
-    const targetIds: string[] = selectedOrders.size > 0
-      ? Array.from(selectedOrders).map(o => o.id)
-      : filteredOrders.filter((o) => o.status === 'assigned').map((o) => o.id);
+    const hasAssignedOrders = selectedOrders.size > 0
+      ? Array.from(selectedOrders).some((o) => o.status === 'assigned')
+      : filteredOrders.some((o) => o.status === 'assigned');
 
-    if (targetIds.length === 0) {
-      toast.error('请先选择已分派的订单');
+    if (!hasAssignedOrders) {
+      toast.error('请先选择已派发给供应商的订单');
       return;
     }
 
-    // 更新订单状态为"通知发货"
-    try {
-      const promises = targetIds.map((id) =>
-        fetch('/api/orders', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id, status: 'notified' }),
-        })
-      );
-      const results = await Promise.all(promises);
-      const dataArr = await Promise.all(results.map((r) => r.json()));
-      const successCount = dataArr.filter((d) => d.success).length;
-      toast.success(`已通知发货 ${successCount} 条订单`);
-      setSelectedOrders(new Set());
-      fetchOrders();
-    } catch (error) {
-      toast.error('操作失败');
-    }
+    toast.info('发货通知单请在“发货通知单”页面按供应商批量导出');
+    window.location.href = '/shipping-export';
   };
 
   // --- Feedback to customer (反馈给客户) ---
-  const handleFeedback = () => {
+  const handleFeedback = async () => {
     const targetIds: string[] = selectedOrders.size > 0
       ? Array.from(selectedOrders).map(o => o.id)
-      : filteredOrders.filter((o) => o.status === 'returned' || o.status === 'completed').map((o) => o.id);
+      : filteredOrders.filter((o) => o.status === 'returned').map((o) => o.id);
 
     if (targetIds.length === 0) {
-      toast.error('没有可反馈的订单');
+      toast.error('没有可反馈的订单（需已回单状态）');
       return;
     }
 
-    const targetOrders = orders.filter((o) => targetIds.includes(o.id));
+    const targetOrders = orders.filter((o) => targetIds.includes(o.id) && o.status === 'returned');
     const lines = targetOrders.map(
       (o) =>
         `${o.sysOrderNo || o.orderNo}\t${o.receiver.name}\t${o.receiver.phone}\t${o.receiver.address}\t${o.supplierName || '-'}\t${o.trackingNo || '-'}\t${o.expressCompany || '-'}`
     );
     const text = `系统单号\t收货人\t电话\t地址\t供应商\t快递单号\t快递公司\n${lines.join('\n')}`;
     navigator.clipboard.writeText(text);
-    toast.success(`已复制 ${targetOrders.length} 条订单信息到剪贴板，可粘贴发送给客户`);
+
+    try {
+      const promises = targetOrders.map((order) =>
+        fetch('/api/orders', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: order.id, status: 'feedbacked' }),
+        })
+      );
+      const results = await Promise.all(promises);
+      const dataArr = await Promise.all(results.map((r) => r.json()));
+      const successCount = dataArr.filter((d) => d.success).length;
+      toast.success(`已复制 ${targetOrders.length} 条订单信息，并标记 ${successCount} 条为已反馈`);
+      setSelectedOrders(new Set());
+      fetchOrders();
+    } catch (error) {
+      toast.warning('已复制反馈内容，但状态标记失败，请稍后重试');
+    }
   };
 
   // --- Export ---
@@ -1371,7 +1397,7 @@ useEffect(() => {
         o.items.reduce((s, i) => s + (i.price || 0), 0).toFixed(2),
         o.salespersonName || '',
         o.operatorName || '',
-        STATUS_CONFIG[o.status]?.label || o.status,
+        getOrderStatusLabel(o.status),
         o.supplierName || '',
         o.expressCompany || '',
         o.trackingNo || '',
@@ -1434,10 +1460,13 @@ useEffect(() => {
     (o) => o.status === 'pending'
   ).length;
   const selectedAssignedCount = Array.from(selectedOrders).filter(
-    (o) => o.status === 'assigned' || o.status === 'notified'
+    (o) => o.status === 'assigned'
   ).length;
   const selectedReturnableCount = Array.from(selectedOrders).filter(
-    (o) => o.status === 'returned' || o.status === 'completed'
+    (o) => o.status === 'returned'
+  ).length;
+  const selectedFeedbackedCount = Array.from(selectedOrders).filter(
+    (o) => o.status === 'feedbacked'
   ).length;
 
   // 统计未归档订单数
@@ -1707,11 +1736,11 @@ useEffect(() => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleBatchArchive}
-                disabled={selectedOrders.size > 0 && selectedReturnableCount === 0}
+                onClick={handleExportKingdee}
+                disabled={selectedOrders.size > 0 && selectedFeedbackedCount === 0}
               >
                 <Archive className="w-4 h-4 mr-1.5" />
-                订单归档
+                导出金蝶
               </Button>
             </div>
           </CardContent>
@@ -1785,7 +1814,7 @@ useEffect(() => {
                         已选 {selectedStatuses.length} 个状态
                       </span>
                     ) : statusFilter ? (
-                      <span className="truncate">{STATUS_CONFIG[statusFilter]?.label || statusFilter}</span>
+                      <span className="truncate">{getOrderStatusLabel(statusFilter)}</span>
                     ) : (
                       <span className="text-muted-foreground truncate">全部状态</span>
                     )}
@@ -1821,54 +1850,54 @@ useEffect(() => {
                     {/* 单选模式：单个状态 */}
                     <div className="px-2 py-1.5">
                       <div className="text-xs text-muted-foreground mb-1">单选</div>
-                      {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
+                      {ORDER_STATUS_OPTIONS.map((option) => (
                         <button
-                          key={key}
+                          key={option.value}
                           onClick={() => {
-                            setStatusFilter(key);
+                            setStatusFilter(option.value);
                             setSelectedStatuses([]);
                           }}
                           className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-muted cursor-pointer flex items-center gap-2 ${
-                            statusFilter === key && selectedStatuses.length === 0 ? 'bg-primary/10 text-primary' : ''
+                            statusFilter === option.value && selectedStatuses.length === 0 ? 'bg-primary/10 text-primary' : ''
                           }`}
                         >
                           <div className={`h-4 w-4 border rounded ${
-                            statusFilter === key && selectedStatuses.length === 0 ? 'bg-primary border-primary' : 'border-muted-foreground'
+                            statusFilter === option.value && selectedStatuses.length === 0 ? 'bg-primary border-primary' : 'border-muted-foreground'
                           }`}>
-                            {statusFilter === key && selectedStatuses.length === 0 && (
+                            {statusFilter === option.value && selectedStatuses.length === 0 && (
                               <Check className="h-3 w-3 text-white" />
                             )}
                           </div>
-                          {cfg.label}
+                          {option.label}
                         </button>
                       ))}
                     </div>
                     {/* 多选模式 */}
                     <div className="px-2 py-1.5 border-t">
                       <div className="text-xs text-muted-foreground mb-1">多选</div>
-                      {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
+                      {ORDER_STATUS_OPTIONS.map((option) => (
                         <button
-                          key={key}
+                          key={option.value}
                           onClick={() => {
                             setStatusFilter(''); // 清空单选
                             setSelectedStatuses(prev => 
-                              prev.includes(key) 
-                                ? prev.filter(k => k !== key)
-                                : [...prev, key]
+                              prev.includes(option.value) 
+                                ? prev.filter(k => k !== option.value)
+                                : [...prev, option.value]
                             );
                           }}
                           className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-muted cursor-pointer flex items-center gap-2 ${
-                            selectedStatuses.includes(key) ? 'bg-primary/10 text-primary' : ''
+                            selectedStatuses.includes(option.value) ? 'bg-primary/10 text-primary' : ''
                           }`}
                         >
                           <div className={`h-4 w-4 border rounded flex items-center justify-center ${
-                            selectedStatuses.includes(key) ? 'bg-primary border-primary' : 'border-muted-foreground'
+                            selectedStatuses.includes(option.value) ? 'bg-primary border-primary' : 'border-muted-foreground'
                           }`}>
-                            {selectedStatuses.includes(key) && (
+                            {selectedStatuses.includes(option.value) && (
                               <Check className="h-3 w-3 text-white" />
                             )}
                           </div>
-                          {cfg.label}
+                          {option.label}
                         </button>
                       ))}
                     </div>
@@ -2158,8 +2187,8 @@ useEffect(() => {
                       {order.operatorName || '-'}
                     </TableCell>
                     <TableCell>
-                      <Badge className={STATUS_CONFIG[order.status]?.color}>
-                        {STATUS_CONFIG[order.status]?.label || order.status}
+                      <Badge className={getOrderStatusBadgeClass(order.status)}>
+                        {getOrderStatusLabel(order.status)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm">
@@ -2257,8 +2286,8 @@ useEffect(() => {
                 )}
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground mb-1">状态</h4>
-                  <Badge className={STATUS_CONFIG[selectedOrder.status]?.color}>
-                    {STATUS_CONFIG[selectedOrder.status]?.label}
+                  <Badge className={getOrderStatusBadgeClass(selectedOrder.status)}>
+                    {getOrderStatusLabel(selectedOrder.status)}
                   </Badge>
                   {/* 操作约束提示 */}
                   <div className="mt-2 text-xs text-muted-foreground space-y-1">
@@ -2989,8 +3018,8 @@ useEffect(() => {
             <DialogDescription>
               {editForm.status && (
                 <div className="mt-1 flex items-center gap-2">
-                  <Badge className={STATUS_CONFIG[editForm.status]?.color}>
-                    {STATUS_CONFIG[editForm.status]?.label}
+                  <Badge className={getOrderStatusBadgeClass(editForm.status)}>
+                    {getOrderStatusLabel(editForm.status)}
                   </Badge>
                   {editForm.status === 'assigned' || editForm.status === 'partial_returned' ? (
                     <span className="text-xs text-muted-foreground">
