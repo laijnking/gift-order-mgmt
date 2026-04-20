@@ -294,9 +294,9 @@ export default function HomePage() {
 
   return (
     <PageGuard permission="dashboard:view" title="无权查看首页" description="当前账号没有查看首页数据概览的权限。">
-    <div className="space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
+    <div className="space-y-6 px-3 py-4 sm:px-4 sm:py-6 lg:px-6">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <BarChart3 className="h-8 w-8" />
             数据报表
@@ -305,13 +305,14 @@ export default function HomePage() {
             系统运营数据统计与分析
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <Button 
             variant={isToday ? "default" : "outline"} 
             size="sm"
             onClick={() => {
               setIsToday(true);
             }}
+            className="w-full sm:w-auto"
           >
             今日
           </Button>
@@ -319,7 +320,7 @@ export default function HomePage() {
             setDateRange(v);
             setIsToday(false);
           }}>
-            <SelectTrigger className="w-[150px]">
+            <SelectTrigger className="w-full sm:w-[150px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -328,11 +329,11 @@ export default function HomePage() {
               <SelectItem value="90">近90天</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" onClick={loadDashboardData}>
+          <Button variant="outline" onClick={loadDashboardData} className="w-full sm:w-auto">
             <RefreshCw className="mr-2 h-4 w-4" />
             刷新
           </Button>
-          <Button onClick={handleExport}>
+          <Button onClick={handleExport} className="w-full sm:w-auto">
             <Download className="mr-2 h-4 w-4" />
             导出报表
           </Button>

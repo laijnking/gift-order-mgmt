@@ -10,6 +10,7 @@
     "check:alert-executor": "tsx ./scripts/validate-alert-executor.ts",
     "check:api-export-feedback": "tsx ./scripts/validate-api-export-feedback.ts",
     "check:api-export-records": "tsx ./scripts/validate-api-export-records.ts",
+    "check:layout-acceptance": "node --import tsx ./scripts/validate-layout-acceptance.ts",
     "check:api-orders": "tsx ./scripts/validate-api-orders.ts",
     "check:api-orders-duplicates": "tsx ./scripts/validate-api-orders-duplicates.ts",
     "check:api-reports": "node --import tsx ./scripts/validate-api-reports.ts",

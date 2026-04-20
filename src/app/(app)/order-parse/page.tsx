@@ -3105,10 +3105,11 @@ export default function OrderParsePage() {
               </ScrollArea>
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button
               variant="outline"
               onClick={() => setImportResult(null)}
+              className="w-full sm:w-auto"
             >
               继续录入
             </Button>
@@ -3120,6 +3121,7 @@ export default function OrderParsePage() {
                   ? `/orders?importBatch=${encodeURIComponent(importBatch)}&status=pending`
                   : '/orders?status=pending';
               }}
+              className="w-full sm:w-auto"
             >
               查看本批待派发
             </Button>
@@ -3130,6 +3132,7 @@ export default function OrderParsePage() {
                   ? `/orders?importBatch=${encodeURIComponent(importBatch)}`
                   : '/orders';
               }}
+              className="w-full sm:w-auto"
             >
               查看本批全部
             </Button>
@@ -3247,8 +3250,8 @@ export default function OrderParsePage() {
               )}
             </ScrollArea>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowMappingDialog(false)}>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setShowMappingDialog(false)} className="w-full sm:w-auto">
               关闭
             </Button>
           </DialogFooter>
