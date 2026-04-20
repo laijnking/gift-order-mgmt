@@ -437,7 +437,8 @@ export async function GET(request: NextRequest) {
 
     // ==================== 数据权限过滤 ====================
     // 仅本人(self)：只看业务员或跟单员是自己的订单
-    if (currentUser && currentUser.dataScope === 'self') {
+    // admin 角色不看 dataScope 限制，可查看全部数据
+    if (currentUser && currentUser.dataScope === 'self' && currentUser.role !== 'admin') {
       // 根据 username 获取用户的真实姓名
       const realName = await getUserRealNameByUsername(client, currentUser.username);
       

@@ -433,9 +433,7 @@ export default function OrdersPage() {
       }
 
       const res = await fetch(`/api/orders${params.toString() ? `?${params.toString()}` : ''}`, {
-        headers: {
-          'x-user-info': JSON.stringify(userInfo),
-        },
+        headers: buildUserInfoHeaders(),
       });
       const data = await res.json();
       if (data.success) {
