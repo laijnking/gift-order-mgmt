@@ -77,6 +77,7 @@ import {
 } from '@/components/ui/popover';
 import { PageGuard } from '@/components/auth/page-guard';
 import { buildUserInfoHeaders, getCurrentUser, getUserDataScope } from '@/lib/auth';
+import { ProductPickerDialog, ProductPickerItem } from '@/components/product/product-picker-dialog';
 
 interface Order {
   id: string;
@@ -332,6 +333,9 @@ export default function OrdersPage() {
     orderNo: '',
     customerCode: '',
     productName: '',
+    productCode: '',
+    productSpec: '',
+    productBrand: '',
     quantity: 1,
     receiverName: '',
     receiverPhone: '',
@@ -349,6 +353,9 @@ export default function OrdersPage() {
     orderNo: '',
     customerCode: '',
     productName: '',
+    productCode: '',
+    productSpec: '',
+    productBrand: '',
     quantity: 1,
     receiverName: '',
     receiverPhone: '',
@@ -359,6 +366,11 @@ export default function OrdersPage() {
     status: '',
   });
   const [editLoading, setEditLoading] = useState(false);
+
+  // 商品选择器 - 新增订单用
+  const [createProductPickerOpen, setCreateProductPickerOpen] = useState(false);
+  // 商品选择器 - 编辑订单用
+  const [editProductPickerOpen, setEditProductPickerOpen] = useState(false);
 
   // 删除确认对话框
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -640,6 +652,9 @@ useEffect(() => {
         customerCode: createForm.customerCode || 'UNKNOWN',
         items: [{
           product_name: createForm.productName || '未指定商品',
+          product_code: createForm.productCode || '',
+          product_spec: createForm.productSpec || '',
+          product_brand: createForm.productBrand || '',
           quantity: createForm.quantity || 1,
         }],
         receiver: {
@@ -667,6 +682,9 @@ useEffect(() => {
           orderNo: '',
           customerCode: '',
           productName: '',
+          productCode: '',
+          productSpec: '',
+          productBrand: '',
           quantity: 1,
           receiverName: '',
           receiverPhone: '',
@@ -695,6 +713,9 @@ useEffect(() => {
       orderNo: order.orderNo,
       customerCode: order.customerCode || '',
       productName: (firstItem as Record<string, unknown>).cuProductName as string || (firstItem as Record<string, unknown>).product_name as string || '',
+      productCode: (firstItem as Record<string, unknown>).productCode as string || '',
+      productSpec: (firstItem as Record<string, unknown>).productSpec as string || (firstItem as Record<string, unknown>).product_spec as string || '',
+      productBrand: (firstItem as Record<string, unknown>).productBrand as string || '',
       quantity: firstItem.quantity || 1,
       receiverName: order.receiver.name,
       receiverPhone: order.receiver.phone,
@@ -724,6 +745,9 @@ useEffect(() => {
           customerCode: editForm.customerCode || 'UNKNOWN',
           items: [{
             product_name: editForm.productName || '未指定商品',
+            product_code: editForm.productCode || '',
+            product_spec: editForm.productSpec || '',
+            product_brand: editForm.productBrand || '',
             quantity: editForm.quantity || 1,
           }],
           receiver: {
@@ -3124,11 +3148,29 @@ useEffect(() => {
             </div>
             <div className="space-y-2">
               <Label>商品名称 <span className="text-destructive">*</span></Label>
-              <Input
-                placeholder="商品名称"
-                value={createForm.productName}
-                onChange={(e) => setCreateForm({ ...createForm, productName: e.target.value })}
-              />
+              <div className="flex gap-2">
+                <Input
+                  placeholder="商品名称"
+                  value={createForm.productName}
+                  onChange={(e) => setCreateForm({ ...createForm, productName: e.target.value })}
+                  className="flex-1"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCreateProductPickerOpen(true)}
+                  title="从商品目录选择"
+                >
+                  选择商品
+                </Button>
+              </div>
+              {createForm.productCode && (
+                <div className="text-xs text-muted-foreground">
+                  系统编码：<span className="font-mono">{createForm.productCode}</span>
+                  {createForm.productSpec && <span className="ml-2">规格：{createForm.productSpec}</span>}
+                  {createForm.productBrand && <span className="ml-2">品牌：{createForm.productBrand}</span>}
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -3245,12 +3287,30 @@ useEffect(() => {
               <Label className={((editForm.status === 'assigned' || editForm.status === 'partial_returned') ? 'text-muted-foreground' : '')}>
                 商品名称 {editForm.status === 'assigned' || editForm.status === 'partial_returned' && <span className="text-xs">(已派发订单不可修改)</span>}
               </Label>
-              <Input
-                value={editForm.productName}
-                onChange={(e) => setEditForm({ ...editForm, productName: e.target.value })}
-                disabled={editForm.status === 'assigned' || editForm.status === 'partial_returned'}
-                className={editForm.status === 'assigned' || editForm.status === 'partial_returned' ? 'bg-muted' : ''}
-              />
+              <div className="flex gap-2">
+                <Input
+                  value={editForm.productName}
+                  onChange={(e) => setEditForm({ ...editForm, productName: e.target.value })}
+                  disabled={editForm.status === 'assigned' || editForm.status === 'partial_returned'}
+                  className={editForm.status === 'assigned' || editForm.status === 'partial_returned' ? 'bg-muted flex-1' : 'flex-1'}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditProductPickerOpen(true)}
+                  disabled={editForm.status === 'assigned' || editForm.status === 'partial_returned'}
+                  title="从商品目录选择"
+                >
+                  选择商品
+                </Button>
+              </div>
+              {editForm.productCode && (
+                <div className="text-xs text-muted-foreground">
+                  系统编码：<span className="font-mono">{editForm.productCode}</span>
+                  {editForm.productSpec && <span className="ml-2">规格：{editForm.productSpec}</span>}
+                  {editForm.productBrand && <span className="ml-2">品牌：{editForm.productBrand}</span>}
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -3320,6 +3380,42 @@ useEffect(() => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 商品选择器 - 新增订单用 */}
+      <ProductPickerDialog
+        open={createProductPickerOpen}
+        onOpenChange={setCreateProductPickerOpen}
+        onSelect={(product) => {
+          if (product) {
+            setCreateForm(prev => ({
+              ...prev,
+              productName: product.name,
+              productCode: product.code,
+              productSpec: product.spec || '',
+              productBrand: product.brand || '',
+            }));
+          }
+        }}
+        title="选择系统商品（新增订单）"
+      />
+
+      {/* 商品选择器 - 编辑订单用 */}
+      <ProductPickerDialog
+        open={editProductPickerOpen}
+        onOpenChange={setEditProductPickerOpen}
+        onSelect={(product) => {
+          if (product) {
+            setEditForm(prev => ({
+              ...prev,
+              productName: product.name,
+              productCode: product.code,
+              productSpec: product.spec || '',
+              productBrand: product.brand || '',
+            }));
+          }
+        }}
+        title="选择系统商品（编辑订单）"
+      />
 
       {/* 删除确认对话框 */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
