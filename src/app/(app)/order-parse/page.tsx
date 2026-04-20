@@ -284,12 +284,12 @@ function getSubmitValidationSummary(orders: ParsedOrder[]): SubmitValidationSumm
       const missingAddress = !order.receiver_address?.trim();
       const missingSupplier = !order.supplierId?.trim();
 
+      // 核心必填字段缺失才算无效（收货人/电话/地址，供应商可留空走待派发）
       if (
         missingProductName ||
         missingReceiver ||
         missingPhone ||
-        missingAddress ||
-        missingSupplier
+        missingAddress
       ) {
         summary.invalidOrderIds.push(order.id);
       }
@@ -1253,17 +1253,27 @@ export default function OrderParsePage() {
     }
 
     const validation = getSubmitValidationSummary(parsedOrders);
-    if (validation.invalidOrderIds.length > 0) {
+    // 核心字段缺失（收货人/电话/地址）仍阻止提交
+    const coreInvalidCount = validation.invalidOrderIds.length;
+    const missingSupplierCount = validation.missingSupplierCount;
+
+    if (coreInvalidCount > 0) {
       const missingLabels: string[] = [];
       if (validation.missingReceiverCount > 0) missingLabels.push('收货人');
       if (validation.missingPhoneCount > 0) missingLabels.push('收货电话');
       if (validation.missingAddressCount > 0) missingLabels.push('收货地址');
-      if (validation.missingSupplierCount > 0) missingLabels.push('发货供应商');
 
       toast.error(
-        `还有 ${validation.invalidOrderIds.length} 条选中订单待补全${missingLabels.length > 0 ? `：${missingLabels.join('、')}` : ''}`
+        `还有 ${coreInvalidCount} 条选中订单缺少核心信息${missingLabels.length > 0 ? `：${missingLabels.join('、')}` : ''}，请补全后再提交`
       );
       return;
+    }
+
+    // 供应商缺失时给出提示，但允许提交（订单将标记为待派发）
+    if (missingSupplierCount > 0) {
+      toast.warning(
+        `有 ${missingSupplierCount} 条订单未选择发货供应商，提交后将标记为「待派发」状态，可后续由业务员线下采购后再调整`
+      );
     }
 
     setIsSubmitting(true);
