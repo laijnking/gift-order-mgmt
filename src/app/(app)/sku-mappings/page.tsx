@@ -875,23 +875,23 @@ export default function ProductMappingsPage() {
               style={{ display: 'none' }}
               onChange={handleFileUpload}
             />
-            <Button variant="outline" onClick={downloadTemplate}>
+            <Button variant="outline" onClick={downloadTemplate} className="w-full sm:w-auto">
               <Download className="mr-2 h-4 w-4" />
               模板下载
             </Button>
-            <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={!canEditProducts}>
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={!canEditProducts} className="w-full sm:w-auto">
               <Upload className="mr-2 h-4 w-4" />
               Excel导入
             </Button>
-            <Button variant="outline" onClick={() => setIsImportDialogOpen(true)} disabled={!canEditProducts}>
+            <Button variant="outline" onClick={() => setIsImportDialogOpen(true)} disabled={!canEditProducts} className="w-full sm:w-auto">
               <Upload className="mr-2 h-4 w-4" />
               批量导入
             </Button>
-            <Button variant="outline" onClick={handleExport}>
+            <Button variant="outline" onClick={handleExport} className="w-full sm:w-auto">
               <Download className="mr-2 h-4 w-4" />
               导出
             </Button>
-            <Button onClick={() => { resetForm(); setIsDialogOpen(true); }} disabled={!canEditProducts}>
+            <Button onClick={() => { resetForm(); setIsDialogOpen(true); }} disabled={!canEditProducts} className="w-full sm:w-auto">
               <Plus className="mr-2 h-4 w-4" />
               添加映射
             </Button>
@@ -1001,7 +1001,7 @@ export default function ProductMappingsPage() {
                         />
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
+                        <div className="flex flex-wrap justify-end gap-1">
                           <Button
                             variant="ghost"
                             size="icon"
@@ -1126,11 +1126,11 @@ export default function ProductMappingsPage() {
                 <Label htmlFor="is_active">启用映射</Label>
               </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+            <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="w-full sm:w-auto">
                 取消
               </Button>
-              <Button onClick={handleSubmit} disabled={!canEditProducts || !formData.partnerCode || !formData.partnerProductName || !formData.productCode}>
+              <Button onClick={handleSubmit} disabled={!canEditProducts || !formData.partnerCode || !formData.partnerProductName || !formData.productCode} className="w-full sm:w-auto">
                 {editingMapping ? '保存修改' : '创建映射'}
               </Button>
             </DialogFooter>
@@ -1194,11 +1194,11 @@ export default function ProductMappingsPage() {
                 </ul>
               </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsImportDialogOpen(false)}>
+            <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button variant="outline" onClick={() => setIsImportDialogOpen(false)} className="w-full sm:w-auto">
                 取消
               </Button>
-              <Button onClick={handleImport} disabled={!canEditProducts}>
+              <Button onClick={handleImport} disabled={!canEditProducts} className="w-full sm:w-auto">
                 开始导入
               </Button>
             </DialogFooter>
@@ -1347,16 +1347,16 @@ export default function ProductMappingsPage() {
               </div>
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button variant="outline" onClick={() => {
                 setFieldMappingDialogOpen(false);
                 setExcelImportData([]);
                 setFieldMappings({});
                 setMappingSearchTerm({});
-              }} disabled={importing}>
+              }} disabled={importing} className="w-full sm:w-auto">
                 取消
               </Button>
-              <Button onClick={confirmFieldMapping} disabled={importing || !canEditProducts}>
+              <Button onClick={confirmFieldMapping} disabled={importing || !canEditProducts} className="w-full sm:w-auto">
                 <Check className="mr-2 h-4 w-4" />
                 确认映射并继续
               </Button>
@@ -1442,9 +1442,9 @@ export default function ProductMappingsPage() {
                 </div>
               )}
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setExcelImportDialogOpen(false)} disabled={importing}>取消</Button>
-              <Button onClick={confirmExcelImport} disabled={importing || !canEditProducts}>
+            <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button variant="outline" onClick={() => setExcelImportDialogOpen(false)} disabled={importing} className="w-full sm:w-auto">取消</Button>
+              <Button onClick={confirmExcelImport} disabled={importing || !canEditProducts} className="w-full sm:w-auto">
                 {importing ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />

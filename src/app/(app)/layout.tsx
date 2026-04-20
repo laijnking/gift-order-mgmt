@@ -74,6 +74,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [user, isLoading, pathname, router, isPublicPath]);
 
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mobileOpen]);
+
   const toggleMenu = (label: string) => {
     const newExpanded = new Set(expandedMenus);
     if (newExpanded.has(label)) {
@@ -105,6 +118,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const permissionAllowed = !item.permissions || item.permissions.some(permission => user.permissions.includes(permission));
     return roleAllowed && permissionAllowed;
   });
+  const hideSidebarLabels = collapsed && !mobileOpen;
 
   const renderMenuItem = (item: MenuItem) => {
     const hasChildren = item.children && item.children.length > 0;
@@ -124,11 +138,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 ? 'bg-gradient-to-r from-sidebar-primary/20 to-sidebar-primary/10 text-sidebar-primary border-l-2 border-sidebar-primary' 
                 : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
               }
-              ${collapsed ? 'justify-center' : ''}
+              ${hideSidebarLabels ? 'justify-center' : ''}
             `}
           >
             <Icon className="w-5 h-5 flex-shrink-0" />
-            {!collapsed && (
+            {!hideSidebarLabels && (
               <>
                 <span className="flex-1 text-sm font-medium text-left">{item.label}</span>
                 <ChevronDown className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
@@ -136,7 +150,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             )}
           </button>
           
-          {!collapsed && isExpanded && (
+          {!hideSidebarLabels && isExpanded && (
             <div className="ml-6 mt-1 space-y-1">
               {item.children?.map((child) => {
                 const childIsActive = pathname === child.href || (child.href && child.href !== '/' && pathname.startsWith(child.href));
@@ -178,12 +192,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             ? 'bg-gradient-to-r from-sidebar-primary/20 to-sidebar-primary/10 text-sidebar-primary border-l-2 border-sidebar-primary' 
             : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
           }
-          ${collapsed ? 'justify-center' : ''}
+          ${hideSidebarLabels ? 'justify-center' : ''}
         `}
-        title={collapsed ? item.label : undefined}
+        title={hideSidebarLabels ? item.label : undefined}
       >
         <Icon className="w-5 h-5 flex-shrink-0" />
-        {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
+        {!hideSidebarLabels && <span className="text-sm font-medium">{item.label}</span>}
       </Link>
     );
   };
@@ -215,7 +229,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         className={`
           fixed top-0 left-0 h-full z-50
           transition-all duration-300 ease-in-out
-          ${collapsed ? 'w-[70px]' : 'w-[240px]'}
+          w-[min(85vw,320px)] ${collapsed ? 'lg:w-[70px]' : 'lg:w-[240px]'}
           ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
           bg-gradient-to-b from-sidebar to-sidebar/95
           border-r border-sidebar-border
@@ -224,7 +238,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       >
         {/* Logo */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-sidebar-border shrink-0">
-          {!collapsed && (
+          {!hideSidebarLabels && (
             <div className="flex items-center gap-2">
               <div className="w-9 h-9 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center shadow-sm">
                 <Package className="w-5 h-5 text-primary-foreground" />
@@ -235,7 +249,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </div>
             </div>
           )}
-          {collapsed && (
+          {hideSidebarLabels && (
             <div className="w-9 h-9 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center mx-auto shadow-sm">
               <Package className="w-5 h-5 text-primary-foreground" />
             </div>
@@ -264,12 +278,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* User info */}
-        <div className={`p-3 border-t border-sidebar-border bg-sidebar/50 shrink-0 ${collapsed ? 'text-center' : ''}`}>
-          <div className={`flex items-center gap-3 ${collapsed ? 'justify-center' : ''}`}>
+        <div className={`p-3 border-t border-sidebar-border bg-sidebar/50 shrink-0 ${hideSidebarLabels ? 'text-center' : ''}`}>
+          <div className={`flex items-center gap-3 ${hideSidebarLabels ? 'justify-center' : ''}`}>
             <div className="w-9 h-9 bg-gradient-to-br from-sidebar-primary to-sidebar-primary/80 rounded-full flex items-center justify-center shadow-sm">
               <User className="w-4 h-4 text-sidebar-primary-foreground" />
             </div>
-            {!collapsed && (
+            {!hideSidebarLabels && (
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-sidebar-foreground truncate">{user.realName || user.username}</p>
                 <p className="text-xs text-sidebar-foreground/60 truncate">
@@ -277,7 +291,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </p>
               </div>
             )}
-            {!collapsed && (
+            {!hideSidebarLabels && (
               <Button
                 variant="ghost"
                 size="icon"
