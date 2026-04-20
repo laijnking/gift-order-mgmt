@@ -191,10 +191,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background">
       {/* Mobile menu button */}
-      <div className="lg:hidden fixed top-4 left-4 z-50">
+      <div className="lg:hidden fixed left-3 top-3 z-50">
         <Button
           variant="outline"
           size="icon"
+          className="h-9 w-9 bg-background/95 shadow-sm backdrop-blur"
           onClick={() => setMobileOpen(!mobileOpen)}
         >
           {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
@@ -293,7 +294,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Main content */}
       <main 
         className={`
-          min-h-screen transition-all duration-300
+          min-h-screen transition-all duration-300 pt-16 lg:pt-0
           ${collapsed ? 'lg:ml-[70px]' : 'lg:ml-[240px]'}
         `}
       >

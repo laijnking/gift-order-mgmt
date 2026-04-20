@@ -1,0 +1,30 @@
+{
+  "name": "excel-unrecognized-headers",
+  "description": "包含客户自定义列名和扩展列，验证未识别表头与扩展列统计",
+  "headerRow": 0,
+  "headers": ["单号", "礼品名", "颜色备注", "数量", "收件人", "联系电话", "详细地址", "客户备注"],
+  "columnMapping": {
+    "0": "ext_field_1",
+    "1": "product_name",
+    "2": "ext_field_2",
+    "3": "quantity",
+    "4": "receiver_name",
+    "5": "receiver_phone",
+    "6": "receiver_address",
+    "7": "remark"
+  },
+  "rows": [
+    ["X-2001", "蓝牙音箱", "黑金", "1", "王五", "13700137000", "深圳市南山区科技园1号", "工作日送达"]
+  ],
+  "expected": {
+    "coverageRate": 75,
+    "recognizedFieldCount": 6,
+    "unrecognizedHeaders": ["单号", "颜色备注"],
+    "conflictFields": []
+  },
+  "expectedMetadata": {
+    "normalizedHeaders": ["单号", "礼品名", "颜色备注", "数量", "收件人", "联系电话", "详细地址", "客户备注"],
+    "headerFingerprint": "15d1d4de0b1caba6",
+    "templateSignature": "534020d67c62aabb14fe4f2a"
+  }
+}

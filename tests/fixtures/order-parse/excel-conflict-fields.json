@@ -1,0 +1,28 @@
+{
+  "name": "excel-conflict-fields",
+  "description": "重复将多个表头映射到同一系统字段，验证冲突字段统计与模板签名稳定输出",
+  "headerRow": 0,
+  "headers": ["商品名称", "礼品名称", "数量", "收货人", "收货电话", "收货地址"],
+  "columnMapping": {
+    "0": "product_name",
+    "1": "product_name",
+    "2": "quantity",
+    "3": "receiver_name",
+    "4": "receiver_phone",
+    "5": "receiver_address"
+  },
+  "rows": [
+    ["随行杯", "礼盒随行杯", "2", "赵六", "13600136000", "厦门市湖里区高新园8号"]
+  ],
+  "expected": {
+    "coverageRate": 100,
+    "recognizedFieldCount": 6,
+    "unrecognizedHeaders": [],
+    "conflictFields": ["product_name"]
+  },
+  "expectedMetadata": {
+    "normalizedHeaders": ["商品名称", "礼品名称", "数量", "收货人", "收货电话", "收货地址"],
+    "headerFingerprint": "e204250e96ce859e",
+    "templateSignature": "bcb0b7e209cc1910bbd5493e"
+  }
+}

@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { updateOrderCostHistoryFees } from '@/lib/order-cost-history';
+import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 // 更新历史成本库的快递费用
 export async function PATCH(request: NextRequest) {
+  const authError = requirePermission(request, 'orders:edit');
+  if (authError) return authError;
   const client = getSupabaseClient();
   
   try {
@@ -29,57 +33,31 @@ export async function PATCH(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // 构建查询条件
-    let query = client
-      .from('order_cost_history')
-      .select('id, order_id, order_no, unit_cost, quantity, total_cost, express_fee, other_fee, total_amount, remark');
+    const summary = await updateOrderCostHistoryFees(client, {
+      orderId,
+      orderNo,
+      expressFee,
+      otherFee,
+      remark,
+    });
 
-    if (orderId) {
-      query = query.eq('order_id', orderId);
-    } else if (orderNo) {
-      query = query.eq('order_no', orderNo);
-    }
-
-    const { data: records, error: queryError } = await query;
-    
-    if (queryError) throw new Error(`查询历史成本失败: ${queryError.message}`);
-
-    if (!records || records.length === 0) {
+    if (!summary) {
       return NextResponse.json({ 
         success: false, 
         error: '未找到对应的历史成本记录' 
       }, { status: 404 });
     }
 
-    // 更新费用
-    const updatedRecords: string[] = [];
-    for (const record of records) {
-      const newExpressFee = expressFee || 0;
-      const newOtherFee = otherFee || record.other_fee || 0;
-      const newTotalAmount = (record.unit_cost * record.quantity) + newExpressFee + newOtherFee;
-
-      await client
-        .from('order_cost_history')
-        .update({
-          express_fee: newExpressFee,
-          other_fee: newOtherFee,
-          total_amount: newTotalAmount,
-          remark: remark || record.remark,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', record.id);
-
-      updatedRecords.push(record.order_no);
-    }
-
     return NextResponse.json({
       success: true,
-      message: `已更新 ${updatedRecords.length} 条记录的费用信息`,
+      message: `已更新 ${summary.updatedCount} 条记录的费用信息`,
       data: {
-        orderNos: updatedRecords,
-        expressFee,
-        otherFee: otherFee || 0,
-        updatedCount: updatedRecords.length
+        orderIds: summary.orderIds,
+        orderNos: summary.orderNos,
+        expressFee: summary.expressFee,
+        otherFee: summary.otherFee,
+        totalAmount: summary.totalAmount,
+        updatedCount: summary.updatedCount,
       }
     });
 

@@ -1,0 +1,97 @@
+{
+  "cases": [
+    {
+      "name": "persisted-record-with-persisted-details",
+      "recordId": "record-1",
+      "record": {
+        "file_url": "/api/export-records/record-1/download",
+        "metadata": {
+          "artifact": {
+            "provider": "local",
+            "relative_path": "data/exports/record-1/batch.zip",
+            "file_name": "batch.zip"
+          }
+        }
+      },
+      "details": [
+        {
+          "fileName": "supplier-a.xlsx",
+          "fileUrl": "/api/export-records/record-1/download?detailIndex=0",
+          "artifact": {
+            "provider": "local",
+            "relative_path": "data/exports/record-1/supplier-a.xlsx",
+            "file_name": "supplier-a.xlsx"
+          }
+        },
+        {
+          "fileName": "supplier-b.xlsx",
+          "fileUrl": "/api/export-records/record-1/download?detailIndex=1",
+          "artifact": {
+            "provider": "s3",
+            "relative_path": "record-1/supplier-b.xlsx",
+            "file_name": "supplier-b.xlsx"
+          }
+        }
+      ],
+      "expected": {
+        "recordPersisted": true,
+        "recordStrategy": "本地下载",
+        "detailPersisted": [true, true],
+        "detailStrategies": ["本地下载", "直链下载"],
+        "recordDownloadPath": "/api/export-records/record-1/download",
+        "detailDownloadPaths": [
+          "/api/export-records/record-1/download?detailIndex=0",
+          "/api/export-records/record-1/download?detailIndex=1"
+        ]
+      }
+    },
+    {
+      "name": "persisted-record-with-regenerate-details",
+      "recordId": "record-2",
+      "record": {
+        "file_url": "/api/export-records/record-2/download",
+        "metadata": {
+          "artifact": {
+            "provider": "local",
+            "relative_path": "data/exports/record-2/batch.zip",
+            "file_name": "batch.zip"
+          }
+        }
+      },
+      "details": [
+        {
+          "fileName": "customer-a.xlsx"
+        }
+      ],
+      "expected": {
+        "recordPersisted": true,
+        "recordStrategy": "本地下载",
+        "detailPersisted": [false],
+        "detailStrategies": ["按需重生成"],
+        "recordDownloadPath": "/api/export-records/record-2/download",
+        "detailDownloadPaths": [null]
+      }
+    },
+    {
+      "name": "regenerate-only-record",
+      "recordId": "record-3",
+      "record": {
+        "file_url": "/exports/placeholder.zip",
+        "metadata": {}
+      },
+      "details": [
+        {
+          "fileName": "customer-b.xlsx"
+        }
+      ],
+      "expected": {
+        "recordPersisted": false,
+        "recordStrategy": "按需重生成",
+        "detailPersisted": [false],
+        "detailStrategies": ["按需重生成"],
+        "recordDownloadPath": null,
+        "detailDownloadPaths": [null]
+      }
+    }
+  ]
+}

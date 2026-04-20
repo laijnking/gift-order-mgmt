@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 export async function DELETE(request: NextRequest) {
+  const authError = requirePermission(request, 'settings:edit');
+  if (authError) return authError;
+
   try {
     // 获取清理类型
     const { searchParams } = new URL(request.url);
@@ -55,6 +58,9 @@ export async function DELETE(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  const authError = requirePermission(request, 'settings:edit');
+  if (authError) return authError;
+
   try {
     const adminKey = request.headers.get('x-admin-key');
     if (adminKey !== 'clear-all-orders-2024') {

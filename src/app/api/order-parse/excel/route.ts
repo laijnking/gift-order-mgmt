@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { getColumnMappingDiagnostics } from '@/lib/column-mapping-diagnostics';
+import { requirePermission } from '@/lib/server-auth';
+import type {
+  ParsedOrderBundleDraft,
+  ParsedOrderDraftItem,
+} from '@/types/order-parse';
 
 // 中文列名自动映射配置（简化为最常用的精确匹配，避免冲突）
 const CHINESE_COLUMN_MAPPING: Record<string, string[]> = {
@@ -36,56 +42,6 @@ const CHINESE_COLUMN_MAPPING: Record<string, string[]> = {
 
 // 匹配精度排序
 const MATCH_PRIORITY = ['spec', 'code', 'barcode', 'name'];
-
-interface ParsedOrderItem {
-  id: string;
-  // 客户原始信息
-  customerProductName: string;
-  customerProductSpec: string;
-  customerProductCode: string;
-  customerBarcode: string;
-  // 匹配后的系统信息
-  systemProductId: string | null;
-  systemProductName: string | null;
-  systemProductSpec: string | null;
-  systemProductCode: string | null;
-  systemProductBrand: string | null;
-  systemProductPrice: number | null;
-  matchType: string | null;
-  matchHint: string | null;
-  // 供应商库存信息
-  supplierMatches: {
-    supplierId: string;
-    supplierName: string;
-    stockQuantity: number;
-    stockPrice: number;
-    warehouseName: string;
-    matchType: string;
-  }[];
-  // 其他字段
-  quantity: number;
-  price: number | null;
-  remark: string;
-}
-
-interface ParsedOrder {
-  id: string;
-  orderNo: string;
-  billDate: string;
-  // 收货信息
-  receiverName: string;
-  receiverPhone: string;
-  receiverAddress: string;
-  province: string;
-  city: string;
-  district: string;
-  // 商品列表
-  items: ParsedOrderItem[];
-  // 订单级别的其他信息
-  expressCompany: string;
-  trackingNo: string;
-  remark: string;
-}
 
 // 从地址中提取省市区
 function extractAddressParts(address: string): { province: string; city: string; district: string } {
@@ -398,8 +354,8 @@ async function parseExcelData(
   rows: (string | number | null)[][],
   columnMapping: Record<string, string>,
   customerCode: string
-): Promise<ParsedOrder[]> {
-  const orders: Map<string, ParsedOrder> = new Map();
+): Promise<ParsedOrderBundleDraft[]> {
+  const orders: Map<string, ParsedOrderBundleDraft> = new Map();
   
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -476,7 +432,7 @@ async function parseExcelData(
     );
     
     // 创建订单商品明细
-    const orderItem: ParsedOrderItem = {
+    const orderItem: ParsedOrderDraftItem = {
       id: `item_${Date.now()}_${i}`,
       customerProductName: productName,
       customerProductSpec: productSpec,
@@ -503,11 +459,13 @@ async function parseExcelData(
 }
 
 export async function POST(request: NextRequest) {
+  const authError = requirePermission(request, 'orders:create');
+  if (authError) return authError;
   const client = getSupabaseClient();
   
   try {
     const body = await request.json();
-    const { rows, columnMapping, customerCode } = body;
+    const { rows, columnMapping, customerCode, headers = [] } = body;
     
     // 调试日志
     console.log('【API】接收请求:', {
@@ -543,12 +501,26 @@ export async function POST(request: NextRequest) {
     }
     
     // 统计匹配结果
+    const mappingDiagnostics = getColumnMappingDiagnostics(
+      Array.isArray(headers) ? headers.map((header) => String(header ?? '')) : [],
+      mapping
+    );
+
     const stats = {
       totalItems: orders.reduce((sum, o) => sum + o.items.length, 0),
       matchedItems: orders.reduce((sum, o) => sum + o.items.filter(i => i.systemProductId).length, 0),
       unmatchedItems: orders.reduce((sum, o) => sum + o.items.filter(i => !i.systemProductId).length, 0),
       ordersWithSupplier: orders.reduce((sum, o) => sum + o.items.filter(i => i.supplierMatches.length > 0).length, 0),
       ordersWithoutSupplier: orders.reduce((sum, o) => sum + o.items.filter(i => i.supplierMatches.length === 0).length, 0),
+      totalHeaderCount: mappingDiagnostics.totalHeaderCount,
+      nonEmptyHeaderCount: mappingDiagnostics.nonEmptyHeaderCount,
+      mappedColumnCount: mappingDiagnostics.mappedColumnCount,
+      ignoredColumnCount: mappingDiagnostics.ignoredColumnCount,
+      extensionColumnCount: mappingDiagnostics.extensionColumnCount,
+      recognizedFieldCount: mappingDiagnostics.recognizedFieldCount,
+      coverageRate: mappingDiagnostics.coverageRate,
+      conflictFields: mappingDiagnostics.conflictFields,
+      unrecognizedHeaders: mappingDiagnostics.unrecognizedHeaders,
     };
     
     return NextResponse.json({

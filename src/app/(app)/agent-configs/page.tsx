@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { PageGuard } from '@/components/auth/page-guard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,6 +34,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { buildUserInfoHeaders, usePermission } from '@/lib/auth';
 import { toast } from 'sonner';
 import {
   Bot,
@@ -93,6 +95,7 @@ const MODELS = [
 ];
 
 export default function AgentConfigsPage() {
+  const { hasPermission } = usePermission();
   const [agents, setAgents] = useState<AgentConfig[]>([]);
   const [filteredAgents, setFilteredAgents] = useState<AgentConfig[]>([]);
   const [loading, setLoading] = useState(true);
@@ -106,6 +109,7 @@ export default function AgentConfigsPage() {
   const [testOutput, setTestOutput] = useState('');
   const [isTesting, setIsTesting] = useState(false);
   const [testDuration, setTestDuration] = useState<number | null>(null);
+  const canEditAgentConfigs = hasPermission('agent_configs:edit');
 
   // 表单状态
   const [formData, setFormData] = useState({
@@ -149,7 +153,7 @@ export default function AgentConfigsPage() {
   const loadAgents = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/agent-configs');
+      const res = await fetch('/api/agent-configs', { headers: buildUserInfoHeaders() });
       const data = await res.json();
       if (data.success) {
         setAgents(data.data || []);
@@ -163,6 +167,11 @@ export default function AgentConfigsPage() {
   };
 
   const handleSubmit = async () => {
+    if (!canEditAgentConfigs) {
+      toast.error('当前账号没有编辑 Agent 配置的权限');
+      return;
+    }
+
     try {
       const url = editingAgent
         ? `/api/agent-configs/${editingAgent.id}`
@@ -171,7 +180,10 @@ export default function AgentConfigsPage() {
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          ...buildUserInfoHeaders(),
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(formData),
       });
 
@@ -208,11 +220,17 @@ export default function AgentConfigsPage() {
   };
 
   const handleDelete = async (id: string) => {
+    if (!canEditAgentConfigs) {
+      toast.error('当前账号没有编辑 Agent 配置的权限');
+      return;
+    }
+
     if (!confirm('确定要删除这个Agent配置吗？')) return;
 
     try {
       const res = await fetch(`/api/agent-configs/${id}`, {
         method: 'DELETE',
+        headers: buildUserInfoHeaders(),
       });
       const data = await res.json();
       if (data.success) {
@@ -228,10 +246,18 @@ export default function AgentConfigsPage() {
   };
 
   const handleToggleActive = async (agent: AgentConfig) => {
+    if (!canEditAgentConfigs) {
+      toast.error('当前账号没有编辑 Agent 配置的权限');
+      return;
+    }
+
     try {
       const res = await fetch(`/api/agent-configs/${agent.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          ...buildUserInfoHeaders(),
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({ is_active: !agent.is_active }),
       });
       const data = await res.json();
@@ -246,6 +272,11 @@ export default function AgentConfigsPage() {
   };
 
   const handleTest = async () => {
+    if (!canEditAgentConfigs) {
+      toast.error('当前账号没有执行 Agent 测试的权限');
+      return;
+    }
+
     if (!testInput.trim()) {
       toast.error('请输入测试内容');
       return;
@@ -258,7 +289,10 @@ export default function AgentConfigsPage() {
     try {
       const res = await fetch('/api/ai-test', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          ...buildUserInfoHeaders(),
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           agentId: testingAgent?.id,
           input: testInput,
@@ -354,25 +388,29 @@ export default function AgentConfigsPage() {
   }
 
   return (
-    <>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Bot className="h-8 w-8" />
+    <PageGuard permission="agent_configs:view" title="无权查看 Agent 配置" description="当前账号没有查看 Agent 配置管理的权限。">
+      <div className="space-y-6 px-3 py-4 sm:px-4 sm:py-6">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <h1 className="flex items-center gap-2 text-2xl font-bold sm:text-3xl">
+              <Bot className="h-7 w-7 sm:h-8 sm:w-8" />
               Agent配置管理
-          </h1>
-          <p className="text-muted-foreground">
-            配置AI Agent的Prompt模板和模型参数
-          </p>
+            </h1>
+            <p className="text-sm text-muted-foreground sm:text-base">
+              配置AI Agent的 Prompt 模板和模型参数
+            </p>
+          </div>
+          <Button
+            onClick={() => { resetForm(); setIsDialogOpen(true); }}
+            disabled={!canEditAgentConfigs}
+            className="w-full sm:w-auto"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            新建Agent
+          </Button>
         </div>
-        <Button onClick={() => { resetForm(); setIsDialogOpen(true); }}>
-          <Plus className="mr-2 h-4 w-4" />
-          新建Agent
-        </Button>
-      </div>
 
-      <div className="flex gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Terminal className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -383,7 +421,7 @@ export default function AgentConfigsPage() {
           />
         </div>
         <Select value={typeFilter || 'all'} onValueChange={(v) => setTypeFilter(v === 'all' ? '' : v)}>
-          <SelectTrigger className="w-[200px]">
+          <SelectTrigger className="w-full sm:w-[200px]">
             <SelectValue placeholder="筛选类型" />
           </SelectTrigger>
           <SelectContent>
@@ -397,7 +435,7 @@ export default function AgentConfigsPage() {
         </Select>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {filteredAgents.length === 0 ? (
           <div className="col-span-full text-center py-12 text-muted-foreground">
             {agents.length === 0 ? '暂无Agent配置' : '未找到匹配的Agent'}
@@ -406,19 +444,20 @@ export default function AgentConfigsPage() {
           filteredAgents.map((agent) => (
             <Card key={agent.id} className={!agent.is_active ? 'opacity-60' : ''}>
               <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex items-center gap-2">
                     <Bot className="h-5 w-5 text-primary" />
-                    <CardTitle className="text-lg">{agent.name}</CardTitle>
+                    <CardTitle className="truncate text-lg">{agent.name}</CardTitle>
                   </div>
                   <Switch
                     checked={agent.is_active}
+                    disabled={!canEditAgentConfigs}
                     onCheckedChange={() => handleToggleActive(agent)}
                   />
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="outline">{getTypeLabel(agent.type)}</Badge>
-                  <code className="text-xs text-muted-foreground">{agent.code}</code>
+                  <code className="break-all text-xs text-muted-foreground">{agent.code}</code>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -426,7 +465,7 @@ export default function AgentConfigsPage() {
                   {agent.description || '暂无描述'}
                 </p>
 
-                <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
                   <div>
                     <span className="text-muted-foreground">模型：</span>
                     <span className="font-medium">{agent.model}</span>
@@ -438,7 +477,7 @@ export default function AgentConfigsPage() {
                 </div>
 
                 {agent.run_count > 0 && (
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <Play className="h-3 w-3" />
                       {agent.run_count}次运行
@@ -455,17 +494,18 @@ export default function AgentConfigsPage() {
                 )}
 
                 {agent.last_run_at && (
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
                     <Clock className="h-3 w-3" />
                     {new Date(agent.last_run_at).toLocaleString()}
                   </div>
                 )}
 
-                <div className="flex gap-2 pt-2 border-t">
+                <div className="flex flex-wrap gap-2 border-t pt-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    className="flex-1"
+                    className="flex-1 min-w-[120px]"
+                    disabled={!canEditAgentConfigs}
                     onClick={() => openTestDialog(agent)}
                   >
                     <Play className="mr-1 h-3 w-3" />
@@ -474,6 +514,7 @@ export default function AgentConfigsPage() {
                   <Button
                     variant="outline"
                     size="icon"
+                    disabled={!canEditAgentConfigs}
                     onClick={() => handleEdit(agent)}
                   >
                     <Edit className="h-4 w-4" />
@@ -481,6 +522,7 @@ export default function AgentConfigsPage() {
                   <Button
                     variant="outline"
                     size="icon"
+                    disabled={!canEditAgentConfigs}
                     onClick={() => handleDelete(agent.id)}
                     className="text-destructive hover:text-destructive"
                   >
@@ -499,7 +541,7 @@ export default function AgentConfigsPage() {
 
       {/* 新建/编辑对话框 */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingAgent ? '编辑Agent配置' : '新建Agent配置'}
@@ -509,7 +551,7 @@ export default function AgentConfigsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label htmlFor="code">Agent编码 *</Label>
                 <Input
@@ -531,7 +573,7 @@ export default function AgentConfigsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label htmlFor="type">类型 *</Label>
                 <Select
@@ -612,7 +654,7 @@ export default function AgentConfigsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label htmlFor="temperature">温度 (0-1)</Label>
                 <Input
@@ -636,7 +678,7 @@ export default function AgentConfigsPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
               <div className="flex items-center gap-2">
                 <Switch
                   id="is_active"
@@ -659,7 +701,7 @@ export default function AgentConfigsPage() {
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               取消
             </Button>
-            <Button onClick={handleSubmit} disabled={!formData.code || !formData.name || !formData.prompt_template}>
+            <Button onClick={handleSubmit} disabled={!canEditAgentConfigs || !formData.code || !formData.name || !formData.prompt_template}>
               {editingAgent ? '保存修改' : '创建'}
             </Button>
           </DialogFooter>
@@ -668,7 +710,7 @@ export default function AgentConfigsPage() {
 
       {/* 测试对话框 */}
       <Dialog open={isTestDialogOpen} onOpenChange={setIsTestDialogOpen}>
-        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>测试Agent - {testingAgent?.name}</DialogTitle>
             <DialogDescription>
@@ -678,7 +720,7 @@ export default function AgentConfigsPage() {
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label>模型参数</Label>
-              <div className="flex gap-4 text-sm text-muted-foreground">
+              <div className="flex flex-col gap-1 text-sm text-muted-foreground sm:flex-row sm:flex-wrap sm:gap-4">
                 <span>模型：{testingAgent?.model}</span>
                 <span>温度：{testingAgent?.temperature}</span>
                 <span>最大Token：{testingAgent?.max_tokens}</span>
@@ -698,7 +740,7 @@ export default function AgentConfigsPage() {
             </div>
 
             <div className="flex justify-center">
-              <Button onClick={handleTest} disabled={isTesting || !testInput.trim()}>
+              <Button onClick={handleTest} disabled={!canEditAgentConfigs || isTesting || !testInput.trim()}>
                 {isTesting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -756,6 +798,6 @@ export default function AgentConfigsPage() {
         </DialogContent>
       </Dialog>
     </div>
-    </>
+    </PageGuard>
   );
 }

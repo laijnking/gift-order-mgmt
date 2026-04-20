@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { requirePermission } from '@/lib/server-auth';
 
 // 库存预警阈值
 const LOW_STOCK_THRESHOLD = 2;
@@ -9,6 +10,8 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authError = requirePermission(request, 'stocks:view');
+  if (authError) return authError;
   const client = getSupabaseClient();
   const { id } = await params;
 
@@ -54,6 +57,8 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authError = requirePermission(request, 'stocks:edit');
+  if (authError) return authError;
   const client = getSupabaseClient();
   const { id } = await params;
 
@@ -143,6 +148,8 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authError = requirePermission(request, 'stocks:edit');
+  if (authError) return authError;
   const client = getSupabaseClient();
   const { id } = await params;
 

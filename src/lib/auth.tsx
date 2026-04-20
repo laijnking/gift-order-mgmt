@@ -69,6 +69,23 @@ export function getCurrentUser(): AuthUser | null {
   return readStoredUser();
 }
 
+export function buildUserInfoHeaders(user?: AuthUser | null): Record<string, string> {
+  const currentUser = user ?? getCurrentUser();
+  if (!currentUser) {
+    return {};
+  }
+
+  return {
+    'x-user-info': JSON.stringify({
+      id: currentUser.id,
+      username: currentUser.username,
+      role: currentUser.role,
+      dataScope: currentUser.dataScope,
+      permissions: currentUser.permissions,
+    }),
+  };
+}
+
 export function getUserDataScope(user: AuthUser | null): string {
   return user?.dataScope || 'self';
 }

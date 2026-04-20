@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { PageGuard } from '@/components/auth/page-guard';
+import { buildUserInfoHeaders, useAuth, usePermission } from '@/lib/auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -117,6 +118,8 @@ const ROLE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
 };
 
 export default function UsersPage() {
+  const { user } = useAuth();
+  const { hasPermission } = usePermission();
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
@@ -141,6 +144,7 @@ export default function UsersPage() {
   const [excelImportDialogOpen, setExcelImportDialogOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const authHeaders = () => buildUserInfoHeaders(user);
 
   // 合并 roles 表的角色和用户表中已存在的角色
   const allRoles = React.useMemo(() => {
@@ -182,7 +186,7 @@ export default function UsersPage() {
   const loadRoles = async () => {
     setRolesLoading(true);
     try {
-      const res = await fetch('/api/roles');
+      const res = await fetch('/api/roles', { headers: authHeaders() });
       const data = await res.json();
       if (data.success) {
         setRoles(data.data || []);
@@ -197,7 +201,7 @@ export default function UsersPage() {
   const loadUsers = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/users');
+      const res = await fetch('/api/users', { headers: authHeaders() });
       const data = await res.json();
       if (data.success) {
         setUsers(data.data || []);
@@ -223,7 +227,7 @@ export default function UsersPage() {
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify(finalData),
       });
 
@@ -264,6 +268,7 @@ export default function UsersPage() {
       try {
         const res = await fetch(`/api/users?id=${id}`, {
           method: 'DELETE',
+          headers: authHeaders(),
         });
         const data = await res.json();
         if (data.success) {
@@ -286,7 +291,7 @@ export default function UsersPage() {
     try {
       const res = await fetch(`/api/users/${user.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ isActive: !user.isActive }),
       });
       const data = await res.json();
@@ -411,7 +416,7 @@ export default function UsersPage() {
 
       const res = await fetch('/api/users/batch', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ users: usersData }),
       });
 
@@ -465,10 +470,10 @@ export default function UsersPage() {
         </div>
       ) : (
         <>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
+      <div className="space-y-6 px-3 pb-4 sm:px-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <h1 className="flex items-center gap-2 text-2xl font-bold sm:text-3xl">
               <Users className="h-8 w-8" />
               用户管理
             </h1>
@@ -476,7 +481,7 @@ export default function UsersPage() {
               员工账号管理
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <input
               type="file"
               ref={fileInputRef}
@@ -484,23 +489,27 @@ export default function UsersPage() {
               className="hidden"
               onChange={handleFileUpload}
             />
-            <Button variant="outline" onClick={downloadTemplate}>
+            <Button variant="outline" onClick={downloadTemplate} className="w-full sm:w-auto">
               <Download className="mr-2 h-4 w-4" />
               模板下载
             </Button>
-            <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+            {hasPermission('users:create') && (
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="w-full sm:w-auto">
               <Upload className="mr-2 h-4 w-4" />
               导入
             </Button>
-            <Button onClick={() => { resetForm(); setIsDialogOpen(true); }}>
+            )}
+            {hasPermission('users:create') && (
+            <Button onClick={() => { resetForm(); setIsDialogOpen(true); }} className="w-full sm:w-auto">
               <Plus className="mr-2 h-4 w-4" />
               添加用户
             </Button>
+            )}
           </div>
         </div>
 
         {/* 筛选器 */}
-        <div className="flex gap-4">
+        <div className="flex flex-col gap-4 lg:flex-row">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -511,7 +520,7 @@ export default function UsersPage() {
             />
           </div>
           <Select value={roleFilter || 'all'} onValueChange={(v) => setRoleFilter(v === 'all' ? '' : v)}>
-            <SelectTrigger className="w-[150px]">
+            <SelectTrigger className="w-full lg:w-[150px]">
               <SelectValue placeholder="筛选角色" />
             </SelectTrigger>
             <SelectContent>
@@ -523,7 +532,7 @@ export default function UsersPage() {
               ))}
             </SelectContent>
           </Select>
-          <Button variant="outline" onClick={loadUsers}>
+          <Button variant="outline" onClick={loadUsers} className="w-full lg:w-auto">
             <RefreshCw className="mr-2 h-4 w-4" />
             刷新
           </Button>
@@ -532,6 +541,7 @@ export default function UsersPage() {
         {/* 用户列表 */}
         <Card>
           <CardContent className="p-0">
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -571,11 +581,14 @@ export default function UsersPage() {
                           : '-'}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
+                        <div className="flex flex-wrap justify-end gap-1">
+                          {hasPermission('users:edit') && (
                           <Switch
                             checked={user.isActive}
                             onCheckedChange={() => handleToggleActive(user)}
                           />
+                          )}
+                          {hasPermission('users:edit') && (
                           <Button
                             variant="ghost"
                             size="icon"
@@ -583,6 +596,8 @@ export default function UsersPage() {
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
+                          )}
+                          {hasPermission('users:delete') && (
                           <Button
                             variant="ghost"
                             size="icon"
@@ -591,6 +606,7 @@ export default function UsersPage() {
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -598,6 +614,7 @@ export default function UsersPage() {
                 )}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
 
@@ -608,7 +625,7 @@ export default function UsersPage() {
 
       {/* 添加/编辑对话框 */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>
               {editingUser ? '编辑用户' : '添加用户'}
@@ -700,23 +717,26 @@ export default function UsersPage() {
               <Label htmlFor="isActive">启用账号</Label>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="w-full sm:w-auto">
               取消
             </Button>
+            {((editingUser && hasPermission('users:edit')) || (!editingUser && hasPermission('users:create'))) && (
             <Button
               onClick={handleSubmit}
               disabled={!formData.username || (!editingUser && !formData.password)}
+              className="w-full sm:w-auto"
             >
               {editingUser ? '保存修改' : '创建'}
             </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Excel导入预览对话框 */}
       <Dialog open={excelImportDialogOpen} onOpenChange={setExcelImportDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogContent className="flex max-h-[80vh] w-[calc(100vw-1.5rem)] flex-col overflow-hidden sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>导入用户数据预览</DialogTitle>
             <DialogDescription>
@@ -724,6 +744,7 @@ export default function UsersPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-auto">
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -750,17 +771,20 @@ export default function UsersPage() {
                 ))}
               </TableBody>
             </Table>
+            </div>
             {excelImportData.length > 20 && (
               <p className="text-sm text-gray-500 text-center py-2">
                 仅显示前20条数据...
               </p>
             )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setExcelImportDialogOpen(false)}>取消</Button>
-            <Button onClick={confirmExcelImport} disabled={importing}>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setExcelImportDialogOpen(false)} className="w-full sm:w-auto">取消</Button>
+            {hasPermission('users:create') && (
+            <Button onClick={confirmExcelImport} disabled={importing} className="w-full sm:w-auto">
               {importing ? '导入中...' : `确认导入 ${excelImportData.length} 条`}
             </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

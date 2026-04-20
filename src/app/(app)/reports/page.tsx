@@ -9,6 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getOrderStatusBadgeClass, getOrderStatusLabel } from '@/lib/order-status';
 import { toast } from 'sonner';
+import { PageGuard } from '@/components/auth/page-guard';
+import { buildUserInfoHeaders } from '@/lib/auth';
 import {
   BarChart3,
   TrendingUp,
@@ -204,11 +206,12 @@ export default function ReportsPage() {
     const dateParams = getDateRange();
 
     try {
+      const headers = buildUserInfoHeaders();
       const [reportRes, salesRes, supplierRes, timelineRes] = await Promise.all([
-        fetch(`/api/reports/stats?${dateParams}`),
-        fetch(`/api/reports/sales-performance?${dateParams}`),
-        fetch(`/api/reports/supplier-analysis?${dateParams}`),
-        fetch(`/api/reports/return-timeline?${dateParams}`),
+        fetch(`/api/reports/stats?${dateParams}`, { headers }),
+        fetch(`/api/reports/sales-performance?${dateParams}`, { headers }),
+        fetch(`/api/reports/supplier-analysis?${dateParams}`, { headers }),
+        fetch(`/api/reports/return-timeline?${dateParams}`, { headers }),
       ]);
 
       const [reportJson, salesJson, supplierJson, timelineJson] = await Promise.all([
@@ -296,7 +299,7 @@ export default function ReportsPage() {
         ['生成时间', new Date().toLocaleString('zh-CN')],
         [],
         ['时效汇总'],
-        ['平均派发天数', reportData?.summary.avgOrdersPerDay || '0'],
+        ['平均派发天数', timelineData.summary.avgDispatchDays],
         ['平均回传天数', timelineData.summary.avgReturnDays],
         ['按时回传率', `${timelineData.summary.returnOnTimeRate}%`],
         [],
@@ -337,10 +340,11 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
+    <PageGuard permission="dashboard:view" title="无权查看报表" description="当前账号没有查看数据报表的权限。">
+    <div className="space-y-6 px-3 py-4 sm:px-4 sm:py-6">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="flex items-center gap-2 text-2xl font-bold sm:text-3xl">
             <BarChart3 className="h-8 w-8" />
             数据报表
           </h1>
@@ -348,9 +352,9 @@ export default function ReportsPage() {
             系统运营数据统计与分析
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <Select value={dateRange} onValueChange={setDateRange}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-full sm:w-40">
               <SelectValue placeholder="选择时间范围" />
             </SelectTrigger>
             <SelectContent>
@@ -360,7 +364,7 @@ export default function ReportsPage() {
               <SelectItem value="365">近一年</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" onClick={() => loadAllData()}>
+          <Button variant="outline" onClick={() => loadAllData()} className="w-full sm:w-auto">
             <RefreshCw className="h-4 w-4 mr-2" />
             刷新
           </Button>
@@ -368,7 +372,7 @@ export default function ReportsPage() {
       </div>
 
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="grid grid-cols-4 w-fit">
+        <TabsList className="grid w-full grid-cols-2 sm:w-fit sm:grid-cols-4">
           <TabsTrigger value="overview">总览</TabsTrigger>
           <TabsTrigger value="sales">销售业绩</TabsTrigger>
           <TabsTrigger value="supplier">供应商</TabsTrigger>
@@ -378,7 +382,7 @@ export default function ReportsPage() {
         {/* 总览 */}
         <TabsContent value="overview" className="space-y-4">
           {/* 汇总卡片 */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">总订单数</CardTitle>
@@ -527,9 +531,9 @@ export default function ReportsPage() {
           </Card>
 
           {/* 热销商品和客户 */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <TrendingUp className="h-5 w-5" />
                   热销商品 TOP10
@@ -538,12 +542,14 @@ export default function ReportsPage() {
                   variant="ghost"
                   size="sm"
                   onClick={() => exportReport('orders')}
+                  className="w-full sm:w-auto"
                 >
                   <Download className="h-4 w-4 mr-2" />
                   导出
                 </Button>
               </CardHeader>
               <CardContent>
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -571,6 +577,7 @@ export default function ReportsPage() {
                     )}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
 
@@ -582,6 +589,7 @@ export default function ReportsPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -609,6 +617,7 @@ export default function ReportsPage() {
                     )}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -645,7 +654,7 @@ export default function ReportsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div className="flex items-center gap-3 p-4 bg-red-50 rounded-lg">
                   <AlertTriangle className="h-8 w-8 text-red-500" />
                   <div>
@@ -674,7 +683,7 @@ export default function ReportsPage() {
 
         {/* 销售业绩 */}
         <TabsContent value="sales" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium">总订单数</CardTitle>
@@ -724,18 +733,19 @@ export default function ReportsPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
+              <CardTitle className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <span className="flex items-center gap-2">
                   <Users className="h-5 w-5" />
                   业务员业绩排行
                 </span>
-                <Button variant="ghost" size="sm" onClick={() => exportReport('sales')}>
+                <Button variant="ghost" size="sm" onClick={() => exportReport('sales')} className="w-full sm:w-auto">
                   <Download className="h-4 w-4 mr-2" />
                   导出
                 </Button>
               </CardTitle>
             </CardHeader>
             <CardContent>
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -793,6 +803,7 @@ export default function ReportsPage() {
                   )}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
 
@@ -804,6 +815,7 @@ export default function ReportsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -861,13 +873,14 @@ export default function ReportsPage() {
                   )}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
 
         {/* 供应商分析 */}
         <TabsContent value="supplier" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium">供应商总数</CardTitle>
@@ -906,18 +919,19 @@ export default function ReportsPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
+              <CardTitle className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <span className="flex items-center gap-2">
                   <Building2 className="h-5 w-5" />
                   供应商订单排行 TOP10
                 </span>
-                <Button variant="ghost" size="sm" onClick={() => exportReport('supplier')}>
+                <Button variant="ghost" size="sm" onClick={() => exportReport('supplier')} className="w-full sm:w-auto">
                   <Download className="h-4 w-4 mr-2" />
                   导出
                 </Button>
               </CardTitle>
             </CardHeader>
             <CardContent>
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -969,6 +983,7 @@ export default function ReportsPage() {
                   )}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
 
@@ -981,7 +996,7 @@ export default function ReportsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 {supplierData?.byType.map((item, index) => (
                   <div key={index} className="p-4 border rounded-lg">
                     <div className="flex items-center justify-between">
@@ -1009,7 +1024,7 @@ export default function ReportsPage() {
 
         {/* 回单时效 */}
         <TabsContent value="timeline" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium">总订单数</CardTitle>
@@ -1054,18 +1069,19 @@ export default function ReportsPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
+              <CardTitle className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <span className="flex items-center gap-2">
                   <Truck className="h-5 w-5" />
                   快递时效排行
                 </span>
-                <Button variant="ghost" size="sm" onClick={() => exportReport('timeline')}>
+                <Button variant="ghost" size="sm" onClick={() => exportReport('timeline')} className="w-full sm:w-auto">
                   <Download className="h-4 w-4 mr-2" />
                   导出
                 </Button>
               </CardTitle>
             </CardHeader>
             <CardContent>
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1097,6 +1113,7 @@ export default function ReportsPage() {
                   )}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
 
@@ -1108,6 +1125,7 @@ export default function ReportsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1139,6 +1157,7 @@ export default function ReportsPage() {
                   )}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
 
@@ -1225,5 +1244,6 @@ export default function ReportsPage() {
         </TabsContent>
       </Tabs>
     </div>
+    </PageGuard>
   );
 }

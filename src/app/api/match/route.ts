@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 interface OrderItem {
@@ -190,6 +191,8 @@ function normalizeTransientOrder(input: Record<string, unknown>): Record<string,
 }
 
 export async function POST(request: NextRequest) {
+  const authError = requirePermission(request, 'orders:view');
+  if (authError) return authError;
   const client = getSupabaseClient();
 
   try {

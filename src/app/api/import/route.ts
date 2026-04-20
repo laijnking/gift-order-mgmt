@@ -1,13 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 export async function POST(request: NextRequest) {
+  const body = await request.json();
+  const { type, data } = body;
+
+  const permissionMap: Record<string, string> = {
+    customers: 'customers:create',
+    products: 'products:create',
+    suppliers: 'suppliers:create',
+    warehouses: 'suppliers:create',
+    orders: 'orders:create',
+    stocks: 'stocks:edit',
+  };
+
+  const requiredPermission = type ? permissionMap[type] : null;
+  if (!requiredPermission) {
+    return NextResponse.json({ 
+      success: false, 
+      error: 'Invalid parameters, requires supported type and data array' 
+    }, { status: 400 });
+  }
+
+  const authError = requirePermission(request, requiredPermission);
+  if (authError) return authError;
+
   const client = getSupabaseClient();
   
   try {
-    const body = await request.json();
-    const { type, data } = body;
-    
     if (!type || !data || !Array.isArray(data)) {
       return NextResponse.json({ 
         success: false, 

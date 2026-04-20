@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import * as XLSX from 'xlsx';
+import { requirePermission } from '@/lib/server-auth';
 
 type MatchType = 'code' | 'spec' | 'name' | 'none';
 
@@ -245,6 +246,8 @@ async function recordStockVersion(
 }
 
 export async function POST(request: NextRequest) {
+  const authError = requirePermission(request, 'stocks:edit');
+  if (authError) return authError;
   const client = getSupabaseClient();
 
   try {

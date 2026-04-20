@@ -3,7 +3,7 @@ services:
     image: postgres:16-alpine
     container_name: gift-order-mgmt-db
     ports:
-      - "5432:5432"
+      - "${DB_BIND_HOST:-127.0.0.1}:${DB_PORT:-5432}:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres123
@@ -26,16 +26,27 @@ services:
       dockerfile: Dockerfile
     container_name: gift-order-mgmt
     ports:
-      - "3001:3000"
+      - "${APP_BIND_HOST:-0.0.0.0}:${APP_PORT:-3001}:3000"
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://postgres:postgres123@db:5432/gift_order
-      - NEXT_PUBLIC_SUPABASE_URL=http://166.108.203.24:3001
+      - EXPORT_ARTIFACT_PROVIDER=${EXPORT_ARTIFACT_PROVIDER:-local}
+      - EXPORT_ARTIFACT_DIR=${EXPORT_ARTIFACT_DIR:-/app/data/exports}
+      - EXPORT_ARTIFACT_S3_BUCKET=${EXPORT_ARTIFACT_S3_BUCKET:-}
+      - EXPORT_ARTIFACT_S3_REGION=${EXPORT_ARTIFACT_S3_REGION:-auto}
+      - EXPORT_ARTIFACT_S3_ENDPOINT=${EXPORT_ARTIFACT_S3_ENDPOINT:-}
+      - EXPORT_ARTIFACT_S3_ACCESS_KEY_ID=${EXPORT_ARTIFACT_S3_ACCESS_KEY_ID:-}
+      - EXPORT_ARTIFACT_S3_SECRET_ACCESS_KEY=${EXPORT_ARTIFACT_S3_SECRET_ACCESS_KEY:-}
+      - EXPORT_ARTIFACT_S3_FORCE_PATH_STYLE=${EXPORT_ARTIFACT_S3_FORCE_PATH_STYLE:-false}
+      - EXPORT_ARTIFACT_SIGNED_URL_TTL=${EXPORT_ARTIFACT_SIGNED_URL_TTL:-900}
+      - NEXT_PUBLIC_SUPABASE_URL=${PUBLIC_APP_URL:-http://localhost:3001}
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=local-anon-key
       - NEXT_PUBLIC_SUPABASE_DB_URL=postgresql://postgres:postgres123@db:5432/gift_order
-      - COZE_SUPABASE_URL=http://166.108.203.24:3001
+      - COZE_SUPABASE_URL=${APP_INTERNAL_URL:-http://127.0.0.1:3000}
       - COZE_SUPABASE_ANON_KEY=local-anon-key
       - COZE_SUPABASE_SERVICE_ROLE_KEY=local-service-role-key
+    volumes:
+      - app_data:/app/data
     depends_on:
       db:
         condition: service_healthy
@@ -43,8 +54,47 @@ services:
     networks:
       - app-network
 
+  minio:
+    image: minio/minio:RELEASE.2026-02-10T00-53-09Z
+    container_name: gift-order-mgmt-minio
+    profiles:
+      - object-storage
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${EXPORT_ARTIFACT_S3_ACCESS_KEY_ID:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${EXPORT_ARTIFACT_S3_SECRET_ACCESS_KEY:-minioadmin}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  minio-init:
+    image: minio/mc:RELEASE.2026-03-12T17-29-24Z
+    container_name: gift-order-mgmt-minio-init
+    profiles:
+      - object-storage
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until (/usr/bin/mc alias set local http://minio:9000 ${EXPORT_ARTIFACT_S3_ACCESS_KEY_ID:-minioadmin} ${EXPORT_ARTIFACT_S3_SECRET_ACCESS_KEY:-minioadmin}); do
+        echo 'waiting for minio...' && sleep 2;
+      done;
+      /usr/bin/mc mb -p local/${EXPORT_ARTIFACT_S3_BUCKET:-gift-order-exports} || true;
+      /usr/bin/mc anonymous set private local/${EXPORT_ARTIFACT_S3_BUCKET:-gift-order-exports} || true;
+      exit 0;
+      "
+    networks:
+      - app-network
+
 volumes:
   postgres_data:
+  app_data:
+  minio_data:
 
 networks:
   app-network:

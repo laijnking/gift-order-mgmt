@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 // 数据库字段转前端格式
@@ -35,6 +36,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authError = requirePermission(request, 'agent_configs:view');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
   const { id } = await params;
 
@@ -66,6 +70,9 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authError = requirePermission(request, 'agent_configs:edit');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
   const { id } = await params;
   
@@ -125,6 +132,9 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authError = requirePermission(request, 'agent_configs:edit');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
   const { id } = await params;
 

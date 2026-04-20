@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { requirePermission } from '@/lib/server-auth';
 
 export async function POST(request: NextRequest) {
+  const authError = requirePermission(request, 'stocks:edit');
+  if (authError) return authError;
   try {
     const { stocks } = await request.json();
     

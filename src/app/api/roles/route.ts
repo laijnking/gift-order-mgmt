@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { requirePermission } from '@/lib/server-auth';
 
 // 获取角色列表
 export async function GET(request: NextRequest) {
+  const authError = requirePermission(request, 'settings:view');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
   const includePermissions = searchParams.get('includePermissions') === 'true';
@@ -51,6 +55,9 @@ export async function GET(request: NextRequest) {
 
 // 创建角色
 export async function POST(request: NextRequest) {
+  const authError = requirePermission(request, 'settings:view');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
   
   try {

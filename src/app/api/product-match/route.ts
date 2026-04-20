@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 // 系统商品匹配接口
 export async function POST(request: NextRequest) {
+  const authError = requirePermission(request, 'products:view');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
   
   try {
@@ -193,6 +197,9 @@ export async function POST(request: NextRequest) {
 
 // 批量匹配接口
 export async function PUT(request: NextRequest) {
+  const authError = requirePermission(request, 'products:view');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
   
   try {

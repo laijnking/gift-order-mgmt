@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requirePermission } from '@/lib/server-auth';
 
 // 创建指向 public schema 的 client
 function getPublicSupabaseClient() {
@@ -15,6 +16,9 @@ function getPublicSupabaseClient() {
 }
 
 export async function POST(request: NextRequest) {
+  const authError = requirePermission(request, 'suppliers:create');
+  if (authError) return authError;
+
   try {
     const { data } = await request.json();
     

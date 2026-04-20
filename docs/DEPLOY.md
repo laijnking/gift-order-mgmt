@@ -105,6 +105,32 @@ export const supabase = createClient(supabaseUrl, supabaseKey);
 
 ## 5. 部署步骤
 
+### 5.0 Docker 外网访问
+
+如果使用仓库根目录的 `docker-compose.yml` 做部署，并且需要外网直接访问应用，请先在 `.env.docker` 里至少设置这几项：
+
+```bash
+APP_BIND_HOST=0.0.0.0
+APP_PORT=3001
+PUBLIC_APP_URL=http://你的公网IP:3001
+APP_INTERNAL_URL=http://127.0.0.1:3000
+DB_BIND_HOST=127.0.0.1
+DB_PORT=5432
+```
+
+说明：
+
+- `PUBLIC_APP_URL` 给浏览器和前端 SDK 使用，应填写公网 IP 或域名
+- `APP_INTERNAL_URL` 给容器内服务端自调用使用，保持 `http://127.0.0.1:3000` 更稳妥
+- `DB_BIND_HOST=127.0.0.1` 可以避免把 PostgreSQL 直接暴露到公网
+- 若要走正式 HTTPS，建议把 `PUBLIC_APP_URL` 换成域名，并在前面加 Nginx / Caddy / 云负载均衡
+
+启动命令：
+
+```bash
+docker compose --env-file .env.docker up --build -d
+```
+
 ### 5.1 首次部署
 
 ```bash

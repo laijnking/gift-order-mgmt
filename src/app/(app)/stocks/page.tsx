@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,6 +41,8 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
+import { PageGuard } from '@/components/auth/page-guard';
+import { buildUserInfoHeaders, usePermission } from '@/lib/auth';
 import {
   Package,
   AlertTriangle,
@@ -139,6 +141,8 @@ interface PriceHistory {
 }
 
 export default function StocksPage() {
+  const { hasPermission } = usePermission();
+  const canEditStocks = hasPermission('stocks:edit');
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [filteredStocks, setFilteredStocks] = useState<Stock[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -210,6 +214,15 @@ export default function StocksPage() {
     loadData();
   }, [showLowStockOnly]);
 
+  const authHeaders = useCallback(() => buildUserInfoHeaders(), []);
+  const jsonHeaders = useCallback(
+    () => ({
+      'Content-Type': 'application/json',
+      ...buildUserInfoHeaders(),
+    }),
+    []
+  );
+
   // 筛选数据
   useEffect(() => {
     let filtered = stocks;
@@ -239,7 +252,7 @@ export default function StocksPage() {
       }
 
       const [stocksRes, suppliersRes] = await Promise.all([
-        fetch(`/api/stocks?${params.toString()}`),
+        fetch(`/api/stocks?${params.toString()}`, { headers: authHeaders() }),
         fetch('/api/suppliers?active=true'),
       ]);
 
@@ -354,7 +367,7 @@ export default function StocksPage() {
 
         const res = await fetch('/api/stocks/import', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: jsonHeaders(),
           body: JSON.stringify({ data: batch }),
         });
         const result = await res.json();
@@ -402,7 +415,7 @@ export default function StocksPage() {
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonHeaders(),
         body: JSON.stringify({
           ...formData,
           supplierId: formData.supplier_id,
@@ -450,6 +463,7 @@ export default function StocksPage() {
     try {
       const res = await fetch(`/api/stocks/${id}`, {
         method: 'DELETE',
+        headers: authHeaders(),
       });
       const data = await res.json();
       if (data.success) {
@@ -501,7 +515,7 @@ export default function StocksPage() {
         params.set('supplierId', stock.supplier_id);
       }
       
-      const res = await fetch(`/api/stock-versions?${params.toString()}`);
+      const res = await fetch(`/api/stock-versions?${params.toString()}`, { headers: authHeaders() });
       const data = await res.json();
       if (data.success) {
         setStockVersions(data.data || []);
@@ -530,7 +544,7 @@ export default function StocksPage() {
         params.set('productCode', versionSearchTerm);
       }
       
-      const res = await fetch(`/api/stock-versions?${params.toString()}`);
+      const res = await fetch(`/api/stock-versions?${params.toString()}`, { headers: authHeaders() });
       const data = await res.json();
       if (data.success) {
         setStockVersions(data.data || []);
@@ -581,7 +595,7 @@ export default function StocksPage() {
         params.set('endDate', priceHistoryDateRange.end);
       }
       
-      const res = await fetch(`/api/price-history?${params.toString()}`);
+      const res = await fetch(`/api/price-history?${params.toString()}`, { headers: authHeaders() });
       const data = await res.json();
       if (data.success) {
         setPriceHistory(data.data || []);
@@ -638,11 +652,12 @@ export default function StocksPage() {
   }
 
   return (
+    <PageGuard permission="stocks:view" title="无权查看库存" description="当前账号没有查看库存管理的权限。">
     <>
-      <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
+      <div className="space-y-6 px-3 pb-4 sm:px-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="flex items-center gap-2 text-2xl font-bold sm:text-3xl">
             <Warehouse className="h-8 w-8" />
             库存管理
           </h1>
@@ -650,12 +665,12 @@ export default function StocksPage() {
             实时库存查询与尾货预警管理
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => { setShowLowStockOnly(!showLowStockOnly); }}>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <Button variant="outline" onClick={() => { setShowLowStockOnly(!showLowStockOnly); }} className="w-full sm:w-auto">
             <AlertTriangle className={`mr-2 h-4 w-4 ${showLowStockOnly ? 'text-orange-500' : ''}`} />
             {showLowStockOnly ? '显示全部' : '只看预警'}
           </Button>
-          <Button variant="outline" onClick={() => { setActiveTab('history'); loadPriceHistory(); }}>
+          <Button variant="outline" onClick={() => { setActiveTab('history'); loadPriceHistory(); }} className="w-full sm:w-auto">
             <TrendingUp className="mr-2 h-4 w-4" />
             价格历史
           </Button>
@@ -687,15 +702,15 @@ export default function StocksPage() {
               console.error('模板下载失败:', error);
               toast.error('模板下载失败');
             }
-          }}>
+          }} className="w-full sm:w-auto">
             <Download className="mr-2 h-4 w-4" />
             模板下载
           </Button>
-          <Button onClick={() => { resetForm(); setIsDialogOpen(true); }}>
+          <Button onClick={() => { resetForm(); setIsDialogOpen(true); }} disabled={!canEditStocks} className="w-full sm:w-auto">
             <Plus className="mr-2 h-4 w-4" />
             添加库存
           </Button>
-          <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+          <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={!canEditStocks} className="w-full sm:w-auto">
             <Upload className="mr-2 h-4 w-4" />
             导入库存
           </Button>
@@ -712,7 +727,7 @@ export default function StocksPage() {
       />
 
       {/* 统计卡片 */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">库存总量</CardTitle>
@@ -758,7 +773,7 @@ export default function StocksPage() {
       {(stats.lowStockCount > 0 || stats.outOfStockCount > 0) && !showLowStockOnly && (
         <Card className="border-orange-200 bg-orange-50">
           <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <AlertTriangle className="h-6 w-6 text-orange-600" />
               <div>
                 <p className="font-medium text-orange-800">
@@ -771,7 +786,7 @@ export default function StocksPage() {
               </div>
               <Button
                 variant="outline"
-                className="ml-auto"
+                className="sm:ml-auto"
                 onClick={() => setShowLowStockOnly(true)}
               >
                 查看预警详情
@@ -782,7 +797,7 @@ export default function StocksPage() {
       )}
 
       {/* 筛选器 */}
-      <div className="flex gap-4">
+      <div className="flex flex-col gap-4 lg:flex-row">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -794,7 +809,7 @@ export default function StocksPage() {
         </div>
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="outline" className="w-[200px] justify-start">
+            <Button variant="outline" className="w-full justify-start lg:w-[200px]">
               <span className={supplierFilter && supplierFilter !== 'all' ? '' : 'text-muted-foreground'}>
                 {supplierFilter && supplierFilter !== 'all' 
                   ? suppliers.find(s => s.id === supplierFilter)?.name || '筛选供应商'
@@ -850,7 +865,7 @@ export default function StocksPage() {
             </div>
           </PopoverContent>
         </Popover>
-        <Button variant="outline" onClick={loadData}>
+        <Button variant="outline" onClick={loadData} className="w-full lg:w-auto">
           <RefreshCw className="mr-2 h-4 w-4" />
           刷新
         </Button>
@@ -859,6 +874,7 @@ export default function StocksPage() {
       {/* 库存列表 */}
       <Card>
         <CardContent className="p-0">
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -910,7 +926,7 @@ export default function StocksPage() {
                       {getStockLevelBadge(stock)}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
+                      <div className="flex flex-wrap justify-end gap-1">
                         <Button
                           variant="ghost"
                           size="icon"
@@ -923,6 +939,7 @@ export default function StocksPage() {
                           variant="ghost"
                           size="icon"
                           onClick={() => handleEdit(stock)}
+                          disabled={!canEditStocks}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -930,6 +947,7 @@ export default function StocksPage() {
                           variant="ghost"
                           size="icon"
                           onClick={() => handleDelete(stock.id)}
+                          disabled={!canEditStocks}
                           className="text-destructive hover:text-destructive"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -941,6 +959,7 @@ export default function StocksPage() {
               )}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 
@@ -951,7 +970,7 @@ export default function StocksPage() {
 
       {/* 添加/编辑对话框 */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>
               {editingStock ? '编辑库存' : '添加库存'}
@@ -985,7 +1004,7 @@ export default function StocksPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label htmlFor="product_code">SKU编码 *</Label>
                 <Input
@@ -1005,7 +1024,7 @@ export default function StocksPage() {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid gap-4 sm:grid-cols-3">
               <div className="grid gap-2">
                 <Label htmlFor="quantity">库存数量</Label>
                 <Input
@@ -1052,11 +1071,11 @@ export default function StocksPage() {
               </div>
             )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="w-full sm:w-auto">
               取消
             </Button>
-            <Button onClick={handleSubmit} disabled={!formData.supplier_id || !formData.product_code || !formData.product_name}>
+            <Button onClick={handleSubmit} disabled={!canEditStocks || !formData.supplier_id || !formData.product_code || !formData.product_name} className="w-full sm:w-auto">
               {editingStock ? '保存修改' : '添加'}
             </Button>
           </DialogFooter>
@@ -1065,7 +1084,7 @@ export default function StocksPage() {
 
       {/* 版本历史对话框 */}
       <Dialog open={isVersionDialogOpen} onOpenChange={setIsVersionDialogOpen}>
-        <DialogContent className="sm:max-w-[900px] max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogContent className="flex max-h-[80vh] w-[calc(100vw-1.5rem)] flex-col overflow-hidden sm:max-w-[900px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <History className="h-5 w-5" />
@@ -1081,7 +1100,7 @@ export default function StocksPage() {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="flex items-center gap-2 mb-4">
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -1091,7 +1110,7 @@ export default function StocksPage() {
                 className="pl-10"
               />
             </div>
-            <Button variant="outline" onClick={loadAllVersions}>
+            <Button variant="outline" onClick={loadAllVersions} className="w-full sm:w-auto">
               <RefreshCw className="mr-2 h-4 w-4" />
               刷新
             </Button>
@@ -1107,6 +1126,7 @@ export default function StocksPage() {
                 暂无版本历史记录
               </div>
             ) : (
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1160,6 +1180,7 @@ export default function StocksPage() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             )}
           </div>
           
@@ -1175,7 +1196,7 @@ export default function StocksPage() {
         if (importing && !open) return;
         setImportDialogOpen(open);
       }}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-h-[80vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>
               {importing ? '正在导入库存数据...' : '确认导入库存数据'}
@@ -1253,7 +1274,7 @@ export default function StocksPage() {
             </div>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button
               variant="outline"
               onClick={() => {
@@ -1262,13 +1283,15 @@ export default function StocksPage() {
                   setImportingData([]);
                 }
               }}
-              disabled={importing}
+              disabled={importing || !canEditStocks}
+              className="w-full sm:w-auto"
             >
               {importing ? '导入中，请稍候...' : '取消'}
             </Button>
             <Button
               onClick={confirmImport}
-              disabled={importing || importingData.length === 0}
+              disabled={importing || importingData.length === 0 || !canEditStocks}
+              className="w-full sm:w-auto"
             >
               {importing ? (
                 <>
@@ -1289,7 +1312,7 @@ export default function StocksPage() {
       {/* 价格历史标签页 */}
       {activeTab === 'history' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h2 className="text-xl font-semibold flex items-center gap-2">
                 <TrendingUp className="h-5 w-5" />
@@ -1299,7 +1322,7 @@ export default function StocksPage() {
                 查看商品价格变更记录
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <Button variant="outline" onClick={() => setActiveTab('stock')}>
                 <ArrowUpDown className="mr-2 h-4 w-4" />
                 返回库存
@@ -1314,20 +1337,20 @@ export default function StocksPage() {
           {/* 价格历史筛选 */}
           <Card>
             <CardContent className="pt-4 pb-3">
-              <div className="flex flex-wrap items-end gap-3">
+              <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">商品编码</Label>
                   <Input
                     placeholder="搜索商品编码..."
                     value={priceHistorySearch}
                     onChange={(e) => setPriceHistorySearch(e.target.value)}
-                    className="w-[180px] h-8"
+                    className="h-8 w-full lg:w-[180px]"
                   />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">供应商</Label>
                   <Select value={priceHistorySupplier} onValueChange={setPriceHistorySupplier}>
-                    <SelectTrigger className="w-[180px] h-8">
+                    <SelectTrigger className="h-8 w-full lg:w-[180px]">
                       <SelectValue placeholder="全部供应商" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1346,7 +1369,7 @@ export default function StocksPage() {
                     type="date"
                     value={priceHistoryDateRange.start}
                     onChange={(e) => setPriceHistoryDateRange(prev => ({ ...prev, start: e.target.value }))}
-                    className="w-[150px] h-8"
+                    className="h-8 w-full lg:w-[150px]"
                   />
                 </div>
                 <div className="space-y-1">
@@ -1355,10 +1378,10 @@ export default function StocksPage() {
                     type="date"
                     value={priceHistoryDateRange.end}
                     onChange={(e) => setPriceHistoryDateRange(prev => ({ ...prev, end: e.target.value }))}
-                    className="w-[150px] h-8"
+                    className="h-8 w-full lg:w-[150px]"
                   />
                 </div>
-                <Button onClick={loadPriceHistory}>查询</Button>
+                <Button onClick={loadPriceHistory} className="w-full sm:w-auto">查询</Button>
               </div>
             </CardContent>
           </Card>
@@ -1366,6 +1389,7 @@ export default function StocksPage() {
           {/* 价格历史列表 */}
           <Card>
             <CardContent className="p-0">
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1433,6 +1457,7 @@ export default function StocksPage() {
                   )}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
           
@@ -1443,5 +1468,6 @@ export default function StocksPage() {
       )}
     </div>
     </>
+    </PageGuard>
   );
 }

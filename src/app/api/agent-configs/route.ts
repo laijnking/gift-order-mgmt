@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 // 数据库字段转前端格式
@@ -32,6 +33,9 @@ function transformAgent(dbAgent: Record<string, unknown>) {
 
 // 获取Agent配置列表
 export async function GET(request: NextRequest) {
+  const authError = requirePermission(request, 'agent_configs:view');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
   const type = searchParams.get('type');
@@ -71,6 +75,9 @@ export async function GET(request: NextRequest) {
 
 // 新增Agent配置
 export async function POST(request: NextRequest) {
+  const authError = requirePermission(request, 'agent_configs:edit');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
   
   try {

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { syncOrderCostHistoryAfterReturn } from '@/lib/order-cost-history';
+import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import * as XLSX from 'xlsx';
 
@@ -155,6 +157,8 @@ async function findOrder(client: ReturnType<typeof getSupabaseClient>, row: Retu
 }
 
 export async function POST(request: NextRequest) {
+  const authError = requirePermission(request, 'orders:edit');
+  if (authError) return authError;
   const client = getSupabaseClient();
 
   try {
@@ -216,15 +220,12 @@ export async function POST(request: NextRequest) {
         })
         .eq('id', order.id);
 
-      await client
-        .from('order_cost_history')
-        .update({
-          express_company: row.expressCompany,
-          tracking_no: row.trackingNo,
-          returned_date: now.slice(0, 10),
-          updated_at: now,
-        })
-        .eq('order_id', order.id);
+      await syncOrderCostHistoryAfterReturn(client, {
+        orderId: String(order.id),
+        expressCompany: row.expressCompany,
+        trackingNo: row.trackingNo,
+        returnedAt: now,
+      });
 
       await client.from('return_receipts').insert({
         order_id: order.id,

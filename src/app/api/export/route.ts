@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { recordOrderCostFromDispatch } from '@/lib/order-cost-history';
+import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import * as XLSX from 'xlsx';
 
@@ -33,11 +35,6 @@ function parseItems(value: unknown): OrderItem[] {
 function toNumber(value: unknown, fallback = 0): number {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
-}
-
-function toDateOnly(value?: unknown): string {
-  const d = value ? new Date(String(value)) : new Date();
-  return Number.isNaN(d.getTime()) ? new Date().toISOString().slice(0, 10) : d.toISOString().slice(0, 10);
 }
 
 async function findStockForDispatch(
@@ -183,35 +180,14 @@ async function dispatchOneOrder(
     });
 
     const unitCost = beforePrice || toNumber(item.unit_price ?? item.price);
-    const totalCost = unitCost * quantity;
-
-    await client.from('order_cost_history').insert({
-      order_id: order.id,
-      order_no: order.order_no,
-      match_code: order.match_code || null,
-      supplier_id: supplier.id,
-      supplier_name: supplier.name,
-      warehouse_id: stock.warehouse_id || null,
-      warehouse_name: stock.warehouse_name || null,
-      product_code: stock.product_code || item.product_code || item.productCode || null,
-      product_name: stock.product_name || item.product_name || item.productName || null,
+    await recordOrderCostFromDispatch(client, {
+      order,
+      supplier,
+      stock,
+      item: item as Record<string, unknown>,
       quantity,
-      unit_cost: unitCost,
-      total_cost: totalCost,
-      express_fee: 0,
-      other_fee: 0,
-      total_amount: totalCost,
-      receiver_name: order.receiver_name || null,
-      receiver_phone: order.receiver_phone || null,
-      receiver_address: order.receiver_address || null,
-      customer_code: order.customer_code || null,
-      customer_name: order.customer_name || null,
-      salesperson: order.salesperson || null,
-      operator_name: order.operator_name || null,
-      order_date: toDateOnly(order.created_at),
-      shipped_date: toDateOnly(),
-      dispatch_batch: batchNo,
-      remark: order.remark || null,
+      unitCost,
+      batchNo,
     });
 
     dispatchItems.push({
@@ -250,6 +226,8 @@ async function dispatchOneOrder(
 }
 
 export async function POST(request: NextRequest) {
+  const authError = requirePermission(request, 'orders:export');
+  if (authError) return authError;
   const client = getSupabaseClient();
 
   try {

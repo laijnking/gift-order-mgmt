@@ -1,0 +1,95 @@
+{
+  "cases": [
+    {
+      "name": "shipping-export-response",
+      "recordId": "record-ship",
+      "response": {
+        "zipFileName": "发货通知单批量导出+20260419.zip",
+        "zipFileUrl": "/api/export-records/record-ship/download",
+        "templateSource": "default",
+        "artifact": {
+          "provider": "local",
+          "relative_path": "data/exports/record-ship/batch.zip",
+          "file_name": "发货通知单批量导出+20260419.zip"
+        },
+        "details": [
+          {
+            "supplierId": "supplier-1",
+            "supplierName": "供应商A",
+            "fileName": "供应商A+发货通知单+20260419.xlsx",
+            "fileUrl": "/api/export-records/record-ship/download?detailIndex=0",
+            "templateSource": "default",
+            "artifact": {
+              "provider": "local",
+              "relative_path": "data/exports/record-ship/supplier-a.xlsx",
+              "file_name": "供应商A+发货通知单+20260419.xlsx"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "hasZip": true,
+        "hasPersistedArtifact": true,
+        "detailCount": 1,
+        "persistedDetailCount": 1,
+        "templateSource": "default",
+        "zipDownloadPath": "/api/export-records/record-ship/download",
+        "detailDownloadPaths": [
+          "/api/export-records/record-ship/download?detailIndex=0"
+        ]
+      }
+    },
+    {
+      "name": "customer-feedback-response",
+      "recordId": "record-feedback",
+      "response": {
+        "zipFileName": "客户反馈批量导出+20260419.zip",
+        "zipFileUrl": "/api/export-records/record-feedback/download",
+        "templateSource": "mixed",
+        "artifact": {
+          "provider": "s3",
+          "relative_path": "record-feedback/batch.zip",
+          "file_name": "客户反馈批量导出+20260419.zip"
+        },
+        "details": [
+          {
+            "customerId": "customer-1",
+            "customerName": "客户A",
+            "fileName": "客户A+订单反馈+20260419.xlsx",
+            "fileUrl": "/api/export-records/record-feedback/download?detailIndex=0",
+            "templateSource": "column_mapping",
+            "artifact": {
+              "provider": "s3",
+              "relative_path": "record-feedback/customer-a.xlsx",
+              "file_name": "客户A+订单反馈+20260419.xlsx"
+            }
+          },
+          {
+            "customerId": "customer-2",
+            "customerName": "客户B",
+            "fileName": "客户B+订单反馈+20260419.xlsx",
+            "fileUrl": "/api/export-records/record-feedback/download?detailIndex=1",
+            "templateSource": "default",
+            "artifact": {
+              "provider": "s3",
+              "relative_path": "record-feedback/customer-b.xlsx",
+              "file_name": "客户B+订单反馈+20260419.xlsx"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "hasZip": true,
+        "hasPersistedArtifact": true,
+        "detailCount": 2,
+        "persistedDetailCount": 2,
+        "templateSource": "mixed",
+        "zipDownloadPath": "/api/export-records/record-feedback/download",
+        "detailDownloadPaths": [
+          "/api/export-records/record-feedback/download?detailIndex=0",
+          "/api/export-records/record-feedback/download?detailIndex=1"
+        ]
+      }
+    }
+  ]
+}

@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
+import { PageGuard } from '@/components/auth/page-guard';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { buildUserInfoHeaders, useAuth, usePermission } from '@/lib/auth';
 import { isOperatorAssignableRole, isSalesAssignableRole } from '@/lib/roles';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
@@ -58,6 +60,11 @@ interface User {
 }
 
 export default function CustomersPage() {
+  const { user } = useAuth();
+  const { hasPermission } = usePermission();
+  const canCreateCustomers = hasPermission('customers:create');
+  const canEditCustomers = hasPermission('customers:edit');
+  const canDeleteCustomers = hasPermission('customers:delete');
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -104,9 +111,11 @@ export default function CustomersPage() {
     fetchUsers();
   }, []);
 
+  const authHeaders = useCallback(() => buildUserInfoHeaders(user), [user]);
+
   const fetchCustomers = async () => {
     try {
-      const res = await fetch('/api/customers');
+      const res = await fetch('/api/customers', { headers: authHeaders() });
       const data = await res.json();
       if (data.success) {
         setCustomers(data.data);
@@ -120,7 +129,7 @@ export default function CustomersPage() {
 
   const fetchUsers = async () => {
     try {
-      const res = await fetch('/api/users?isActive=true');
+      const res = await fetch('/api/users?isActive=true', { headers: authHeaders() });
       const data = await res.json();
       if (data.success) {
         setUsers(data.data);
@@ -215,7 +224,7 @@ export default function CustomersPage() {
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify(formData),
       });
 
@@ -235,7 +244,7 @@ export default function CustomersPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`/api/customers/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/customers/${id}`, { method: 'DELETE', headers: authHeaders() });
       const data = await res.json();
       if (data.success) {
         setAlert({ type: 'success', message: '客户删除成功' });
@@ -308,7 +317,7 @@ export default function CustomersPage() {
       for (const update of updates) {
         const res = await fetch(`/api/customers/${update.id}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
           body: JSON.stringify(update),
         });
         if (!res.ok) throw new Error('更新失败');
@@ -389,7 +398,7 @@ export default function CustomersPage() {
         
         const res = await fetch('/api/import/customers', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
           body: JSON.stringify({ data: batch }),
         });
         const result = await res.json();
@@ -464,19 +473,19 @@ export default function CustomersPage() {
   };
 
   return (
-    <>
+    <PageGuard permission="customers:view" title="无权查看客户" description="当前账号没有查看客户管理的权限。">
       <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-10">
+      <header className="sticky top-0 z-10 border-b bg-white">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
             <Link href="/archive">
               <Button variant="ghost" size="sm">
                 <ArrowLeft className="w-4 h-4 mr-1" />
                 返回
               </Button>
             </Link>
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
                 <Users className="w-6 h-6 text-white" />
               </div>
@@ -490,9 +499,9 @@ export default function CustomersPage() {
       </header>
 
       {/* Navigation */}
-      <div className="bg-white border-b">
+      <div className="border-b bg-white">
         <div className="container mx-auto px-4">
-          <nav className="flex gap-6">
+          <nav className="flex gap-4 overflow-x-auto">
             <Link href="/archive" className="py-4 px-2 border-b-2 border-transparent text-sm font-medium text-gray-600 hover:text-gray-900">
               总览
             </Link>
@@ -553,7 +562,7 @@ export default function CustomersPage() {
         {/* Search and Actions */}
         <Card className="mb-6">
           <CardContent className="pt-6">
-            <div className="flex flex-wrap items-center gap-4">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
@@ -565,7 +574,7 @@ export default function CustomersPage() {
               </div>
               {/* 业务员筛选 */}
               <Select value={salesUserFilter || 'all'} onValueChange={(v) => setSalesUserFilter(v === 'all' ? '' : v)}>
-                <SelectTrigger className="w-[150px]">
+                <SelectTrigger className="w-full xl:w-[150px]">
                   <SelectValue placeholder="按业务员" />
                 </SelectTrigger>
                 <SelectContent>
@@ -579,7 +588,7 @@ export default function CustomersPage() {
               </Select>
               {/* 跟单员筛选 */}
               <Select value={operatorUserFilter || 'all'} onValueChange={(v) => setOperatorUserFilter(v === 'all' ? '' : v)}>
-                <SelectTrigger className="w-[150px]">
+                <SelectTrigger className="w-full xl:w-[150px]">
                   <SelectValue placeholder="按跟单员" />
                 </SelectTrigger>
                 <SelectContent>
@@ -594,12 +603,12 @@ export default function CustomersPage() {
               {/* 批量交接按钮 */}
               <Dialog open={batchDialogOpen} onOpenChange={setBatchDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" disabled={selectedCustomers.length === 0}>
+                  <Button variant="outline" disabled={selectedCustomers.length === 0 || !canEditCustomers}>
                     <UsersRound className="w-4 h-4 mr-1" />
                     批量交接 ({selectedCustomers.length})
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-lg">
                   <DialogHeader>
                     <DialogTitle>批量交接客户</DialogTitle>
                     <DialogDescription>
@@ -645,9 +654,9 @@ export default function CustomersPage() {
                       </Select>
                     </div>
                   </div>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setBatchDialogOpen(false)}>取消</Button>
-                    <Button onClick={handleBatchTransfer}>确认交接</Button>
+                  <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                    <Button variant="outline" onClick={() => setBatchDialogOpen(false)} className="w-full sm:w-auto">取消</Button>
+                    <Button onClick={handleBatchTransfer} disabled={!canEditCustomers} className="w-full sm:w-auto">确认交接</Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
@@ -659,26 +668,26 @@ export default function CustomersPage() {
                 style={{ display: 'none' }}
                 onChange={handleFileUpload}
               />
-              <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+              <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="w-full xl:w-auto" disabled={!canCreateCustomers}>
                 <Upload className="w-4 h-4 mr-1" />
                 导入
               </Button>
-              <Button variant="outline" onClick={downloadTemplate}>
+              <Button variant="outline" onClick={downloadTemplate} className="w-full xl:w-auto">
                 <Download className="w-4 h-4 mr-1" />
                 下载模板
               </Button>
-              <Button variant="outline" onClick={handleExport} disabled={filteredCustomers.length === 0}>
+              <Button variant="outline" onClick={handleExport} disabled={filteredCustomers.length === 0} className="w-full xl:w-auto">
                 <Download className="w-4 h-4 mr-1" />
                 导出
               </Button>
               <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button onClick={() => { resetForm(); setDialogOpen(true); }}>
+                  <Button onClick={() => { resetForm(); setDialogOpen(true); }} className="w-full xl:w-auto" disabled={!canCreateCustomers}>
                     <Plus className="w-4 h-4 mr-1" />
                     新增客户
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                <DialogContent className="max-h-[80vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-2xl">
                   <DialogHeader>
                     <DialogTitle>{editingCustomer ? '编辑客户' : '新增客户'}</DialogTitle>
                     <DialogDescription>
@@ -690,7 +699,7 @@ export default function CustomersPage() {
                       <AlertDescription>{alert.message}</AlertDescription>
                     </Alert>
                   )}
-                  <div className="grid grid-cols-2 gap-4 py-4">
+                  <div className="grid gap-4 py-4 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label>客户代码 *</Label>
                       <Input 
@@ -755,7 +764,7 @@ export default function CustomersPage() {
                         placeholder="如: 思明区"
                       />
                     </div>
-                    <div className="col-span-2 space-y-2">
+                    <div className="space-y-2 sm:col-span-2">
                       <Label>详细地址</Label>
                       <Input 
                         value={formData.address} 
@@ -824,7 +833,7 @@ export default function CustomersPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="col-span-2 space-y-2">
+                    <div className="space-y-2 sm:col-span-2">
                       <Label>备注</Label>
                       <Input 
                         value={formData.remark} 
@@ -833,9 +842,9 @@ export default function CustomersPage() {
                       />
                     </div>
                   </div>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>
-                    <Button onClick={handleSubmit}>{editingCustomer ? '保存修改' : '创建客户'}</Button>
+                  <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                    <Button variant="outline" onClick={() => setDialogOpen(false)} className="w-full sm:w-auto">取消</Button>
+                    <Button onClick={handleSubmit} disabled={editingCustomer ? !canEditCustomers : !canCreateCustomers} className="w-full sm:w-auto">{editingCustomer ? '保存修改' : '创建客户'}</Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
@@ -844,7 +853,7 @@ export default function CustomersPage() {
                 if (importing && !open) return;
                 setImportDialogOpen(open);
               }}>
-                <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                <DialogContent className="max-h-[80vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-4xl">
                   <DialogHeader>
                     <DialogTitle>
                       {importing ? '正在导入客户数据...' : '确认导入客户数据'}
@@ -920,17 +929,19 @@ export default function CustomersPage() {
                     </div>
                   )}
                   
-                  <DialogFooter>
+                  <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                     <Button 
                       variant="outline" 
                       onClick={() => setImportDialogOpen(false)}
                       disabled={importing}
+                      className="w-full sm:w-auto"
                     >
                       {importing ? '导入中，请稍候...' : '取消'}
                     </Button>
                     <Button 
                       onClick={confirmImport} 
                       disabled={importing}
+                      className="w-full sm:w-auto"
                     >
                       {importing ? (
                         <>
@@ -954,6 +965,7 @@ export default function CustomersPage() {
         {/* Customer List */}
         <Card>
           <CardContent className="p-0">
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -1029,26 +1041,26 @@ export default function CustomersPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(customer)}>
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(customer)} disabled={!canEditCustomers}>
                             <Edit className="w-4 h-4" />
                           </Button>
                           <Dialog open={deleteConfirmId === customer.id} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
                             <DialogTrigger asChild>
-                              <Button variant="ghost" size="sm" onClick={() => setDeleteConfirmId(customer.id)}>
+                              <Button variant="ghost" size="sm" onClick={() => setDeleteConfirmId(customer.id)} disabled={!canDeleteCustomers}>
                                 <Trash2 className="w-4 h-4 text-red-500" />
                               </Button>
                             </DialogTrigger>
-                            <DialogContent>
+                            <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-lg">
                               <DialogHeader>
                                 <DialogTitle>确认删除</DialogTitle>
                                 <DialogDescription>
                                 确定要删除客户 &quot;{customer.name}&quot; 吗？此操作无法撤销。
                                 </DialogDescription>
                               </DialogHeader>
-                              <DialogFooter>
-                                <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>取消</Button>
-                                <Button variant="destructive" onClick={() => handleDelete(customer.id)}>删除</Button>
+                              <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                                <Button variant="outline" onClick={() => setDeleteConfirmId(null)} className="w-full sm:w-auto">取消</Button>
+                                <Button variant="destructive" onClick={() => handleDelete(customer.id)} disabled={!canDeleteCustomers} className="w-full sm:w-auto">删除</Button>
                               </DialogFooter>
                             </DialogContent>
                           </Dialog>
@@ -1059,10 +1071,11 @@ export default function CustomersPage() {
                 )}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       </main>
     </div>
-    </>
+    </PageGuard>
   );
 }

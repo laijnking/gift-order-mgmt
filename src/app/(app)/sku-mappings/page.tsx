@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { PageGuard } from '@/components/auth/page-guard';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,6 +47,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { buildUserInfoHeaders, usePermission } from '@/lib/auth';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import {
@@ -177,6 +179,7 @@ interface ProductData {
 type MappingType = 'customer' | 'supplier';
 
 export default function ProductMappingsPage() {
+  const { hasPermission } = usePermission();
   const [activeTab, setActiveTab] = useState<MappingType>('customer');
   const [mappings, setMappings] = useState<ProductMapping[]>([]);
   const [filteredMappings, setFilteredMappings] = useState<ProductMapping[]>([]);
@@ -206,6 +209,8 @@ export default function ProductMappingsPage() {
   const [excelColumns, setExcelColumns] = useState<string[]>([]);
   const [fieldMappings, setFieldMappings] = useState<Record<string, string>>({});
   const [mappingSearchTerm, setMappingSearchTerm] = useState<Record<string, string>>({});
+  const canEditProducts = hasPermission('products:edit');
+  const canDeleteProducts = hasPermission('products:delete');
 
   // 表单状态
   const [formData, setFormData] = useState({
@@ -259,11 +264,12 @@ export default function ProductMappingsPage() {
   const loadData = async () => {
     setLoading(true);
     try {
+      const headers = buildUserInfoHeaders();
       const [mappingsRes, customersRes, suppliersRes, productsRes] = await Promise.all([
-        fetch('/api/product-mappings'),
-        fetch('/api/customers'),
-        fetch('/api/suppliers?active=true'),
-        fetch('/api/products'),
+        fetch('/api/product-mappings', { headers }),
+        fetch('/api/customers', { headers }),
+        fetch('/api/suppliers?active=true', { headers }),
+        fetch('/api/products', { headers }),
       ]);
 
       const mappingsData = await mappingsRes.json() as MappingData;
@@ -305,6 +311,11 @@ export default function ProductMappingsPage() {
   };
 
   const handleSubmit = async () => {
+    if (!canEditProducts) {
+      toast.error('当前账号没有编辑 SKU 映射的权限');
+      return;
+    }
+
     try {
       const url = editingMapping
         ? `/api/product-mappings/${editingMapping.id}`
@@ -333,7 +344,10 @@ export default function ProductMappingsPage() {
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          ...buildUserInfoHeaders(),
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(mappingData),
       });
 
@@ -377,11 +391,17 @@ export default function ProductMappingsPage() {
   };
 
   const handleDelete = async (id: string) => {
+    if (!canDeleteProducts) {
+      toast.error('当前账号没有删除 SKU 映射的权限');
+      return;
+    }
+
     if (!confirm('确定要删除这条映射吗？')) return;
 
     try {
       const res = await fetch(`/api/product-mappings/${id}`, {
         method: 'DELETE',
+        headers: buildUserInfoHeaders(),
       });
       const data = await res.json();
       if (data.success) {
@@ -397,10 +417,18 @@ export default function ProductMappingsPage() {
   };
 
   const handleToggleActive = async (mapping: ProductMapping) => {
+    if (!canEditProducts) {
+      toast.error('当前账号没有编辑 SKU 映射的权限');
+      return;
+    }
+
     try {
       const res = await fetch(`/api/product-mappings/${mapping.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          ...buildUserInfoHeaders(),
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({ isActive: !mapping.isActive }),
       });
       const data = await res.json();
@@ -436,6 +464,11 @@ export default function ProductMappingsPage() {
   };
 
   const handleImport = async () => {
+    if (!canEditProducts) {
+      toast.error('当前账号没有导入 SKU 映射的权限');
+      return;
+    }
+
     const partnerCode = activeTab === 'customer' ? selectedCustomer : selectedSupplier;
     if (!partnerCode || !importText.trim()) {
       toast.error('请选择' + (activeTab === 'customer' ? '客户' : '供应商') + '并输入映射数据');
@@ -478,7 +511,10 @@ export default function ProductMappingsPage() {
       // 批量创建
       const res = await fetch('/api/product-mappings/batch', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          ...buildUserInfoHeaders(),
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({ mappings }),
       });
 
@@ -648,6 +684,11 @@ export default function ProductMappingsPage() {
 
   // 确认Excel导入
   const confirmExcelImport = async () => {
+    if (!canEditProducts) {
+      toast.error('当前账号没有导入 SKU 映射的权限');
+      return;
+    }
+
     if (excelImportData.length === 0) {
       toast.error('请先上传Excel文件');
       return;
@@ -770,7 +811,10 @@ export default function ProductMappingsPage() {
         
         const res = await fetch('/api/product-mappings/batch', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            ...buildUserInfoHeaders(),
+            'Content-Type': 'application/json',
+          },
           body: JSON.stringify({ mappings: batch }),
         });
 
@@ -815,14 +859,14 @@ export default function ProductMappingsPage() {
   const partnerLabel = activeTab === 'customer' ? '客户' : '供应商';
 
   return (
-    <>
+    <PageGuard permission="products:view" title="无权查看 SKU 映射" description="当前账号没有查看 SKU 映射管理的权限。">
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">SKU映射管理</h1>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold sm:text-3xl">SKU映射管理</h1>
             <p className="text-muted-foreground">管理客户/供应商商品与系统商品的映射关系</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             {/* 隐藏的文件输入 */}
             <input
               type="file"
@@ -835,11 +879,11 @@ export default function ProductMappingsPage() {
               <Download className="mr-2 h-4 w-4" />
               模板下载
             </Button>
-            <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={!canEditProducts}>
               <Upload className="mr-2 h-4 w-4" />
               Excel导入
             </Button>
-            <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
+            <Button variant="outline" onClick={() => setIsImportDialogOpen(true)} disabled={!canEditProducts}>
               <Upload className="mr-2 h-4 w-4" />
               批量导入
             </Button>
@@ -847,7 +891,7 @@ export default function ProductMappingsPage() {
               <Download className="mr-2 h-4 w-4" />
               导出
             </Button>
-            <Button onClick={() => { resetForm(); setIsDialogOpen(true); }}>
+            <Button onClick={() => { resetForm(); setIsDialogOpen(true); }} disabled={!canEditProducts}>
               <Plus className="mr-2 h-4 w-4" />
               添加映射
             </Button>
@@ -855,13 +899,13 @@ export default function ProductMappingsPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as MappingType)}>
-          <TabsList>
+          <TabsList className="grid w-full grid-cols-2 sm:inline-flex sm:w-auto">
             <TabsTrigger value="customer">客户商品映射</TabsTrigger>
             <TabsTrigger value="supplier">供应商商品映射</TabsTrigger>
           </TabsList>
         </Tabs>
 
-        <div className="flex gap-4">
+        <div className="flex flex-col gap-4 lg:flex-row">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -872,7 +916,7 @@ export default function ProductMappingsPage() {
             />
           </div>
           <Select value={getPartnerFilter || 'all'} onValueChange={(v) => setPartnerFilter(v === 'all' ? '' : v)}>
-            <SelectTrigger className="w-[200px]">
+            <SelectTrigger className="w-full lg:w-[200px]">
               <SelectValue placeholder={activeTab === 'customer' ? "筛选客户" : "筛选供应商"} />
             </SelectTrigger>
             <SelectContent>
@@ -888,6 +932,7 @@ export default function ProductMappingsPage() {
 
         <Card>
           <CardContent className="p-0">
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -951,6 +996,7 @@ export default function ProductMappingsPage() {
                       <TableCell>
                         <Switch
                           checked={mapping.isActive ?? true}
+                          disabled={!canEditProducts}
                           onCheckedChange={() => handleToggleActive(mapping)}
                         />
                       </TableCell>
@@ -959,6 +1005,7 @@ export default function ProductMappingsPage() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            disabled={!canEditProducts}
                             onClick={() => handleEdit(mapping)}
                           >
                             <Edit className="h-4 w-4" />
@@ -966,6 +1013,7 @@ export default function ProductMappingsPage() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            disabled={!canDeleteProducts}
                             onClick={() => handleDelete(mapping.id)}
                             className="text-destructive hover:text-destructive"
                           >
@@ -978,6 +1026,7 @@ export default function ProductMappingsPage() {
                 )}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
 
@@ -987,7 +1036,7 @@ export default function ProductMappingsPage() {
 
         {/* 添加/编辑对话框 */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="sm:max-w-[600px]">
+          <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-[600px]">
             <DialogHeader>
               <DialogTitle>
                 {editingMapping ? '编辑SKU映射' : '添加SKU映射'}
@@ -1081,7 +1130,7 @@ export default function ProductMappingsPage() {
               <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                 取消
               </Button>
-              <Button onClick={handleSubmit} disabled={!formData.partnerCode || !formData.partnerProductName || !formData.productCode}>
+              <Button onClick={handleSubmit} disabled={!canEditProducts || !formData.partnerCode || !formData.partnerProductName || !formData.productCode}>
                 {editingMapping ? '保存修改' : '创建映射'}
               </Button>
             </DialogFooter>
@@ -1090,7 +1139,7 @@ export default function ProductMappingsPage() {
 
         {/* 批量导入对话框 */}
         <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
-          <DialogContent className="sm:max-w-[700px]">
+          <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-[700px]">
             <DialogHeader>
               <DialogTitle>批量导入SKU映射</DialogTitle>
               <DialogDescription>
@@ -1149,7 +1198,7 @@ export default function ProductMappingsPage() {
               <Button variant="outline" onClick={() => setIsImportDialogOpen(false)}>
                 取消
               </Button>
-              <Button onClick={handleImport}>
+              <Button onClick={handleImport} disabled={!canEditProducts}>
                 开始导入
               </Button>
             </DialogFooter>
@@ -1165,7 +1214,7 @@ export default function ProductMappingsPage() {
             setMappingSearchTerm({});
           }
         }}>
-          <DialogContent className="sm:max-w-[900px] max-h-[85vh] overflow-y-auto">
+          <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-[900px] max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>字段映射配置</DialogTitle>
               <DialogDescription>
@@ -1307,7 +1356,7 @@ export default function ProductMappingsPage() {
               }} disabled={importing}>
                 取消
               </Button>
-              <Button onClick={confirmFieldMapping} disabled={importing}>
+              <Button onClick={confirmFieldMapping} disabled={importing || !canEditProducts}>
                 <Check className="mr-2 h-4 w-4" />
                 确认映射并继续
               </Button>
@@ -1317,7 +1366,7 @@ export default function ProductMappingsPage() {
 
         {/* Excel导入确认对话框 */}
         <Dialog open={excelImportDialogOpen} onOpenChange={setExcelImportDialogOpen}>
-          <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
+          <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{'确认Excel导入SKU映射'}</DialogTitle>
               <DialogDescription>
@@ -1395,7 +1444,7 @@ export default function ProductMappingsPage() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setExcelImportDialogOpen(false)} disabled={importing}>取消</Button>
-              <Button onClick={confirmExcelImport} disabled={importing}>
+              <Button onClick={confirmExcelImport} disabled={importing || !canEditProducts}>
                 {importing ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1407,6 +1456,6 @@ export default function ProductMappingsPage() {
           </DialogContent>
         </Dialog>
       </div>
-    </>
+    </PageGuard>
   );
 }

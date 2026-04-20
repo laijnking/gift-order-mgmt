@@ -28,7 +28,12 @@ import {
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { PageGuard } from '@/components/auth/page-guard';
+import { buildUserInfoHeaders } from '@/lib/auth';
+import { getColumnMappingDiagnostics } from '@/lib/column-mapping-diagnostics';
+import { flattenBundleDraftsToFlatOrders } from '@/lib/order-parse-bundles';
 import { findUserByIdOrName, getUserDisplayName, isOperatorAssignableRole, isSalesAssignableRole } from '@/lib/roles';
+import type { ParsedOrderBundleDraft, ParsedOrderDraft } from '@/types/order-parse';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
@@ -165,124 +170,26 @@ interface Supplier {
   province?: string;
 }
 
-interface ParsedOrder {
+type ParsedOrder = ParsedOrderDraft & {
   id: string;
-  orderNo?: string;
-  billNo?: string;
-  billDate?: string;
-  customerOrderNo?: string;
-  supplierOrderNo?: string;
-  customer_code?: string;
-  customer_name?: string;
-  product_name: string;
-  product_code?: string;
-  product_spec?: string;
-  quantity: number;
-  price?: number;
-  amount?: number;
-  discount?: number;
-  taxRate?: number;
-  receiver_name?: string;
-  receiver_phone?: string;
-  receiver_address?: string;
-  express_company?: string;
-  tracking_no?: string;
-  warehouse?: string;
-  remark?: string;
-  invoice_required?: boolean;
-  income_name?: string;
-  income_amount?: number;
-  salesperson?: string;
-  operator?: string;
-  mappedProductCode?: string;
-  mappedProductName?: string;
-  mappedProductSpec?: string;
-  mappedProductBrand?: string;
-  systemProductId?: string;
-  customerSku?: string;
-  customerPrice?: number;
-  supplierId?: string;
-  supplierName?: string;
-  // 供应商匹配列表
-  supplierMatches?: {
-    supplierId: string;
-    supplierName: string;
-    stockQuantity: number;
-    stockPrice: number;
-    warehouseName: string;
-    matchType: string;
-  }[];
-  // 匹配类型
-  matchType?: string | null;
-  matchHint?: string | null;
-  extFields?: Record<string, string>;
   selected?: boolean;
   expanded?: boolean;
-}
+};
 
-// 增强版解析订单（包含商品明细）
-interface ParsedOrderDetail {
-  id: string;
-  orderNo?: string;
+type ParsedOrderDetail = ParsedOrderBundleDraft & {
   billNo?: string;
-  billDate?: string;
   customerOrderNo?: string;
   supplierOrderNo?: string;
   customer_code?: string;
   customer_name?: string;
-  // 收货信息（兼容驼峰和下划线两种命名）
-  receiverName?: string;
-  receiverPhone?: string;
-  receiverAddress?: string;
   receiver_name?: string;
   receiver_phone?: string;
   receiver_address?: string;
-  province?: string;
-  city?: string;
-  district?: string;
-  // 商品明细列表
-  items: {
-    id: string;
-    // 客户原始商品信息
-    customerProductName: string;
-    customerProductSpec: string;
-    product_spec?: string; // 客户规格型号（用于表单显示）
-    product_name?: string; // 客户商品名称（用于表单显示）
-    customerProductCode: string;
-    customerBarcode: string;
-    // 供应商信息
-    supplierName?: string;
-    // 系统商品信息
-    systemProductId: string | null;
-    systemProductName: string | null;
-    systemProductSpec: string | null;
-    systemProductCode: string | null;
-    systemProductBrand: string | null;
-    systemProductPrice: number | null;
-    matchType: string | null;
-    matchHint: string | null;
-    // 供应商匹配
-    supplierMatches: {
-      supplierId: string;
-      supplierName: string;
-      stockQuantity: number;
-      stockPrice: number;
-      warehouseName: string;
-      matchType: string;
-    }[];
-    quantity: number;
-    price: number | null | undefined;
-    remark: string;
-  }[];
-  // 订单级别字段（兼容驼峰和下划线）
-  expressCompany?: string;
-  trackingNo?: string;
   express_company?: string;
   tracking_no?: string;
-  remark?: string;
   selected?: boolean;
   expanded?: boolean;
-}
+};
 
 interface MappingHistory {
   id: string;
@@ -292,6 +199,116 @@ interface MappingHistory {
   created_at: string;
   created_by?: string;
   remark?: string;
+  header_fingerprint?: string;
+  template_signature?: string;
+  source_headers?: string[];
+}
+
+interface SubmitValidationSummary {
+  invalidOrderIds: string[];
+  missingProductNameCount: number;
+  missingReceiverCount: number;
+  missingPhoneCount: number;
+  missingAddressCount: number;
+  missingSupplierCount: number;
+}
+
+interface DuplicateSummary {
+  totalSkipped: number;
+  batchDuplicateCount: number;
+  existingDuplicateCount: number;
+  details: Array<{
+    orderNo: string;
+    receiverName: string;
+    reason: 'batch_duplicate' | 'existing_order';
+    existingSysOrderNo?: string;
+  }>;
+}
+
+interface MatchStatsSummary {
+  total: number;
+  bySpec: number;
+  byName: number;
+  byMapping: number;
+  none: number;
+  matched: number;
+  matchRate: string;
+}
+
+function normalizeBundleDraftsForPage(
+  bundles: Array<Record<string, unknown>>
+): ParsedOrderDetail[] {
+  return bundles.map((bundle, index) => ({
+    ...bundle,
+    id: String(bundle.id || `parsed_${Date.now()}_${index}`),
+    orderNo: String(bundle.orderNo || ''),
+    billDate: String(bundle.billDate || ''),
+    receiverName: String(bundle.receiverName || ''),
+    receiverPhone: String(bundle.receiverPhone || ''),
+    receiverAddress: String(bundle.receiverAddress || ''),
+    province: String(bundle.province || ''),
+    city: String(bundle.city || ''),
+    district: String(bundle.district || ''),
+    expressCompany: String(bundle.expressCompany || ''),
+    trackingNo: String(bundle.trackingNo || ''),
+    remark: String(bundle.remark || ''),
+    items: Array.isArray(bundle.items) ? bundle.items : [],
+    selected: true,
+    expanded: true,
+  }));
+}
+
+function buildFlatOrdersForPage(
+  bundles: ParsedOrderBundleDraft[],
+  customerCode: string,
+  idPrefix: string
+): ParsedOrder[] {
+  return flattenBundleDraftsToFlatOrders(bundles, customerCode).map((order, index) => ({
+    ...order,
+    id: order.id || `${idPrefix}_${Date.now()}_${index}`,
+    selected: true,
+    expanded: true,
+  }));
+}
+
+function getSubmitValidationSummary(orders: ParsedOrder[]): SubmitValidationSummary {
+  const selectedOrders = orders.filter((order) => order.selected);
+
+  return selectedOrders.reduce<SubmitValidationSummary>(
+    (summary, order) => {
+      const missingProductName = !order.product_name?.trim();
+      const missingReceiver = !order.receiver_name?.trim();
+      const missingPhone = !order.receiver_phone?.trim();
+      const missingAddress = !order.receiver_address?.trim();
+      const missingSupplier = !order.supplierId?.trim();
+
+      if (
+        missingProductName ||
+        missingReceiver ||
+        missingPhone ||
+        missingAddress ||
+        missingSupplier
+      ) {
+        summary.invalidOrderIds.push(order.id);
+      }
+
+      if (missingProductName) summary.missingProductNameCount += 1;
+      if (missingReceiver) summary.missingReceiverCount += 1;
+      if (missingPhone) summary.missingPhoneCount += 1;
+      if (missingAddress) summary.missingAddressCount += 1;
+      if (missingSupplier) summary.missingSupplierCount += 1;
+
+      return summary;
+    },
+    {
+      invalidOrderIds: [],
+      missingProductNameCount: 0,
+      missingReceiverCount: 0,
+      missingPhoneCount: 0,
+      missingAddressCount: 0,
+      missingSupplierCount: 0,
+    }
+  );
 }
 
 export default function OrderParsePage() {
@@ -312,13 +329,21 @@ export default function OrderParsePage() {
   const [headerRow, setHeaderRow] = useState(0);
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
   const [parsedOrders, setParsedOrders] = useState<ParsedOrder[]>([]);
-  const [parsedOrderDetails, setParsedOrderDetails] = useState<ParsedOrderDetail[]>([]);
   const [parseStats, setParseStats] = useState<{
     totalItems: number;
     matchedItems: number;
     unmatchedItems: number;
     ordersWithSupplier: number;
     ordersWithoutSupplier: number;
+    totalHeaderCount?: number;
+    nonEmptyHeaderCount?: number;
+    mappedColumnCount?: number;
+    ignoredColumnCount?: number;
+    extensionColumnCount?: number;
+    recognizedFieldCount?: number;
+    coverageRate?: number;
+    conflictFields?: string[];
+    unrecognizedHeaders?: string[];
   } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -335,8 +360,12 @@ export default function OrderParsePage() {
     importBatch: string;
     sysOrderNos: string[];
     message: string;
+    customerName?: string;
+    duplicateSummary?: DuplicateSummary;
+    matchStats?: MatchStatsSummary;
   } | null>(null);
   const [mappingHistory, setMappingHistory] = useState<MappingHistory[]>([]);
+  const [activeMappingMeta, setActiveMappingMeta] = useState<MappingHistory | null>(null);
   const [showMappingDialog, setShowMappingDialog] = useState(false);
   const [mappingSearchTerm, setMappingSearchTerm] = useState('');
   const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
@@ -575,10 +604,10 @@ export default function OrderParsePage() {
     loadCustomers();
     loadSuppliers();
     // 加载用户列表
-    const loadUsers = async () => {
-      try {
-        const res = await fetch('/api/users');
-        const data = await res.json();
+  const loadUsers = async () => {
+    try {
+      const res = await fetch('/api/users', { headers: buildUserInfoHeaders() });
+      const data = await res.json();
         if (data.success) {
           setUsers(data.data || []);
         }
@@ -610,7 +639,7 @@ export default function OrderParsePage() {
 
   const loadCustomers = async () => {
     try {
-      const res = await fetch('/api/customers');
+      const res = await fetch('/api/customers', { headers: buildUserInfoHeaders() });
       const data = await res.json();
       if (data.success) {
         setCustomers((data.data || []).filter((c: Customer) => c.code && c.name));
@@ -622,7 +651,7 @@ export default function OrderParsePage() {
 
   const loadSuppliers = async () => {
     try {
-      const res = await fetch('/api/suppliers');
+      const res = await fetch('/api/suppliers', { headers: buildUserInfoHeaders() });
       const data = await res.json();
       if (data.success) {
         setSuppliers((data.data || []).filter((s: Supplier) => s.id && s.name));
@@ -635,13 +664,27 @@ export default function OrderParsePage() {
   // 加载保存的映射配置
   const loadSavedMapping = async (customerCode: string) => {
     try {
-      const res = await fetch(`/api/column-mappings?customerCode=${encodeURIComponent(customerCode)}&activeOnly=true`);
+      const res = await fetch(`/api/column-mappings?customerCode=${encodeURIComponent(customerCode)}`, {
+        headers: buildUserInfoHeaders(),
+      });
       const data = await res.json();
-      if (data.success && data.data && data.data.length > 0) {
-        const savedMapping = data.data[0];
+      if (data.success && data.data) {
+        const savedMapping = data.data;
         setColumnMapping(savedMapping.mapping_config || {});
         setHeaderRow(savedMapping.header_row || 0);
+        setActiveMappingMeta(savedMapping);
+        const currentHeaders = normalizeHeadersForCompare(excelPreview[savedMapping.header_row || 0] || []);
+        const savedHeaders = normalizeHeadersForCompare(savedMapping.source_headers || []);
+        if (currentHeaders.length > 0 && savedHeaders.length > 0) {
+          const sameHeaderShape = JSON.stringify(currentHeaders) === JSON.stringify(savedHeaders);
+          if (!sameHeaderShape) {
+            toast.info(`已加载保存配置 (v${savedMapping.version})，但当前表头与保存版本不完全一致`);
+            return;
+          }
+        }
         toast.success(`已加载保存的配置 (v${savedMapping.version})`);
+      } else {
+        setActiveMappingMeta(null);
       }
     } catch (error) {
       console.error('加载映射配置失败:', error);
@@ -651,7 +694,9 @@ export default function OrderParsePage() {
   // 加载映射历史版本
   const loadMappingHistory = async (customerCode: string) => {
     try {
-      const res = await fetch(`/api/column-mappings?customerCode=${encodeURIComponent(customerCode)}&activeOnly=false`);
+      const res = await fetch(`/api/column-mappings/history?customerCode=${encodeURIComponent(customerCode)}`, {
+        headers: buildUserInfoHeaders(),
+      });
       const data = await res.json();
       if (data.success) {
         setMappingHistory(data.data || []);
@@ -671,11 +716,15 @@ export default function OrderParsePage() {
     try {
       const res = await fetch('/api/column-mappings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          ...buildUserInfoHeaders(),
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           customerCode: selectedCustomer,
           mappingConfig: columnMapping,
           headerRow,
+          sourceHeaders: excelPreview[headerRow] || [],
         }),
       });
 
@@ -697,6 +746,7 @@ export default function OrderParsePage() {
     try {
       const res = await fetch(`/api/column-mappings/${mappingId}`, {
         method: 'PATCH',
+        headers: buildUserInfoHeaders(),
       });
       const data = await res.json();
       if (data.success) {
@@ -786,7 +836,10 @@ export default function OrderParsePage() {
     try {
       const res = await fetch('/api/order-parse', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          ...buildUserInfoHeaders(),
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           text: inputText,
           customerCode: selectedCustomer,
@@ -798,12 +851,9 @@ export default function OrderParsePage() {
       console.log('【前端】API返回:', data);
 
       if (data.success) {
-        const orders = (data.data.orders || []).map((o: Record<string, unknown>, i: number) => ({
-          ...o,
-          id: `temp_${Date.now()}_${i}`,
-          selected: true,
-          expanded: true,
-        }));
+        const detailOrders = normalizeBundleDraftsForPage(data.data.orders || []);
+        const orders = buildFlatOrdersForPage(detailOrders, selectedCustomer, 'text_flat');
+
         setParsedOrders(orders);
         setParseResult({
           duration: data.data.duration,
@@ -841,6 +891,7 @@ export default function OrderParsePage() {
       const startTime = Date.now();
       const headers = excelPreview[headerRow] || [];
       const dataRows = excelPreview.slice(headerRow + 1);
+      const mappingDiagnostics = getColumnMappingDiagnostics(headers, columnMapping);
 
       // 调试日志
       console.log('Excel解析调试:', {
@@ -854,9 +905,13 @@ export default function OrderParsePage() {
       // 调用增强版解析API
       const res = await fetch('/api/order-parse/excel', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          ...buildUserInfoHeaders(),
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           rows: dataRows,
+          headers,
           columnMapping,
           customerCode: selectedCustomer,
         }),
@@ -875,56 +930,22 @@ export default function OrderParsePage() {
       if (data.success) {
         // 设置解析统计信息
         if (data.data.stats) {
-          setParseStats(data.data.stats);
+          setParseStats({
+            ...data.data.stats,
+            totalHeaderCount: data.data.stats.totalHeaderCount ?? mappingDiagnostics.totalHeaderCount,
+            nonEmptyHeaderCount: data.data.stats.nonEmptyHeaderCount ?? mappingDiagnostics.nonEmptyHeaderCount,
+            mappedColumnCount: data.data.stats.mappedColumnCount ?? mappingDiagnostics.mappedColumnCount,
+            ignoredColumnCount: data.data.stats.ignoredColumnCount ?? mappingDiagnostics.ignoredColumnCount,
+            extensionColumnCount: data.data.stats.extensionColumnCount ?? mappingDiagnostics.extensionColumnCount,
+            recognizedFieldCount: data.data.stats.recognizedFieldCount ?? mappingDiagnostics.recognizedFieldCount,
+            coverageRate: data.data.stats.coverageRate ?? mappingDiagnostics.coverageRate,
+            conflictFields: data.data.stats.conflictFields ?? mappingDiagnostics.conflictFields,
+            unrecognizedHeaders: data.data.stats.unrecognizedHeaders ?? mappingDiagnostics.unrecognizedHeaders,
+          });
         }
 
-        // 转换增强版订单格式为前端兼容格式
-        const detailOrders: ParsedOrderDetail[] = data.data.orders.map((order: Record<string, unknown>, i: number) => ({
-          ...order,
-          id: order.id || `excel_${Date.now()}_${i}`,
-          selected: true,
-          expanded: true,
-        })) as ParsedOrderDetail[];
-
-        // 同时生成兼容的简单格式用于提交
-        const simpleOrders: ParsedOrder[] = detailOrders.flatMap((order: ParsedOrderDetail) => {
-          // 兼容后端驼峰和前端下划线两种命名
-          const getOrderField = (field: string): string => {
-            return (order as unknown as Record<string, unknown>)[field] as string || '';
-          };
-          return order.items.map((item: Record<string, unknown>) => ({
-            id: item.id as string,
-            orderNo: order.orderNo || '',
-            billNo: order.billNo || '',
-            customerOrderNo: getOrderField('customerOrderNo') || getOrderField('customer_order_no') || '',
-            supplierOrderNo: order.supplierOrderNo || '',
-            supplierName: (item.supplierName as string) || '',
-            customer_code: getOrderField('customerCode') || getOrderField('customer_code') || selectedCustomer,
-            receiver_name: getOrderField('receiverName') || getOrderField('receiver_name') || '',
-            receiver_phone: getOrderField('receiverPhone') || getOrderField('receiver_phone') || '',
-            receiver_address: getOrderField('receiverAddress') || getOrderField('receiver_address') || '',
-            province: getOrderField('province') || '',
-            city: getOrderField('city') || '',
-            district: getOrderField('district') || '',
-            product_name: (item.customerProductName as string) || '',
-            product_code: (item.customerProductCode as string) || '',
-            product_spec: (item.customerProductSpec as string) || (item.product_spec as string) || '',
-            quantity: (item.quantity as number) || 1,
-            price: (item.price as number | undefined) ?? undefined,
-            express_company: getOrderField('expressCompany') || getOrderField('express_company') || '',
-            tracking_no: getOrderField('trackingNo') || getOrderField('tracking_no') || '',
-            remark: order.remark || getOrderField('remark') || '',
-            mappedProductCode: item.systemProductCode as string,
-            mappedProductName: item.systemProductName as string,
-            mappedProductSpec: item.systemProductSpec as string,
-            mappedProductBrand: item.systemProductBrand as string,
-            supplierMatches: item.supplierMatches as ParsedOrder['supplierMatches'],
-            matchType: (item.matchType as string | null) ?? undefined,
-            matchHint: (item.matchHint as string | null) ?? undefined,
-            selected: true,
-            expanded: true,
-          }));
-        });
+        const detailOrders = normalizeBundleDraftsForPage(data.data.orders || []);
+        const simpleOrders = buildFlatOrdersForPage(detailOrders, selectedCustomer, 'excel_flat');
         
         console.log('转换后的订单:', {
           detailOrdersCount: detailOrders.length,
@@ -932,7 +953,6 @@ export default function OrderParsePage() {
           firstSimpleOrder: simpleOrders[0],
         });
 
-        setParsedOrderDetails(detailOrders);
         setParsedOrders(simpleOrders);
         setParseResult({
           duration: Date.now() - startTime,
@@ -954,14 +974,12 @@ export default function OrderParsePage() {
       } else {
         toast.error(data.error || '解析失败');
         setParsedOrders([]);
-        setParsedOrderDetails([]);
         setParseStats(null);
       }
     } catch (error) {
       console.error('Excel解析失败:', error);
       toast.error('Excel解析失败');
       setParsedOrders([]);
-      setParsedOrderDetails([]);
       setParseStats(null);
     } finally {
       setIsLoading(false);
@@ -980,8 +998,14 @@ export default function OrderParsePage() {
     setInputText('');
     setExcelFile(null);
     setExcelPreview([]);
+    setExcelSheetNames([]);
+    setSelectedSheet('');
     setParsedOrders([]);
+    setParseStats(null);
     setParseResult(null);
+    setSupplierMatchResults({});
+    setMatchingSupplierOrderId(null);
+    setIsMatchingSupplier(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -996,6 +1020,36 @@ export default function OrderParsePage() {
       orders.map(o => (o.id === id ? { ...o, expanded: !o.expanded } : o))
     );
   };
+
+  const syncGlobalAssigneeToOrders = useCallback((
+    kind: 'salesperson' | 'operator',
+    nextId: string,
+    nextName: string,
+    previousName?: string
+  ) => {
+    const idField = kind === 'salesperson' ? 'salespersonId' : 'operatorId';
+
+    setParsedOrders((orders) =>
+      orders.map((order) => {
+        const currentName = kind === 'salesperson' ? order.salesperson : order.operator;
+        const currentId = kind === 'salesperson' ? order.salespersonId : order.operatorId;
+        const shouldSync =
+          !currentId ||
+          !currentName ||
+          (previousName ? currentName === previousName : false);
+
+        if (!shouldSync) {
+          return order;
+        }
+
+        return {
+          ...order,
+          [kind]: nextName,
+          [idField]: nextId,
+        };
+      })
+    );
+  }, []);
 
   const updateOrder = (id: string, field: string, value: unknown) => {
     setParsedOrders(orders =>
@@ -1030,8 +1084,13 @@ export default function OrderParsePage() {
       ...orders,
       {
         id: `manual_${Date.now()}`,
+        customer_code: selectedCustomer,
         product_name: '',
         quantity: 1,
+        salesperson: salespersonName || undefined,
+        salespersonId: salespersonId || undefined,
+        operator: operatorName || undefined,
+        operatorId: operatorId || undefined,
         selected: true,
         expanded: true,
       },
@@ -1050,7 +1109,10 @@ export default function OrderParsePage() {
     try {
       const res = await fetch('/api/match', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          ...buildUserInfoHeaders(),
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           orders: parsedOrders.filter(o => o.id === orderId),
         }),
@@ -1102,7 +1164,10 @@ export default function OrderParsePage() {
     try {
       const res = await fetch('/api/match', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          ...buildUserInfoHeaders(),
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({ orders: selectedParsedOrders }),
       });
       const data = await res.json();
@@ -1148,10 +1213,24 @@ export default function OrderParsePage() {
       return;
     }
 
-    const selectedOrders = parsedOrders.filter(o => o.selected && o.product_name);
+    const selectedOrders = parsedOrders.filter((order) => order.selected && order.product_name?.trim());
 
     if (selectedOrders.length === 0) {
       toast.error('请至少选择一条有效的订单');
+      return;
+    }
+
+    const validation = getSubmitValidationSummary(parsedOrders);
+    if (validation.invalidOrderIds.length > 0) {
+      const missingLabels: string[] = [];
+      if (validation.missingReceiverCount > 0) missingLabels.push('收货人');
+      if (validation.missingPhoneCount > 0) missingLabels.push('收货电话');
+      if (validation.missingAddressCount > 0) missingLabels.push('收货地址');
+      if (validation.missingSupplierCount > 0) missingLabels.push('发货供应商');
+
+      toast.error(
+        `还有 ${validation.invalidOrderIds.length} 条选中订单待补全${missingLabels.length > 0 ? `：${missingLabels.join('、')}` : ''}`
+      );
       return;
     }
 
@@ -1161,7 +1240,9 @@ export default function OrderParsePage() {
       const orderData = {
         customerCode: selectedCustomer,
         customerName: customers.find(c => c.code === selectedCustomer)?.name || '',
+        salespersonId: salespersonId || '',
         salespersonName: salespersonName || selectedOrders[0]?.salesperson || '',
+        operatorId: operatorId || '',
         operatorName: operatorName || selectedOrders[0]?.operator || '',
         items: selectedOrders.map(o => ({
           orderNo: o.orderNo || o.billNo || '',
@@ -1195,7 +1276,9 @@ export default function OrderParsePage() {
           invoice_required: o.invoice_required,
           income_name: o.income_name,
           income_amount: o.income_amount,
+          salespersonId: o.salespersonId || '',
           salesperson: o.salesperson,
+          operatorId: o.operatorId || '',
           operator: o.operator,
           extFields: o.extFields || {},
         })),
@@ -1203,7 +1286,10 @@ export default function OrderParsePage() {
 
       const res = await fetch('/api/orders', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          ...buildUserInfoHeaders(),
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(orderData),
       });
 
@@ -1218,6 +1304,9 @@ export default function OrderParsePage() {
           importBatch: data.importBatch || '',
           sysOrderNos,
           message: data.message || `成功创建 ${data.total || selectedOrders.length} 条订单`,
+          customerName: customers.find(c => c.code === selectedCustomer)?.name || selectedCustomer,
+          duplicateSummary: data.duplicateSummary,
+          matchStats: data.matchStats,
         });
         handleClear();
       } else {
@@ -1245,12 +1334,46 @@ export default function OrderParsePage() {
     return option?.label || fieldValue;
   };
 
+  const normalizeHeadersForCompare = (headers: string[]) =>
+    headers.map((header) => String(header || '').trim()).filter(Boolean);
+
+  const currentPreviewHeaders = normalizeHeadersForCompare(excelPreview[headerRow] || []);
+  const activeMappingHeaders = normalizeHeadersForCompare(activeMappingMeta?.source_headers || []);
+  const isCurrentHeaderAlignedWithActiveMapping =
+    currentPreviewHeaders.length > 0 &&
+    activeMappingHeaders.length > 0 &&
+    headerRow === (activeMappingMeta?.header_row ?? headerRow) &&
+    JSON.stringify(currentPreviewHeaders) === JSON.stringify(activeMappingHeaders);
+  const getHistoryCompatibility = (history: MappingHistory) => {
+    const historyHeaders = normalizeHeadersForCompare(history.source_headers || []);
+    if (currentPreviewHeaders.length === 0 || historyHeaders.length === 0) {
+      return null;
+    }
+
+    const isAligned =
+      headerRow === history.header_row &&
+      JSON.stringify(currentPreviewHeaders) === JSON.stringify(historyHeaders);
+
+    return {
+      isAligned,
+      label: isAligned ? '匹配当前文件' : '与当前文件有差异',
+    };
+  };
+  const submitValidation = getSubmitValidationSummary(parsedOrders);
+  const selectedValidOrderCount =
+    parsedOrders.filter((order) => order.selected).length - submitValidation.invalidOrderIds.length;
+
   return (
-    <div className="h-[calc(100vh-4rem)] flex flex-col">
+    <PageGuard
+      permission="orders:create"
+      title="无权录入订单"
+      description="当前账号没有使用订单录入功能的权限。"
+    >
+    <div className="flex min-h-[calc(100vh-4rem)] flex-col px-3 pb-3 sm:px-4">
       {/* Header */}
-      <div className="flex items-center justify-between px-1 py-3 shrink-0">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
+      <div className="flex shrink-0 flex-col gap-3 px-1 py-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="flex items-center gap-2 text-xl font-bold sm:text-2xl">
             <Sparkles className="h-6 w-6 text-primary" />
             AI智能订单录入
           </h1>
@@ -1258,12 +1381,13 @@ export default function OrderParsePage() {
             支持文本/Excel导入，AI自动识别并生成结构化订单
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
           {selectedCustomer && (
             <Button
               variant="outline"
               size="sm"
               onClick={() => setShowMappingDialog(true)}
+              className="w-full sm:w-auto"
             >
               <History className="h-4 w-4 mr-1" />
               映射历史 ({mappingHistory.length})
@@ -1273,6 +1397,7 @@ export default function OrderParsePage() {
             variant="outline"
             size="sm"
             onClick={() => setLeftPanelCollapsed(!leftPanelCollapsed)}
+            className="w-full sm:w-auto"
           >
             {leftPanelCollapsed ? (
               <PanelLeftOpen className="h-4 w-4 mr-1" />
@@ -1285,14 +1410,14 @@ export default function OrderParsePage() {
       </div>
 
       {/* Main content */}
-      <div className="flex-1 flex gap-4 min-h-0">
+      <div className="flex flex-1 min-h-0 flex-col gap-4 xl:flex-row">
         {/* Left Panel: Input */}
         <div
           className={`transition-all duration-300 ease-in-out shrink-0 ${
-            leftPanelCollapsed ? 'w-0 overflow-hidden opacity-0' : 'w-[520px] opacity-100'
+            leftPanelCollapsed ? 'h-0 overflow-hidden opacity-0 xl:h-auto xl:w-0' : 'w-full opacity-100 xl:w-[520px]'
           }`}
         >
-          <div className="h-full flex flex-col gap-3 overflow-y-auto pr-1">
+          <div className="flex h-full flex-col gap-3 overflow-y-auto pr-0 xl:pr-1">
             {/* Customer Select */}
             <Card className="shrink-0">
               <CardContent className="pt-4 pb-4">
@@ -1320,7 +1445,7 @@ export default function OrderParsePage() {
                         <ChevronDown className="ml-auto h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-[400px] p-0" align="start">
+                    <PopoverContent className="w-[min(400px,calc(100vw-2rem))] p-0" align="start">
                       <Command shouldFilter={true}>
                         <CommandInput
                           placeholder="输入客户名称或编码搜索..."
@@ -1354,15 +1479,24 @@ export default function OrderParsePage() {
                                         name: customer?.operatorUserName,
                                       });
 
-                                      setSalespersonId(matchedSalesUser?.id || customer?.salesUserId || '');
-                                      setSalespersonName(customer?.salesUserName || getUserDisplayName(matchedSalesUser));
-                                      setOperatorId(matchedOperatorUser?.id || customer?.operatorUserId || '');
-                                      setOperatorName(customer?.operatorUserName || getUserDisplayName(matchedOperatorUser));
+                                      const nextSalespersonId = matchedSalesUser?.id || customer?.salesUserId || '';
+                                      const nextSalespersonName = customer?.salesUserName || getUserDisplayName(matchedSalesUser);
+                                      const nextOperatorId = matchedOperatorUser?.id || customer?.operatorUserId || '';
+                                      const nextOperatorName = customer?.operatorUserName || getUserDisplayName(matchedOperatorUser);
+
+                                      setSalespersonId(nextSalespersonId);
+                                      setSalespersonName(nextSalespersonName);
+                                      setOperatorId(nextOperatorId);
+                                      setOperatorName(nextOperatorName);
+                                      syncGlobalAssigneeToOrders('salesperson', nextSalespersonId, nextSalespersonName, salespersonName);
+                                      syncGlobalAssigneeToOrders('operator', nextOperatorId, nextOperatorName, operatorName);
                                     } else {
                                       setSalespersonId('');
                                       setOperatorId('');
                                       setSalespersonName('');
                                       setOperatorName('');
+                                      syncGlobalAssigneeToOrders('salesperson', '', '', salespersonName);
+                                      syncGlobalAssigneeToOrders('operator', '', '', operatorName);
                                     }
                                   }}
                                 >
@@ -1378,22 +1512,28 @@ export default function OrderParsePage() {
                     </PopoverContent>
                   </Popover>
                   {selectedCustomer && (
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground">业务员</Label>
                         <Select 
                           value={salespersonId || (salespersonName ? `__name__${salespersonName}` : '__empty__')} 
                           onValueChange={(v) => {
+                            const previousName = salespersonName;
                             if (v === '__empty__') {
                               setSalespersonId('');
                               setSalespersonName('');
+                              syncGlobalAssigneeToOrders('salesperson', '', '', previousName);
                             } else if (v.startsWith('__name__')) {
+                              const nextName = v.replace('__name__', '');
                               setSalespersonId('');
-                              setSalespersonName(v.replace('__name__', ''));
+                              setSalespersonName(nextName);
+                              syncGlobalAssigneeToOrders('salesperson', '', nextName, previousName);
                             } else {
                               setSalespersonId(v);
                               const user = users.find(u => u.id === v);
-                              setSalespersonName(getUserDisplayName(user));
+                              const nextName = getUserDisplayName(user);
+                              setSalespersonName(nextName);
+                              syncGlobalAssigneeToOrders('salesperson', v, nextName, previousName);
                             }
                           }}
                         >
@@ -1420,16 +1560,22 @@ export default function OrderParsePage() {
                         <Select 
                           value={operatorId || (operatorName ? `__name__${operatorName}` : '__empty__')} 
                           onValueChange={(v) => {
+                            const previousName = operatorName;
                             if (v === '__empty__') {
                               setOperatorId('');
                               setOperatorName('');
+                              syncGlobalAssigneeToOrders('operator', '', '', previousName);
                             } else if (v.startsWith('__name__')) {
+                              const nextName = v.replace('__name__', '');
                               setOperatorId('');
-                              setOperatorName(v.replace('__name__', ''));
+                              setOperatorName(nextName);
+                              syncGlobalAssigneeToOrders('operator', '', nextName, previousName);
                             } else {
                               setOperatorId(v);
                               const user = users.find(u => u.id === v);
-                              setOperatorName(getUserDisplayName(user));
+                              const nextName = getUserDisplayName(user);
+                              setOperatorName(nextName);
+                              syncGlobalAssigneeToOrders('operator', v, nextName, previousName);
                             }
                           }}
                         >
@@ -1454,15 +1600,41 @@ export default function OrderParsePage() {
                     </div>
                   )}
                   {selectedCustomer && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs w-full"
-                      onClick={saveMapping}
-                    >
-                      <Save className="h-3 w-3 mr-1" />
-                      保存当前映射配置
-                    </Button>
+                    <div className="space-y-2">
+                      {activeMappingMeta && (
+                        <div className="rounded-md border border-dashed bg-muted/30 p-2 text-xs text-muted-foreground">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="outline">当前映射 v{activeMappingMeta.version}</Badge>
+                            {activeMappingMeta.header_fingerprint && (
+                              <Badge variant="outline">表头指纹 {activeMappingMeta.header_fingerprint}</Badge>
+                            )}
+                            {activeMappingMeta.template_signature && (
+                              <Badge variant="outline">模板签名 {activeMappingMeta.template_signature}</Badge>
+                            )}
+                          </div>
+                          {currentPreviewHeaders.length > 0 && activeMappingHeaders.length > 0 && (
+                            <p className="mt-2">
+                              当前表头匹配状态：
+                              <span className={cn(
+                                'ml-1 font-medium',
+                                isCurrentHeaderAlignedWithActiveMapping ? 'text-green-600' : 'text-orange-600'
+                              )}>
+                                {isCurrentHeaderAlignedWithActiveMapping ? '与已保存版本一致' : '与已保存版本存在差异'}
+                              </span>
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-full text-xs"
+                        onClick={saveMapping}
+                      >
+                        <Save className="h-3 w-3 mr-1" />
+                        保存当前映射配置
+                      </Button>
+                    </div>
                   )}
                 </div>
               </CardContent>
@@ -1477,7 +1649,7 @@ export default function OrderParsePage() {
               >
                 <CardHeader className="pb-2 shrink-0">
                   <div className="flex items-center justify-between">
-                    <TabsList className="grid w-[240px] grid-cols-2">
+                    <TabsList className="grid w-full max-w-[280px] grid-cols-2">
                       <TabsTrigger value="text" className="gap-1">
                         <Type className="h-4 w-4" />
                         文本录入
@@ -1667,10 +1839,10 @@ export default function OrderParsePage() {
                     ) : (
                       <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-hidden">
                         {/* File info */}
-                        <div className="flex items-center justify-between bg-muted p-2 rounded-md shrink-0">
-                          <div className="flex items-center gap-2 text-sm">
+                        <div className="flex flex-col gap-2 rounded-md bg-muted p-2 text-sm sm:flex-row sm:items-center sm:justify-between shrink-0">
+                          <div className="flex min-w-0 items-center gap-2 text-sm">
                             <FileSpreadsheet className="h-4 w-4 text-green-600" />
-                            <span className="font-medium truncate max-w-[180px]">{excelFile.name}</span>
+                            <span className="max-w-[180px] truncate font-medium sm:max-w-[220px]">{excelFile.name}</span>
                             <span className="text-muted-foreground">
                               ({(excelFile.size / 1024).toFixed(1)}KB)
                             </span>
@@ -1709,7 +1881,7 @@ export default function OrderParsePage() {
                         )}
 
                         {/* Header row */}
-                        <div className="grid grid-cols-2 gap-2 items-end shrink-0">
+                        <div className="grid grid-cols-1 gap-2 items-end shrink-0 sm:grid-cols-2 lg:grid-cols-3">
                           <div className="grid gap-1">
                             <Label className="text-xs">表头行（从0开始）</Label>
                             <Input
@@ -1851,7 +2023,7 @@ export default function OrderParsePage() {
 
                 {/* Parse button */}
                 <div className="px-6 pb-4 shrink-0 space-y-2">
-                  <div className="flex gap-2">
+                  <div className="flex flex-col gap-2 sm:flex-row">
                     <Button
                       onClick={handleParse}
                       disabled={isLoading || (inputMode === 'text' ? !inputText.trim() : excelPreview.length < 2)}
@@ -1869,7 +2041,7 @@ export default function OrderParsePage() {
                         </>
                       )}
                     </Button>
-                    <Button variant="outline" onClick={handleClear}>
+                    <Button variant="outline" onClick={handleClear} className="sm:w-auto">
                       清空
                     </Button>
                   </div>
@@ -1911,7 +2083,7 @@ export default function OrderParsePage() {
                       共 {parseStats.totalItems} 个商品
                     </Badge>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
                     <div className="flex items-center gap-2 bg-white rounded px-2 py-1">
                       <Check className="h-3 w-3 text-green-500" />
                       <span className="text-muted-foreground">已匹配商品:</span>
@@ -1933,15 +2105,86 @@ export default function OrderParsePage() {
                       <span className="font-medium text-red-600">{parseStats.ordersWithoutSupplier}</span>
                     </div>
                   </div>
+                  <div className="mt-2 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+                    <div className="flex items-center gap-2 bg-white rounded px-2 py-1">
+                      <FileSpreadsheet className="h-3 w-3 text-blue-500" />
+                      <span className="text-muted-foreground">识别列:</span>
+                      <span className="font-medium text-blue-600">{parseStats.recognizedFieldCount ?? 0}</span>
+                    </div>
+                    <div className="flex items-center gap-2 bg-white rounded px-2 py-1">
+                      <Clock className="h-3 w-3 text-slate-500" />
+                      <span className="text-muted-foreground">扩展列:</span>
+                      <span className="font-medium text-slate-600">{parseStats.extensionColumnCount ?? 0}</span>
+                    </div>
+                    <div className="flex items-center gap-2 bg-white rounded px-2 py-1">
+                      <BarChart3 className="h-3 w-3 text-emerald-500" />
+                      <span className="text-muted-foreground">映射命中率:</span>
+                      <span className="font-medium text-emerald-600">{parseStats.coverageRate ?? 0}%</span>
+                    </div>
+                    <div className="flex items-center gap-2 bg-white rounded px-2 py-1">
+                      <Eye className="h-3 w-3 text-violet-500" />
+                      <span className="text-muted-foreground">有效表头:</span>
+                      <span className="font-medium text-violet-600">{parseStats.nonEmptyHeaderCount ?? 0}</span>
+                    </div>
+                  </div>
+                  {((parseStats.unrecognizedHeaders?.length || 0) > 0 || (parseStats.conflictFields?.length || 0) > 0) && (
+                    <div className="mt-2 space-y-2 text-xs">
+                      {(parseStats.unrecognizedHeaders?.length || 0) > 0 && (
+                        <div className="rounded bg-white px-2 py-2">
+                          <div className="mb-1 flex items-center gap-1 text-amber-700">
+                            <AlertTriangle className="h-3 w-3" />
+                            <span className="font-medium">未识别表头</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {parseStats.unrecognizedHeaders?.slice(0, 8).map((header) => (
+                              <Badge key={header} variant="outline" className="bg-amber-50 text-amber-700">
+                                {header}
+                              </Badge>
+                            ))}
+                            {(parseStats.unrecognizedHeaders?.length || 0) > 8 && (
+                              <Badge variant="outline" className="bg-amber-50 text-amber-700">
+                                +{(parseStats.unrecognizedHeaders?.length || 0) - 8}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {(parseStats.conflictFields?.length || 0) > 0 && (
+                        <div className="rounded bg-white px-2 py-2">
+                          <div className="mb-1 flex items-center gap-1 text-red-700">
+                            <AlertTriangle className="h-3 w-3" />
+                            <span className="font-medium">冲突字段</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {parseStats.conflictFields?.map((field) => (
+                              <Badge key={field} variant="outline" className="bg-red-50 text-red-700">
+                                {field}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
               
               {/* Action Bar */}
-              <div className="flex items-center justify-between mb-3 px-1 shrink-0">
-                <div className="flex items-center gap-2">
+              <div className="mb-3 flex shrink-0 flex-col gap-2 px-1 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="secondary">
                     {parsedOrders.filter(o => o.selected).length} / {parsedOrders.length} 条
                   </Badge>
+                  {submitValidation.invalidOrderIds.length > 0 && (
+                    <Badge variant="destructive">
+                      {submitValidation.invalidOrderIds.length} 条待补全
+                    </Badge>
+                  )}
+                  {selectedValidOrderCount > 0 && (
+                    <Badge variant="outline">
+                      可提交 {selectedValidOrderCount} 条
+                    </Badge>
+                  )}
                   <Button
                     variant="ghost"
                     size="sm"
@@ -1956,12 +2199,12 @@ export default function OrderParsePage() {
                     {parsedOrders.every(o => o.selected) ? '取消全选' : '全选'}
                   </Button>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={addOrder}
-                    className="h-8"
+                    className="h-8 sm:w-auto"
                   >
                     <Plus className="h-4 w-4 mr-1" />
                     添加
@@ -1970,8 +2213,8 @@ export default function OrderParsePage() {
                     variant="default"
                     size="sm"
                     onClick={handleSubmitOrders}
-                    disabled={isSubmitting || !parsedOrders.some(o => o.selected && o.product_name)}
-                    className="h-8"
+                    disabled={isSubmitting || selectedValidOrderCount === 0}
+                    className="h-8 sm:w-auto"
                   >
                     {isSubmitting ? (
                       <>
@@ -1987,6 +2230,42 @@ export default function OrderParsePage() {
                   </Button>
                 </div>
               </div>
+
+              {submitValidation.invalidOrderIds.length > 0 && (
+                <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  <div className="flex items-center gap-1 font-medium">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    提交前还有内容待补全
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {submitValidation.missingProductNameCount > 0 && (
+                      <Badge variant="outline" className="border-amber-300 bg-white text-amber-800">
+                        商品名称 {submitValidation.missingProductNameCount}
+                      </Badge>
+                    )}
+                    {submitValidation.missingReceiverCount > 0 && (
+                      <Badge variant="outline" className="border-amber-300 bg-white text-amber-800">
+                        收货人 {submitValidation.missingReceiverCount}
+                      </Badge>
+                    )}
+                    {submitValidation.missingPhoneCount > 0 && (
+                      <Badge variant="outline" className="border-amber-300 bg-white text-amber-800">
+                        收货电话 {submitValidation.missingPhoneCount}
+                      </Badge>
+                    )}
+                    {submitValidation.missingAddressCount > 0 && (
+                      <Badge variant="outline" className="border-amber-300 bg-white text-amber-800">
+                        收货地址 {submitValidation.missingAddressCount}
+                      </Badge>
+                    )}
+                    {submitValidation.missingSupplierCount > 0 && (
+                      <Badge variant="outline" className="border-amber-300 bg-white text-amber-800">
+                        发货供应商 {submitValidation.missingSupplierCount}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Orders List */}
               <div className="flex-1 overflow-y-auto">
@@ -2006,8 +2285,8 @@ export default function OrderParsePage() {
                           {/* Content */}
                           <div className="flex-1 min-w-0">
                             {/* Header */}
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-2 min-w-0">
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="flex min-w-0 flex-wrap items-center gap-2">
                                 <span className="text-xs font-medium text-muted-foreground">
                                   #{idx + 1}
                                 </span>
@@ -2029,7 +2308,7 @@ export default function OrderParsePage() {
                                   </Badge>
                                 )}
                               </div>
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-center gap-1 self-end sm:self-auto">
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -2062,7 +2341,7 @@ export default function OrderParsePage() {
                             </div>
 
                             {/* Main info */}
-                            <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                            <div className="mt-2 grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
                               <div className="flex items-center gap-1 min-w-0">
                                 <Package className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                                 <span className="truncate font-medium">
@@ -2103,7 +2382,7 @@ export default function OrderParsePage() {
                                       </Badge>
                                     )}
                                   </div>
-                                  <div className="grid grid-cols-3 gap-1 text-xs">
+                                  <div className="grid grid-cols-1 gap-1 text-xs sm:grid-cols-3">
                                     <div>
                                       <span className="text-muted-foreground">系统商品:</span>
                                       <span className="ml-1 font-medium text-green-700">{order.mappedProductName}</span>
@@ -2186,7 +2465,7 @@ export default function OrderParsePage() {
                             {order.expanded && (
                               <div className="mt-3 pt-3 border-t space-y-2">
                                 {/* 订单信息 */}
-                                <div className="grid grid-cols-4 gap-2">
+                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
                                   <div>
                                     <Label className="text-xs text-muted-foreground">单据编号</Label>
                                     <Input
@@ -2231,7 +2510,7 @@ export default function OrderParsePage() {
                                     <Package className="h-3.5 w-3.5" />
                                     客户商品信息
                                   </div>
-                                  <div className="grid grid-cols-2 gap-2">
+                                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                     <div>
                                       <Label className="text-xs text-muted-foreground">客户商品名称</Label>
                                       <Input
@@ -2259,7 +2538,7 @@ export default function OrderParsePage() {
                                     <Check className="h-3.5 w-3.5" />
                                     系统商品信息
                                   </div>
-                                  <div className="grid grid-cols-3 gap-2">
+                                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
                                     <div>
                                       <Label className="text-xs text-muted-foreground">系统商品编码</Label>
                                       <Input
@@ -2298,7 +2577,7 @@ export default function OrderParsePage() {
                                 </div>
 
                                 {/* 价格信息 */}
-                                <div className="grid grid-cols-4 gap-2">
+                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
                                   <div>
                                     <Label className="text-xs text-muted-foreground">单价</Label>
                                     <Input
@@ -2342,7 +2621,7 @@ export default function OrderParsePage() {
                                 </div>
 
                                 {/* 收货信息 */}
-                                <div className="grid grid-cols-2 gap-2">
+                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                   <div>
                                     <Label className="text-xs text-muted-foreground">收货人</Label>
                                     <Input
@@ -2374,7 +2653,7 @@ export default function OrderParsePage() {
                                 </div>
 
                                 {/* 快递信息 */}
-                                <div className="grid grid-cols-3 gap-2">
+                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
                                   <div>
                                     <Label className="text-xs text-muted-foreground">快递公司</Label>
                                     <Input
@@ -2405,12 +2684,17 @@ export default function OrderParsePage() {
                                 </div>
 
                                 {/* 人员信息 */}
-                                <div className="grid grid-cols-2 gap-2">
+                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                   <div>
                                     <Label className="text-xs text-muted-foreground">业务员</Label>
                                     <Input
                                       value={order.salesperson || salespersonName || ''}
-                                      onChange={(e) => updateOrder(order.id, 'salesperson', e.target.value)}
+                                      onChange={(e) => {
+                                        updateOrder(order.id, 'salesperson', e.target.value);
+                                        if (!e.target.value) {
+                                          updateOrder(order.id, 'salespersonId', '');
+                                        }
+                                      }}
                                       className="h-7 text-xs"
                                       placeholder="业务员"
                                     />
@@ -2419,7 +2703,12 @@ export default function OrderParsePage() {
                                     <Label className="text-xs text-muted-foreground">跟单员</Label>
                                     <Input
                                       value={order.operator || operatorName || ''}
-                                      onChange={(e) => updateOrder(order.id, 'operator', e.target.value)}
+                                      onChange={(e) => {
+                                        updateOrder(order.id, 'operator', e.target.value);
+                                        if (!e.target.value) {
+                                          updateOrder(order.id, 'operatorId', '');
+                                        }
+                                      }}
                                       className="h-7 text-xs"
                                       placeholder="跟单员"
                                     />
@@ -2608,8 +2897,17 @@ export default function OrderParsePage() {
             <DialogTitle className="flex items-center gap-2">
               {importResult?.success ? (
                 <>
-                  <Check className="h-5 w-5 text-green-500" />
-                  订单导入成功
+                  {importResult.total > 0 ? (
+                    <>
+                      <Check className="h-5 w-5 text-green-500" />
+                      订单导入成功
+                    </>
+                  ) : (
+                    <>
+                      <AlertTriangle className="h-5 w-5 text-amber-500" />
+                      未创建新订单
+                    </>
+                  )}
                 </>
               ) : (
                 <>
@@ -2622,9 +2920,119 @@ export default function OrderParsePage() {
               {importResult?.message}
             </DialogDescription>
           </DialogHeader>
+          {importResult?.success && (
+              <div className="grid grid-cols-1 gap-2 rounded-lg border bg-muted/30 p-3 text-xs sm:grid-cols-3">
+                <div className="space-y-1">
+                  <p className="text-muted-foreground">本次创建</p>
+                  <p className="font-medium">{importResult.total} 条订单</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-muted-foreground">关联客户</p>
+                  <p className="font-medium">{importResult.customerName || '-'}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-muted-foreground">导入批次</p>
+                <p className="font-medium break-all">{importResult.importBatch || '-'}</p>
+              </div>
+            </div>
+          )}
+          {importResult?.success && importResult.total === 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              本次没有创建新订单，当前结果主要用于复盘重复记录和匹配情况。
+            </div>
+          )}
+          {importResult?.success && importResult.matchStats && (
+            <div className="space-y-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs">
+              <div className="flex items-center gap-1 font-medium text-blue-800">
+                <BarChart3 className="h-3.5 w-3.5" />
+                商品匹配统计
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="rounded border bg-white px-2 py-1">
+                  <div className="text-muted-foreground">已匹配</div>
+                  <div className="font-medium text-green-700">{importResult.matchStats.matched}</div>
+                </div>
+                <div className="rounded border bg-white px-2 py-1">
+                  <div className="text-muted-foreground">未匹配</div>
+                  <div className="font-medium text-orange-700">{importResult.matchStats.none}</div>
+                </div>
+                <div className="rounded border bg-white px-2 py-1">
+                  <div className="text-muted-foreground">匹配率</div>
+                  <div className="font-medium text-blue-700">{importResult.matchStats.matchRate}</div>
+                </div>
+                <div className="rounded border bg-white px-2 py-1">
+                  <div className="text-muted-foreground">映射匹配</div>
+                  <div className="font-medium text-blue-700">{importResult.matchStats.byMapping}</div>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {importResult.matchStats.bySpec > 0 && (
+                  <Badge variant="outline" className="border-blue-300 bg-white text-blue-800">
+                    规格匹配 {importResult.matchStats.bySpec}
+                  </Badge>
+                )}
+                {importResult.matchStats.byName > 0 && (
+                  <Badge variant="outline" className="border-blue-300 bg-white text-blue-800">
+                    名称匹配 {importResult.matchStats.byName}
+                  </Badge>
+                )}
+              </div>
+            </div>
+          )}
+          {importResult?.success && importResult.duplicateSummary && importResult.duplicateSummary.totalSkipped > 0 && (
+            <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs">
+              <div className="flex items-center gap-1 font-medium text-amber-800">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                已跳过重复记录 {importResult.duplicateSummary.totalSkipped} 条
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {importResult.duplicateSummary.batchDuplicateCount > 0 && (
+                  <Badge variant="outline" className="border-amber-300 bg-white text-amber-800">
+                    同批重复 {importResult.duplicateSummary.batchDuplicateCount}
+                  </Badge>
+                )}
+                {importResult.duplicateSummary.existingDuplicateCount > 0 && (
+                  <Badge variant="outline" className="border-amber-300 bg-white text-amber-800">
+                    系统已存在 {importResult.duplicateSummary.existingDuplicateCount}
+                  </Badge>
+                )}
+              </div>
+              <ScrollArea className="h-[120px] rounded border bg-white">
+                <div className="space-y-2 p-2">
+                  {importResult.duplicateSummary.details.map((item, index) => (
+                    <div key={`${item.orderNo}-${index}`} className="rounded border px-2 py-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">{item.orderNo || '未提供订单号'}</span>
+                        <Badge variant="outline" className="text-[10px]">
+                          {item.reason === 'batch_duplicate' ? '同批重复' : '系统已存在'}
+                        </Badge>
+                      </div>
+                      <div className="mt-1 text-muted-foreground">
+                        收货人：{item.receiverName || '未填写'}
+                        {item.existingSysOrderNo ? ` | 已存在系统单号：${item.existingSysOrderNo}` : ''}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
           {importResult?.success && importResult.sysOrderNos && (
             <div className="space-y-2">
-              <Label className="text-sm">系统订单号</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-sm">系统订单号</Label>
+                {importResult.sysOrderNos.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => copyToClipboard(importResult.sysOrderNos.join('\n'))}
+                  >
+                    <Copy className="mr-1 h-3 w-3" />
+                    全部复制
+                  </Button>
+                )}
+              </div>
               <ScrollArea className="h-[100px] border rounded">
                 <div className="p-2 text-xs space-y-1">
                   {importResult.sysOrderNos.map((no, i) => (
@@ -2651,8 +3059,26 @@ export default function OrderParsePage() {
             >
               继续录入
             </Button>
-            <Button onClick={() => window.location.href = '/orders'}>
-              查看订单
+            <Button
+              variant="outline"
+              onClick={() => {
+                const importBatch = importResult?.importBatch;
+                window.location.href = importBatch
+                  ? `/orders?importBatch=${encodeURIComponent(importBatch)}&status=pending`
+                  : '/orders?status=pending';
+              }}
+            >
+              查看本批待派发
+            </Button>
+            <Button
+              onClick={() => {
+                const importBatch = importResult?.importBatch;
+                window.location.href = importBatch
+                  ? `/orders?importBatch=${encodeURIComponent(importBatch)}`
+                  : '/orders';
+              }}
+            >
+              查看本批全部
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2660,7 +3086,7 @@ export default function OrderParsePage() {
 
       {/* Mapping History Dialog */}
       <Dialog open={showMappingDialog} onOpenChange={setShowMappingDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <History className="h-5 w-5" />
@@ -2683,10 +3109,12 @@ export default function OrderParsePage() {
             <ScrollArea className="h-[300px]">
               {filteredHistory.length > 0 ? (
                 <div className="space-y-2">
-                  {filteredHistory.map((h) => (
+                  {filteredHistory.map((h) => {
+                    const compatibility = getHistoryCompatibility(h);
+                    return (
                     <div
                       key={h.id}
-                      className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50"
+                      className="flex flex-col gap-3 rounded-lg border p-3 hover:bg-muted/50 sm:flex-row sm:items-center sm:justify-between"
                     >
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
@@ -2696,6 +3124,22 @@ export default function OrderParsePage() {
                           {h.is_active && (
                             <Badge variant="secondary" className="text-xs">
                               当前
+                            </Badge>
+                          )}
+                          {h.header_fingerprint && (
+                            <Badge variant="outline" className="text-[10px]">
+                              表头 {h.header_fingerprint}
+                            </Badge>
+                          )}
+                          {compatibility && (
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                'text-[10px]',
+                                compatibility.isAligned ? 'border-green-200 text-green-700' : 'border-orange-200 text-orange-700'
+                              )}
+                            >
+                              {compatibility.label}
                             </Badge>
                           )}
                         </div>
@@ -2712,8 +3156,13 @@ export default function OrderParsePage() {
                         {h.remark && (
                           <p className="text-xs text-muted-foreground">{h.remark}</p>
                         )}
+                        {h.template_signature && (
+                          <p className="text-[11px] text-muted-foreground">
+                            模板签名: {h.template_signature}
+                          </p>
+                        )}
                       </div>
-                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 self-end sm:self-auto">
                         <Button
                           variant="outline"
                           size="sm"
@@ -2721,7 +3170,7 @@ export default function OrderParsePage() {
                           onClick={() => restoreMapping(h.id)}
                         >
                           <Eye className="h-4 w-4 mr-1" />
-                          预览
+                          应用配置
                         </Button>
                         {!h.is_active && (
                           <Button
@@ -2735,7 +3184,8 @@ export default function OrderParsePage() {
                         )}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center text-muted-foreground py-8">
@@ -2752,5 +3202,6 @@ export default function OrderParsePage() {
         </DialogContent>
       </Dialog>
     </div>
+    </PageGuard>
   );
 }

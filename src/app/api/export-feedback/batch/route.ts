@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requirePermission } from '@/lib/server-auth';
 import { CUSTOMER_FEEDBACK_SOURCE_STATUSES } from '@/lib/order-status';
+import { saveExportArtifact } from '@/lib/export-artifacts';
+import { buildExportRecordDownloadPath } from '@/lib/export-download';
 import { parseTemplateFieldMappings, resolvePreferredTemplate, type TemplateRecord } from '@/lib/template-utils';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 
 type OrderItem = Record<string, unknown>;
+type ExportTemplateSource = 'explicit' | 'default' | 'first' | 'column_mapping' | 'mixed';
 
 const DEFAULT_CUSTOMER_FEEDBACK_MAPPINGS: Record<string, string> = {
   客户订单号: 'order_no',
@@ -100,13 +104,33 @@ function buildFeedbackRows(
   });
 }
 
+function summarizeTemplateSource(
+  details: Array<{ templateSource?: Exclude<ExportTemplateSource, 'mixed'> }>,
+  fallback: Exclude<ExportTemplateSource, 'mixed'>
+): ExportTemplateSource {
+  const sources = details
+    .map((detail) => detail.templateSource)
+    .filter((source): source is Exclude<ExportTemplateSource, 'mixed'> => Boolean(source));
+
+  if (sources.length === 0) {
+    return fallback;
+  }
+
+  const uniqueSources = Array.from(new Set(sources));
+  return uniqueSources.length > 1 ? 'mixed' : uniqueSources[0];
+}
+
 // 批量导出客户反馈单
 export async function POST(request: NextRequest) {
+  const authError = requirePermission(request, 'orders:export');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
 
   try {
     const body = await request.json();
-    const { customerIds, templateId, exportedBy, skipUnshipped = false } = body;
+    const { customerIds, templateId, exportedBy, skipUnshipped = false, persistenceMode } = body;
+    const resolvedPersistenceMode: 'none' | 'full' = persistenceMode === 'none' ? 'none' : 'full';
 
     if (!customerIds || !Array.isArray(customerIds) || customerIds.length === 0) {
       return NextResponse.json({ success: false, error: '请选择至少一个客户' }, { status: 400 });
@@ -115,6 +139,7 @@ export async function POST(request: NextRequest) {
     const results = [];
     const zip = new JSZip();
     const batchId = crypto.randomUUID();
+    const recordId = crypto.randomUUID();
     let totalOrderCount = 0;
     let totalShippedCount = 0;
     let totalPendingReceiptCount = 0;
@@ -122,6 +147,7 @@ export async function POST(request: NextRequest) {
     let resolvedTemplateId = templateId || null;
     let resolvedTemplate: TemplateRecord | null = null;
     let templateName = '默认客户反馈模板';
+    let templateSource: 'explicit' | 'default' | 'first' = 'default';
     if (resolvedTemplateId) {
       const { data: template } = await client
         .from('templates')
@@ -131,6 +157,7 @@ export async function POST(request: NextRequest) {
       if (template) {
         resolvedTemplate = template as TemplateRecord;
         templateName = template.name;
+        templateSource = 'explicit';
       }
     }
 
@@ -185,11 +212,13 @@ export async function POST(request: NextRequest) {
         ? `客户导入映射(v${customerMapping.version})`
         : templateName;
       let exportTemplateId = resolvedTemplateId;
+      let exportTemplateSource: 'explicit' | 'default' | 'first' | 'column_mapping' =
+        customerMapping ? 'column_mapping' : templateSource;
 
       if (!customerMapping) {
         let customerScopedTemplate = resolvedTemplate;
         if (!customerScopedTemplate) {
-          const { template } = await resolvePreferredTemplate(client, {
+          const { template, source } = await resolvePreferredTemplate(client, {
             type: 'customer_feedback',
             targetType: 'customer',
             targetId: customerId,
@@ -197,6 +226,7 @@ export async function POST(request: NextRequest) {
           if (template) {
             customerScopedTemplate = template;
             if (!resolvedTemplateId && template.id) resolvedTemplateId = template.id;
+            exportTemplateSource = source === 'first' ? 'first' : 'default';
           }
         }
 
@@ -204,6 +234,9 @@ export async function POST(request: NextRequest) {
           exportTemplateId = customerScopedTemplate.id || exportTemplateId;
           exportTemplateName = String(customerScopedTemplate.name || exportTemplateName);
           exportFieldMappings = parseTemplateFieldMappings(customerScopedTemplate);
+          if (resolvedTemplate?.id === customerScopedTemplate.id && templateSource === 'explicit') {
+            exportTemplateSource = 'explicit';
+          }
         }
       }
 
@@ -216,10 +249,33 @@ export async function POST(request: NextRequest) {
       worksheet['!cols'] = headers.map((header) => ({ wch: Math.max(12, Math.min(40, header.length * 2 + 4)) }));
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, '客户反馈');
-      zip.file(fileName, XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }));
+      const workbookBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+      zip.file(fileName, workbookBuffer);
+      const detailArtifact = resolvedPersistenceMode === 'full'
+        ? await saveExportArtifact(recordId, fileName, workbookBuffer)
+        : null;
+      const detailIndex: number = results.length;
 
       // 记录导出详情
-      const detailResult = {
+      const detailResult: {
+        customerId: string;
+        customerName: string;
+        orderCount: number;
+        shippedOrderCount: number;
+        pendingReceiptCount: number;
+        templateId: string | null;
+        templateName: string;
+        fileName: string;
+        fileUrl: string;
+        artifact: {
+          relative_path: string;
+          file_name: string;
+          provider: 'local' | 's3';
+        } | null;
+        hasPendingReceipts: boolean;
+        status: 'success';
+        templateSource: 'explicit' | 'default' | 'first' | 'column_mapping';
+      } = {
         customerId,
         customerName,
         orderCount: orders.length,
@@ -228,10 +284,17 @@ export async function POST(request: NextRequest) {
         templateId: exportTemplateId,
         templateName: exportTemplateName,
         fileName,
-        fileUrl: `/exports/${fileName}`,
+        fileUrl: detailArtifact ? buildExportRecordDownloadPath(recordId, detailIndex) : '',
+        artifact: detailArtifact
+          ? {
+              relative_path: detailArtifact.relativePath,
+              file_name: detailArtifact.fileName,
+              provider: detailArtifact.provider,
+            }
+          : null,
         hasPendingReceipts: pendingReceiptCount > 0,
         status: 'success',
-        mappingSource: customerMapping ? 'column_mapping' : 'template',
+        templateSource: exportTemplateSource,
       };
 
       results.push(detailResult);
@@ -243,25 +306,61 @@ export async function POST(request: NextRequest) {
     // 生成ZIP文件名
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const zipFileName = `客户反馈批量导出+${today}.zip`;
-    const zipBase64 = (await zip.generateAsync({ type: 'nodebuffer' })).toString('base64');
+    const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+    const zipBase64 = zipBuffer.toString('base64');
+    const responseTemplateSource = summarizeTemplateSource(results, templateSource);
+
+    if (resolvedPersistenceMode === 'none') {
+      return NextResponse.json({
+        success: true,
+        message: `成功生成${results.length}个客户的反馈内容，共${totalOrderCount}个订单`,
+        data: {
+          batchId,
+          recordId: null,
+          zipFileName,
+          zipFileUrl: null,
+          zipBase64,
+          artifact: null,
+          totalCustomerCount: results.length,
+          totalOrderCount,
+          shippedOrderCount: totalShippedCount,
+          pendingReceiptCount: totalPendingReceiptCount,
+          templateId: resolvedTemplateId,
+          templateName,
+          templateSource: responseTemplateSource,
+          persistenceMode: resolvedPersistenceMode,
+          details: results,
+        },
+      });
+    }
+
+    const artifact = await saveExportArtifact(recordId, zipFileName, zipBuffer);
 
     // 保存批量导出记录
     const { error: recordError } = await client
       .from('export_records')
       .insert({
+        id: recordId,
         export_type: 'customer_feedback',
         customer_id: customerIds.length === 1 ? customerIds[0] : null,
         template_id: resolvedTemplateId,
         template_name: templateName,
-        file_url: `/exports/${zipFileName}`,
+        file_url: artifact.downloadPath,
         file_name: zipFileName,
-        zip_file_url: `/exports/${zipFileName}`,
+        zip_file_url: artifact.downloadPath,
         zip_file_name: zipFileName,
         total_count: totalOrderCount,
         exported_by: exportedBy || 'system',
         metadata: {
           batch_id: batchId,
           customer_ids: customerIds,
+          download_mode: 'regenerate',
+          artifact: {
+            relative_path: artifact.relativePath,
+            file_name: artifact.fileName,
+            provider: artifact.provider,
+          },
+          template_source: responseTemplateSource,
           details: results,
           shipped_order_count: totalShippedCount,
           pending_receipt_count: totalPendingReceiptCount,
@@ -275,13 +374,23 @@ export async function POST(request: NextRequest) {
       message: `成功导出${results.length}个客户，共${totalOrderCount}个订单`,
       data: {
         batchId,
+        recordId,
         zipFileName,
-        zipFileUrl: `/exports/${zipFileName}`,
+        zipFileUrl: artifact.downloadPath,
         zipBase64,
+        artifact: {
+          relative_path: artifact.relativePath,
+          file_name: artifact.fileName,
+          provider: artifact.provider,
+        },
         totalCustomerCount: results.length,
         totalOrderCount,
         shippedOrderCount: totalShippedCount,
         pendingReceiptCount: totalPendingReceiptCount,
+        templateId: resolvedTemplateId,
+        templateName,
+        templateSource: responseTemplateSource,
+        persistenceMode: resolvedPersistenceMode,
         details: results,
       },
     });

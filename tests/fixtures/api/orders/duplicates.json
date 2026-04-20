@@ -1,0 +1,193 @@
+{
+  "scenarios": [
+    {
+      "name": "同批重复会进入 duplicateSummary",
+      "customer": {
+        "code": "C-BATCH",
+        "name": "同批客户"
+      },
+      "seedOrders": [],
+      "request": {
+        "receiver": {
+          "name": "张三",
+          "phone": "13800138000",
+          "address": "上海市浦东新区世纪大道100号"
+        },
+        "items": [
+          {
+            "orderNo": "BATCH-001",
+            "productName": "礼品A",
+            "quantity": 1
+          },
+          {
+            "orderNo": "BATCH-001",
+            "productName": "礼品B",
+            "quantity": 2
+          },
+          {
+            "orderNo": "BATCH-002",
+            "productName": "礼品C",
+            "quantity": 1
+          }
+        ]
+      },
+      "expected": {
+        "createdCount": 2,
+        "totalSkipped": 1,
+        "batchDuplicateCount": 1,
+        "existingDuplicateCount": 0,
+        "details": [
+          {
+            "orderNo": "BATCH-001",
+            "reason": "batch_duplicate"
+          }
+        ]
+      }
+    },
+    {
+      "name": "系统已存在重复会返回系统单号和原因",
+      "customer": {
+        "code": "C-EXISTING",
+        "name": "系统重复客户"
+      },
+      "seedOrders": [
+        {
+          "order_no": "EXIST-001",
+          "sys_order_no": "SYS-EXIST-0001",
+          "customer_code": "C-EXISTING",
+          "receiver_name": "李四",
+          "created_at": "2026-04-18T10:00:00.000Z"
+        }
+      ],
+      "request": {
+        "receiver": {
+          "name": "李四",
+          "phone": "13800138001",
+          "address": "上海市闵行区都市路500号"
+        },
+        "items": [
+          {
+            "orderNo": "EXIST-001",
+            "productName": "礼品D",
+            "quantity": 1
+          },
+          {
+            "orderNo": "EXIST-002",
+            "productName": "礼品E",
+            "quantity": 1
+          }
+        ]
+      },
+      "expected": {
+        "createdCount": 1,
+        "totalSkipped": 1,
+        "batchDuplicateCount": 0,
+        "existingDuplicateCount": 1,
+        "details": [
+          {
+            "orderNo": "EXIST-001",
+            "reason": "existing_order",
+            "existingSysOrderNo": "SYS-EXIST-0001"
+          }
+        ]
+      }
+    },
+    {
+      "name": "0条新建但有跳过时返回空数据和明确提示",
+      "customer": {
+        "code": "C-ZERO",
+        "name": "零新建客户"
+      },
+      "seedOrders": [
+        {
+          "order_no": "ZERO-001",
+          "sys_order_no": "SYS-ZERO-0001",
+          "customer_code": "C-ZERO",
+          "receiver_name": "王五",
+          "created_at": "2026-04-18T11:00:00.000Z"
+        }
+      ],
+      "request": {
+        "receiver": {
+          "name": "王五",
+          "phone": "13800138002",
+          "address": "上海市徐汇区漕溪北路800号"
+        },
+        "items": [
+          {
+            "orderNo": "ZERO-001",
+            "productName": "礼品F",
+            "quantity": 1
+          },
+          {
+            "orderNo": "ZERO-001",
+            "productName": "礼品G",
+            "quantity": 1
+          }
+        ]
+      },
+      "expected": {
+        "createdCount": 0,
+        "totalSkipped": 2,
+        "batchDuplicateCount": 1,
+        "existingDuplicateCount": 1,
+        "messageIncludes": "没有创建新订单",
+        "details": [
+          {
+            "orderNo": "ZERO-001",
+            "reason": "batch_duplicate"
+          },
+          {
+            "orderNo": "ZERO-001",
+            "reason": "existing_order",
+            "existingSysOrderNo": "SYS-ZERO-0001"
+          }
+        ]
+      }
+    },
+    {
+      "name": "重复明细会返回 existing_order 原因和系统单号",
+      "customer": {
+        "code": "C-DETAIL",
+        "name": "明细校验客户"
+      },
+      "seedOrders": [
+        {
+          "order_no": "DETAIL-001",
+          "sys_order_no": "SYS-DETAIL-9001",
+          "customer_code": "C-DETAIL",
+          "receiver_name": "赵六",
+          "created_at": "2026-04-18T12:00:00.000Z"
+        }
+      ],
+      "request": {
+        "receiver": {
+          "name": "赵六",
+          "phone": "13800138003",
+          "address": "上海市长宁区延安西路900号"
+        },
+        "items": [
+          {
+            "orderNo": "DETAIL-001",
+            "productName": "礼品H",
+            "quantity": 1
+          }
+        ]
+      },
+      "expected": {
+        "createdCount": 0,
+        "totalSkipped": 1,
+        "batchDuplicateCount": 0,
+        "existingDuplicateCount": 1,
+        "messageIncludes": "没有创建新订单",
+        "details": [
+          {
+            "orderNo": "DETAIL-001",
+            "reason": "existing_order",
+            "existingSysOrderNo": "SYS-DETAIL-9001"
+          }
+        ]
+      }
+    }
+  ]
+}

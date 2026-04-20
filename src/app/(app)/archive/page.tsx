@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { ShieldAlert } from 'lucide-react';
+import { buildUserInfoHeaders, useAuth, usePermission } from '@/lib/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -89,6 +91,13 @@ const MODULES = [
 
 export default function ArchiveManagementPage() {
   const pathname = usePathname();
+  const { user } = useAuth();
+  const { hasPermission, hasAnyPermission } = usePermission();
+  const canViewArchive = hasAnyPermission(['customers:view', 'suppliers:view', 'products:view']);
+  const canImportCustomers = hasPermission('customers:create');
+  const canImportSuppliers = hasPermission('suppliers:create');
+  const canImportProducts = hasPermission('products:create');
+  const canImportSkuMappings = hasPermission('products:edit');
   const [stats, setStats] = useState<ModuleStats>({
     customers: 0,
     shippers: 0,
@@ -108,13 +117,23 @@ export default function ArchiveManagementPage() {
     fetchStats();
   }, []);
 
+  const authHeaders = useCallback(() => buildUserInfoHeaders(user), [user]);
+
   const fetchStats = async () => {
     try {
       const [customersRes, suppliersRes, productsRes, warehousesRes] = await Promise.all([
-        fetch('/api/customers?isActive=true'),
-        fetch('/api/suppliers?active=true'),
-        fetch('/api/products?isActive=true'),
-        fetch('/api/warehouses?isActive=true'),
+        hasPermission('customers:view')
+          ? fetch('/api/customers?isActive=true', { headers: authHeaders() })
+          : Promise.resolve(new Response(JSON.stringify({ total: 0 }), { status: 200 })),
+        hasPermission('suppliers:view')
+          ? fetch('/api/suppliers?active=true', { headers: authHeaders() })
+          : Promise.resolve(new Response(JSON.stringify({ total: 0 }), { status: 200 })),
+        hasPermission('products:view')
+          ? fetch('/api/products?isActive=true', { headers: authHeaders() })
+          : Promise.resolve(new Response(JSON.stringify({ total: 0 }), { status: 200 })),
+        hasPermission('suppliers:view')
+          ? fetch('/api/warehouses?isActive=true', { headers: authHeaders() })
+          : Promise.resolve(new Response(JSON.stringify({ total: 0 }), { status: 200 })),
       ]);
 
       const [customersData, suppliersData, productsData, warehousesData] = await Promise.all([
@@ -127,9 +146,13 @@ export default function ArchiveManagementPage() {
       // SKU映射统计
       let skuMappingsCount = 0;
       try {
-        const mappingsRes = await fetch('/api/product-mappings');
-        const mappingsData = await mappingsRes.json();
-        skuMappingsCount = mappingsData.total || 0;
+        const mappingsRes = hasPermission('products:view')
+          ? await fetch('/api/product-mappings', { headers: authHeaders() })
+          : null;
+        if (mappingsRes) {
+          const mappingsData = await mappingsRes.json();
+          skuMappingsCount = mappingsData.total || 0;
+        }
       } catch {
         // 忽略错误
       }
@@ -213,7 +236,7 @@ export default function ArchiveManagementPage() {
     try {
       const res = await fetch(`/api/import/${importingModule}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ data: importingData }),
       });
       const result = await res.json();
@@ -244,13 +267,49 @@ export default function ArchiveManagementPage() {
     }
   };
 
+  const canImportModule = (moduleKey?: string) => {
+    switch (moduleKey) {
+      case 'customers':
+        return canImportCustomers;
+      case 'suppliers':
+        return canImportSuppliers;
+      case 'products':
+        return canImportProducts;
+      case 'skuMappings':
+        return canImportSkuMappings;
+      default:
+        return false;
+    }
+  };
+
+  if (!canViewArchive) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShieldAlert className="h-5 w-5 text-destructive" />
+              无权访问档案管理
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">当前账号没有查看档案管理中心的权限，请联系管理员处理。</p>
+            <Button asChild>
+              <Link href="/">返回首页</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
-        <header className="bg-white border-b sticky top-0 z-10">
+        <header className="sticky top-0 z-10 border-b bg-white">
           <div className="container mx-auto px-4 py-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
                   <Settings className="w-6 h-6 text-white" />
@@ -260,7 +319,7 @@ export default function ArchiveManagementPage() {
                   <p className="text-sm text-gray-500">档案信息统一管理</p>
                 </div>
               </div>
-              <Badge variant="outline">
+              <Badge variant="outline" className="w-fit">
                 <Clock className="w-3 h-3 mr-1" />
                 {new Date().toLocaleDateString('zh-CN')}
               </Badge>
@@ -269,9 +328,9 @@ export default function ArchiveManagementPage() {
         </header>
 
         {/* Navigation Tabs */}
-        <div className="bg-white border-b">
+        <div className="border-b bg-white">
           <div className="container mx-auto px-4">
-            <nav className="flex gap-6">
+            <nav className="flex gap-4 overflow-x-auto">
               <Link 
                 href="/orders" 
                 className={`py-4 px-2 border-b-2 text-sm font-medium transition-colors ${
@@ -298,15 +357,15 @@ export default function ArchiveManagementPage() {
 
         <main className="container mx-auto px-4 py-6">
           {/* 模块卡片网格 */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
             {MODULES.map((module) => (
               <Link key={module.tag} href={module.href}>
                 <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardHeader className="flex flex-row items-center justify-between gap-3 pb-2">
                     <div className={`w-12 h-12 ${module.color} rounded-lg flex items-center justify-center`}>
                       <module.icon className="w-6 h-6 text-white" />
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex shrink-0 items-center gap-2">
                       {module.hasImport && (
                         <Dialog>
                           <DialogTrigger asChild>
@@ -314,12 +373,13 @@ export default function ArchiveManagementPage() {
                               variant="ghost" 
                               size="icon" 
                               className="h-8 w-8"
+                              disabled={!canImportModule(module.moduleKey)}
                               onClick={(e) => e.preventDefault()}
                             >
                               <Upload className="h-4 w-4" />
                             </Button>
                           </DialogTrigger>
-                          <DialogContent className="max-w-md">
+                          <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-md">
                             <DialogHeader>
                               <DialogTitle>{module.title} - Excel导入</DialogTitle>
                               <DialogDescription>
@@ -346,6 +406,7 @@ export default function ArchiveManagementPage() {
                                 <Button 
                                   variant="outline" 
                                   className="w-full"
+                                  disabled={!canImportModule(module.moduleKey)}
                                   onClick={() => fileInputRef.current?.click()}
                                 >
                                   <Upload className="w-4 h-4 mr-2" />
@@ -362,7 +423,7 @@ export default function ArchiveManagementPage() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <CardTitle className="text-lg mb-1">{module.title}</CardTitle>
+                    <CardTitle className="mb-1 text-lg">{module.title}</CardTitle>
                     <CardDescription className="text-sm mb-3">
                       {module.description}
                     </CardDescription>
@@ -379,7 +440,7 @@ export default function ArchiveManagementPage() {
           </div>
 
           {/* 模块说明 */}
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
@@ -443,7 +504,7 @@ export default function ArchiveManagementPage() {
               <CardTitle className="text-base">数据概览</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                 <div className="bg-white/60 rounded-lg p-4 text-center">
                   <p className="text-sm text-gray-500 mb-1">客户</p>
                   <p className="text-2xl font-bold text-blue-600">{loading ? '-' : stats.customers}</p>
@@ -468,14 +529,15 @@ export default function ArchiveManagementPage() {
 
       {/* Excel 导入确认对话框 */}
       <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>确认导入数据</DialogTitle>
             <DialogDescription>
               共 {importingData.length} 条数据，请确认是否导入
             </DialogDescription>
           </DialogHeader>
-          <ScrollArea className="h-[400px] border rounded-lg p-4">
+          <ScrollArea className="h-[400px] rounded-lg border p-4">
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-white">
                 <tr className="border-b">
@@ -498,17 +560,18 @@ export default function ArchiveManagementPage() {
                 ))}
               </tbody>
             </table>
+            </div>
             {importingData.length > 50 && (
               <p className="text-center text-gray-500 py-4">
                 ... 还有 {importingData.length - 50} 条数据未显示
               </p>
             )}
           </ScrollArea>
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setImportDialogOpen(false)}>
+          <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setImportDialogOpen(false)} className="w-full sm:w-auto">
               取消
             </Button>
-            <Button onClick={confirmImport} disabled={importing}>
+            <Button onClick={confirmImport} disabled={importing || !canImportModule(importingModule)} className="w-full sm:w-auto">
               {importing ? '导入中...' : '确认导入'}
             </Button>
           </div>

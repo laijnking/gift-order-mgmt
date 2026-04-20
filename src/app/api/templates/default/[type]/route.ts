@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requirePermission } from '@/lib/server-auth';
 import { resolvePreferredTemplate, transformTemplateRecord } from '@/lib/template-utils';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
@@ -7,6 +8,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ type: string }> }
 ) {
+  const authError = requirePermission(request, 'settings:view');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
   const { type } = await params;

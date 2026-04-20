@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 // 获取历史成本库列表
 export async function GET(request: NextRequest) {
+  const authError = requirePermission(request, 'orders:view');
+  if (authError) return authError;
   const client = getSupabaseClient();
   
   try {
@@ -49,6 +52,46 @@ export async function GET(request: NextRequest) {
     const { data, error, count } = await query;
 
     if (error) throw new Error(`查询历史成本失败: ${error.message}`);
+
+    const orderIds = Array.from(
+      new Set((data || []).map((item) => item.order_id).filter((value): value is string => Boolean(value)))
+    );
+    const orderSummaryMap = new Map<string, {
+      expressFee: number;
+      otherFee: number;
+      totalAmount: number;
+      totalCost: number;
+      lineCount: number;
+    }>();
+
+    if (orderIds.length > 0) {
+      const { data: summaryRows, error: summaryError } = await client
+        .from('order_cost_history')
+        .select('order_id, express_fee, other_fee, total_amount, total_cost')
+        .in('order_id', orderIds);
+
+      if (summaryError) throw new Error(`查询历史成本汇总失败: ${summaryError.message}`);
+
+      for (const row of (summaryRows || [])) {
+        const orderId = row.order_id;
+        if (!orderId) continue;
+
+        const current = orderSummaryMap.get(orderId) || {
+          expressFee: 0,
+          otherFee: 0,
+          totalAmount: 0,
+          totalCost: 0,
+          lineCount: 0,
+        };
+
+        current.expressFee += parseFloat(String(row.express_fee || 0));
+        current.otherFee += parseFloat(String(row.other_fee || 0));
+        current.totalAmount += parseFloat(String(row.total_amount || 0));
+        current.totalCost += parseFloat(String(row.total_cost || 0));
+        current.lineCount += 1;
+        orderSummaryMap.set(orderId, current);
+      }
+    }
 
     // 获取汇总统计
     let statsQuery = client
@@ -109,6 +152,11 @@ export async function GET(request: NextRequest) {
       expressFee: h.express_fee,
       otherFee: h.other_fee,
       totalAmount: h.total_amount,
+      orderExpressFee: orderSummaryMap.get(h.order_id)?.expressFee ?? h.express_fee ?? 0,
+      orderOtherFee: orderSummaryMap.get(h.order_id)?.otherFee ?? h.other_fee ?? 0,
+      orderTotalAmount: orderSummaryMap.get(h.order_id)?.totalAmount ?? h.total_amount ?? 0,
+      orderGoodsCost: orderSummaryMap.get(h.order_id)?.totalCost ?? h.total_cost ?? 0,
+      orderLineCount: orderSummaryMap.get(h.order_id)?.lineCount ?? 1,
       expressCompany: h.express_company,
       trackingNo: h.tracking_no,
       receiverName: h.receiver_name,
@@ -150,6 +198,8 @@ export async function GET(request: NextRequest) {
 
 // 批量导入历史成本（从订单数据）
 export async function POST(request: NextRequest) {
+  const authError = requirePermission(request, 'orders:edit');
+  if (authError) return authError;
   const client = getSupabaseClient();
   
   try {
@@ -230,12 +280,6 @@ async function importOrders(client: ReturnType<typeof getSupabaseClient>, orders
   for (const order of orders) {
     const items = (order.items as { product_name?: string; product_code?: string; quantity?: number; price?: number; amount?: number }[]) || [];
     
-    // 计算订单成本
-    const totalCost = items.reduce((sum: number, item) => {
-      const amount = parseFloat(String(item.amount || 0));
-      return sum + (isNaN(amount) ? 0 : amount);
-    }, 0);
-
     const supplier = supplierMap.get(order.supplier_id as string);
     const warehouse = warehouseMap.get(order.warehouse_id as string);
 

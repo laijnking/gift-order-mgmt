@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 // 批量导入SKU映射
 export async function POST(request: NextRequest) {
+  const authError = requirePermission(request, 'products:edit');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
   
   try {

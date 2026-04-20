@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { PageGuard } from '@/components/auth/page-guard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -36,6 +37,15 @@ import {
   FileSpreadsheet, Building2
 } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  getDownloadActionLabel,
+  getDownloadHint,
+  getDownloadStrategy,
+  getStorageProviderLabel,
+  isPersistedArtifact,
+  isPersistedRecordUrl,
+} from '@/lib/export-download';
+import { buildUserInfoHeaders, useAuth } from '@/lib/auth';
 
 interface Supplier {
   id: string;
@@ -68,6 +78,13 @@ interface ExportResult {
   fileName: string;
   fileUrl: string;
   status: string;
+  templateName?: string;
+  templateSource?: 'explicit' | 'default' | 'first';
+  artifact?: {
+    provider?: 'local' | 's3';
+    relative_path?: string;
+    file_name?: string;
+  };
 }
 
 interface TemplateOption {
@@ -76,8 +93,39 @@ interface TemplateOption {
   isDefault?: boolean;
 }
 
+interface ExportSummary {
+  recordId?: string | null;
+  zipFileName: string;
+  zipBase64: string;
+  zipFileUrl?: string | null;
+  templateId?: string | null;
+  templateName?: string;
+  templateSource?: 'explicit' | 'default' | 'first';
+  dispatchMode?: 'preview' | 'dispatch';
+  persistenceMode?: 'none' | 'full';
+  executionMode?: 'preview' | 'dispatch_only' | 'dispatch_with_persistence';
+  supplierIds?: string[];
+  dispatchSummary?: {
+    mode: 'preview' | 'dispatch';
+    newDispatchCount: number;
+    reusedDispatchCount: number;
+    assignedOnlyCount: number;
+  };
+  persistenceSummary?: {
+    exportRecordCreated: boolean;
+    zipArtifactPersisted: boolean;
+    detailArtifactPersistedCount: number;
+  };
+  artifact?: {
+    provider?: 'local' | 's3';
+    relative_path?: string;
+    file_name?: string;
+  } | null;
+}
+
 export default function ShippingExportPage() {
   const router = useRouter();
+  const { user } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -89,6 +137,34 @@ export default function ShippingExportPage() {
   const [templateId, setTemplateId] = useState<string>('');
   const [templates, setTemplates] = useState<TemplateOption[]>([]);
   const [exportResults, setExportResults] = useState<ExportResult[]>([]);
+  const [exportSummary, setExportSummary] = useState<ExportSummary | null>(null);
+  const [downloadingTarget, setDownloadingTarget] = useState<string | null>(null);
+  const [downloadingZip, setDownloadingZip] = useState(false);
+
+  const executionModeLabel = (mode?: 'preview' | 'dispatch_only' | 'dispatch_with_persistence') => {
+    switch (mode) {
+      case 'dispatch_only':
+        return '仅派发';
+      case 'dispatch_with_persistence':
+        return '派发并留痕';
+      case 'preview':
+      default:
+        return '预览';
+    }
+  };
+
+  const triggerBrowserDownload = (url: string, filename?: string) => {
+    const downloadLink = document.createElement('a');
+    downloadLink.href = url;
+    if (filename) {
+      downloadLink.download = filename;
+    }
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+  };
+
+  const authHeaders = () => buildUserInfoHeaders(user);
 
   // 加载供应商待发货统计
   useEffect(() => {
@@ -99,7 +175,9 @@ export default function ShippingExportPage() {
   const loadSuppliers = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/shipping-exports/pending');
+      const response = await fetch('/api/shipping-exports/pending', {
+        headers: authHeaders(),
+      });
       const data = await response.json();
       
       if (data.success) {
@@ -117,8 +195,8 @@ export default function ShippingExportPage() {
   const loadTemplates = async () => {
     try {
       const [listResponse, defaultResponse] = await Promise.all([
-        fetch('/api/templates?type=shipping'),
-        fetch('/api/templates/default/shipping'),
+        fetch('/api/templates?type=shipping', { headers: authHeaders() }),
+        fetch('/api/templates/default/shipping', { headers: authHeaders() }),
       ]);
       const [listData, defaultData] = await Promise.all([
         listResponse.json(),
@@ -175,8 +253,21 @@ export default function ShippingExportPage() {
   };
 
   // 导出发货通知单
-  const handleExport = async () => {
-    if (selectedSuppliers.length === 0) {
+  const handleExport = async (
+    supplierIdsOverride?: string[],
+    mode: 'preview' | 'dispatch' = 'dispatch',
+    templateIdOverride?: string | null,
+    persistenceModeOverride?: 'none' | 'full'
+  ) => {
+    const supplierIds = supplierIdsOverride && supplierIdsOverride.length > 0
+      ? supplierIdsOverride
+      : selectedSuppliers;
+    const effectiveTemplateId =
+      templateIdOverride !== undefined ? templateIdOverride : (templateId || null);
+    const effectivePersistenceMode =
+      mode === 'preview' ? 'none' : persistenceModeOverride === 'none' ? 'none' : 'full';
+
+    if (supplierIds.length === 0) {
       toast.error('至少选择一个供应商进行导出');
       return;
     }
@@ -185,10 +276,12 @@ export default function ShippingExportPage() {
       setExporting(true);
       const response = await fetch('/api/shipping-exports/batch', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({
-          supplierIds: selectedSuppliers,
-          templateId: templateId || null,
+          supplierIds,
+          templateId: effectiveTemplateId,
+          dispatchMode: mode,
+          persistenceMode: effectivePersistenceMode,
           exportedBy: 'current_user', // TODO: 获取当前用户
         }),
       });
@@ -196,25 +289,46 @@ export default function ShippingExportPage() {
       const data = await response.json();
       
       if (data.success) {
-        // 自动触发ZIP文件下载
-        if (data.data.zipBase64) {
+        // 正式导出时自动触发ZIP文件下载
+        if (mode === 'dispatch' && data.data.zipBase64) {
           const linkSource = `data:application/zip;base64,${data.data.zipBase64}`;
-          const downloadLink = document.createElement('a');
-          downloadLink.href = linkSource;
-          downloadLink.download = data.data.zipFileName;
-          document.body.appendChild(downloadLink);
-          downloadLink.click();
-          document.body.removeChild(downloadLink);
+          triggerBrowserDownload(linkSource, data.data.zipFileName);
         }
         
         setExportResults(data.data.details || []);
+        setExportSummary({
+          recordId: data.data.recordId ?? null,
+          zipFileName: data.data.zipFileName,
+          zipBase64: data.data.zipBase64,
+          zipFileUrl: data.data.zipFileUrl,
+          templateId: data.data.templateId ?? effectiveTemplateId,
+          templateName: data.data.templateName,
+          templateSource: data.data.templateSource,
+          dispatchMode: data.data.dispatchMode || mode,
+          persistenceMode: data.data.persistenceMode || effectivePersistenceMode,
+          executionMode: data.data.executionMode,
+          supplierIds,
+          dispatchSummary: data.data.dispatchSummary,
+          persistenceSummary: data.data.persistenceSummary,
+          artifact: data.data.artifact,
+        });
         setShowExportDialog(true);
         
-        toast.success(`成功导出 ${data.data.totalSupplierCount} 个供应商，共 ${data.data.totalOrderCount} 个订单`);
+        toast.success(
+          mode === 'preview'
+            ? `已生成预览：${data.data.totalSupplierCount} 个供应商，共 ${data.data.totalOrderCount} 个订单`
+            : data.data.persistenceMode === 'none'
+              ? `已派发 ${data.data.totalSupplierCount} 个供应商，共 ${data.data.totalOrderCount} 个订单，未写入导出记录`
+            : `成功导出 ${data.data.totalSupplierCount} 个供应商，共 ${data.data.totalOrderCount} 个订单`
+        );
         
         // 刷新数据
-        loadSuppliers();
-        setSelectedSuppliers([]);
+        if (mode === 'dispatch') {
+          loadSuppliers();
+        }
+        if (!supplierIdsOverride && mode === 'dispatch') {
+          setSelectedSuppliers([]);
+        }
       } else {
         throw new Error(data.error);
       }
@@ -225,45 +339,105 @@ export default function ShippingExportPage() {
     }
   };
 
-  // 重新导出
-  const handleReExport = async (batchId: string) => {
+  const downloadZipFile = () => {
+    setDownloadingZip(true);
+    const strategy = getDownloadStrategy(
+      exportSummary?.artifact?.provider,
+      isPersistedArtifact(exportSummary?.artifact)
+    );
     try {
-      const response = await fetch(`/api/shipping-exports/batch/${batchId}`, {
-        method: 'POST',
-      });
-      const data = await response.json();
-      
-      if (data.success) {
-        toast.success('文件已重新生成');
-      } else {
-        throw new Error(data.error);
+      if (exportSummary?.zipFileUrl?.startsWith('/api/export-records/')) {
+        triggerBrowserDownload(exportSummary.zipFileUrl, exportSummary.zipFileName);
+        toast.success(strategy === '直链下载' ? '已开始直链下载ZIP文件' : '已开始下载ZIP文件');
+        return;
       }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : '未知错误');
+
+      if (!exportSummary?.zipBase64 || !exportSummary.zipFileName) {
+        toast.error('当前没有可下载的ZIP文件');
+        return;
+      }
+
+      const linkSource = `data:application/zip;base64,${exportSummary.zipBase64}`;
+      triggerBrowserDownload(linkSource, exportSummary.zipFileName);
+      toast.success('已生成并开始下载ZIP文件');
+    } finally {
+      setDownloadingZip(false);
+    }
+  };
+
+  const downloadDetailFile = async (result: ExportResult) => {
+    const targetKey = result.supplierId || result.fileName;
+    setDownloadingTarget(targetKey);
+
+    try {
+      const strategy = getDownloadStrategy(result.artifact?.provider, isPersistedArtifact(result.artifact));
+      if (isPersistedRecordUrl(result.fileUrl)) {
+        triggerBrowserDownload(result.fileUrl, result.fileName);
+        toast.success(strategy === '直链下载' ? '已开始直链下载明细文件' : '已开始下载明细文件');
+        return;
+      }
+
+      if (exportSummary?.dispatchMode === 'preview') {
+        toast.info('预览模式下未持久化明细文件，请先确认导出并派发。');
+        return;
+      }
+
+      toast.info('当前明细文件未持久化，先下载整批 ZIP。');
+      downloadZipFile();
+    } finally {
+      setDownloadingTarget(null);
+    }
+  };
+
+  const isDownloadingDetail = (result: ExportResult) =>
+    downloadingTarget === (result.supplierId || result.fileName);
+
+  const isPreviewMode = exportSummary?.dispatchMode === 'preview';
+
+  const templateSourceLabel = (source?: 'explicit' | 'default' | 'first') => {
+    switch (source) {
+      case 'explicit':
+        return '手动选择';
+      case 'first':
+        return '兜底模板';
+      case 'default':
+      default:
+        return '默认模板';
     }
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <PageGuard permission="orders:export" title="无法访问发货通知导出">
+    <div className="container mx-auto space-y-6 px-3 py-4 sm:px-4 sm:py-6">
       {/* 页面标题 */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0 flex items-start gap-3">
           <div className="p-2 bg-primary/10 rounded-lg">
             <FileSpreadsheet className="h-6 w-6 text-primary" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-2xl font-bold">发货通知单导出</h1>
             <p className="text-sm text-muted-foreground">批量导出供应商待发货订单</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={loadSuppliers} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            刷新
-          </Button>
-          <Button 
-            onClick={handleExport} 
-            disabled={selectedSuppliers.length === 0 || exporting}
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <Button variant="outline" onClick={loadSuppliers} disabled={loading} className="w-full sm:w-auto">
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              刷新
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={() => void handleExport(undefined, 'preview')}
+              disabled={selectedSuppliers.length === 0 || exporting}
+            >
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              预览选中 ({selectedSuppliers.length})
+            </Button>
+            <Button 
+              className="w-full sm:w-auto"
+              onClick={() => void handleExport()} 
+              disabled={selectedSuppliers.length === 0 || exporting}
           >
             {exporting ? (
               <>
@@ -283,8 +457,8 @@ export default function ShippingExportPage() {
       {/* 搜索栏 */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1 max-w-sm">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+            <div className="relative flex-1 xl:max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="搜索供应商名称或编码..."
@@ -294,7 +468,7 @@ export default function ShippingExportPage() {
               />
             </div>
             <Select value={templateId || 'none'} onValueChange={(value) => setTemplateId(value === 'none' ? '' : value)}>
-              <SelectTrigger className="w-[220px]">
+              <SelectTrigger className="w-full xl:w-[220px]">
                 <SelectValue placeholder="选择导出模板" />
               </SelectTrigger>
               <SelectContent>
@@ -307,10 +481,11 @@ export default function ShippingExportPage() {
               </SelectContent>
             </Select>
             {/* 状态筛选 */}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 variant={statusFilter === 'all' ? 'default' : 'outline'}
                 size="sm"
+                className="flex-1 sm:flex-none"
                 onClick={() => setStatusFilter('all')}
               >
                 全部
@@ -318,20 +493,21 @@ export default function ShippingExportPage() {
               <Button
                 variant={statusFilter === 'pending' ? 'default' : 'outline'}
                 size="sm"
+                className={`flex-1 sm:flex-none ${statusFilter === 'pending' ? 'bg-orange-500 hover:bg-orange-600' : ''}`}
                 onClick={() => setStatusFilter('pending')}
-                className={statusFilter === 'pending' ? 'bg-orange-500 hover:bg-orange-600' : ''}
               >
                 待发货+未导出
               </Button>
               <Button
                 variant={statusFilter === 'exported' ? 'default' : 'outline'}
                 size="sm"
+                className="flex-1 sm:flex-none"
                 onClick={() => setStatusFilter('exported')}
               >
                 已导出
               </Button>
             </div>
-            <div className="text-sm text-muted-foreground">
+            <div className="text-sm text-muted-foreground xl:ml-auto">
               共 {filteredSuppliers.length} 个供应商
             </div>
           </div>
@@ -357,6 +533,7 @@ export default function ShippingExportPage() {
               <p>暂无待发货供应商</p>
             </div>
           ) : (
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -410,37 +587,122 @@ export default function ShippingExportPage() {
                         variant="ghost" 
                         size="sm"
                         onClick={() => {
-                          setSelectedSuppliers([supplier.id]);
-                          handleExport();
+                          void handleExport([supplier.id], 'dispatch');
                         }}
                       >
                         <FileDown className="h-4 w-4 mr-1" />
                         导出
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          void handleExport([supplier.id], 'preview');
+                        }}
+                      >
+                        <FileSpreadsheet className="h-4 w-4 mr-1" />
+                        预览
                       </Button>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>
 
       {/* 导出结果对话框 */}
       <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-auto">
+        <DialogContent className="w-[calc(100vw-1.5rem)] max-w-2xl max-h-[80vh] overflow-auto">
           <DialogHeader>
-            <DialogTitle>导出结果</DialogTitle>
+            <DialogTitle>{isPreviewMode ? '预览结果' : '导出结果'}</DialogTitle>
             <DialogDescription>
-              以下文件已成功生成，点击下载
+              {isPreviewMode ? '以下内容为预览，不会派发订单或扣减库存' : '以下文件已成功生成，点击下载'}
             </DialogDescription>
           </DialogHeader>
+
+          {exportSummary && (
+            <div className="rounded-lg border bg-muted/30 p-3 text-xs">
+              <div className="flex flex-wrap gap-2">
+                {exportSummary.templateName && (
+                  <Badge variant="outline">模板：{exportSummary.templateName}</Badge>
+                )}
+                <Badge variant="outline">来源：{templateSourceLabel(exportSummary.templateSource)}</Badge>
+                <Badge variant="outline">{isPreviewMode ? '模式：预览' : '模式：派发导出'}</Badge>
+                <Badge variant="outline">
+                  执行：{executionModeLabel(exportSummary.executionMode)}
+                </Badge>
+                <Badge variant="outline">
+                  持久化：{exportSummary.persistenceMode === 'none' ? '仅派发' : '写记录并落盘'}
+                </Badge>
+                {exportSummary.dispatchSummary && (
+                  <>
+                    <Badge variant="outline">新派发：{exportSummary.dispatchSummary.newDispatchCount}</Badge>
+                    <Badge variant="outline">复用派发：{exportSummary.dispatchSummary.reusedDispatchCount}</Badge>
+                    <Badge variant="outline">仅导出：{exportSummary.dispatchSummary.assignedOnlyCount}</Badge>
+                  </>
+                )}
+                {exportSummary.persistenceSummary && (
+                  <>
+                    <Badge variant="outline">
+                      记录：{exportSummary.persistenceSummary.exportRecordCreated ? '已写入' : '未写入'}
+                    </Badge>
+                    <Badge variant="outline">
+                      ZIP：{exportSummary.persistenceSummary.zipArtifactPersisted ? '已落盘' : '未落盘'}
+                    </Badge>
+                    <Badge variant="outline">
+                      明细落盘：{exportSummary.persistenceSummary.detailArtifactPersistedCount}
+                    </Badge>
+                  </>
+                )}
+                {exportSummary.artifact?.provider && (
+                  <Badge variant="outline">
+                    存储：{getStorageProviderLabel(exportSummary.artifact.provider)}
+                  </Badge>
+                )}
+                <Badge variant="outline">
+                  下载策略：{getDownloadStrategy(
+                    exportSummary.artifact?.provider,
+                    isPersistedArtifact(exportSummary.artifact)
+                  )}
+                </Badge>
+                <Badge variant="outline">打包文件：{exportSummary.zipFileName}</Badge>
+              </div>
+              <p className="mt-2 text-muted-foreground">
+                {isPreviewMode
+                  ? '预览模式仅生成内容，不会写入导出记录，也不会触发派发副作用。'
+                  : exportSummary.persistenceMode === 'none'
+                    ? '当前结果仅执行派发，不写导出记录，也不会落盘 ZIP 或明细文件。'
+                  : getDownloadHint(exportSummary.artifact?.provider, isPersistedArtifact(exportSummary.artifact), '当前会优先回退到整批ZIP')}
+              </p>
+              {exportSummary.dispatchSummary && (
+                <p className="mt-1 text-muted-foreground">
+                  {isPreviewMode
+                    ? `当前预览覆盖 ${exportSummary.dispatchSummary.assignedOnlyCount} 条订单内容。`
+                    : exportSummary.executionMode === 'dispatch_only'
+                      ? `本次执行仅派发：新派发 ${exportSummary.dispatchSummary.newDispatchCount} 单，复用既有派发 ${exportSummary.dispatchSummary.reusedDispatchCount} 单，未新增派发仅导出 ${exportSummary.dispatchSummary.assignedOnlyCount} 单。`
+                      : `本次新派发 ${exportSummary.dispatchSummary.newDispatchCount} 单，复用既有派发 ${exportSummary.dispatchSummary.reusedDispatchCount} 单，仅生成导出文件 ${exportSummary.dispatchSummary.assignedOnlyCount} 单。`}
+                </p>
+              )}
+              {exportSummary.persistenceSummary && (
+                <p className="mt-1 text-muted-foreground">
+                  {isPreviewMode
+                    ? '当前结果仅生成预览内容，不写导出记录，也不会落盘 ZIP 或明细文件。'
+                    : exportSummary.persistenceMode === 'none'
+                      ? '本次只执行派发，不写导出记录；若后续需要留痕或落盘文件，可重新执行导出并派发。'
+                    : `本次已${exportSummary.persistenceSummary.exportRecordCreated ? '' : '未'}写入导出记录，整批 ZIP ${exportSummary.persistenceSummary.zipArtifactPersisted ? '已落盘' : '未落盘'}，明细文件已落盘 ${exportSummary.persistenceSummary.detailArtifactPersistedCount} 份。`}
+                </p>
+              )}
+            </div>
+          )}
           
           <div className="space-y-4">
             {exportResults.map((result, index) => (
               <div 
                 key={index}
-                className="flex items-center justify-between p-4 border rounded-lg"
+                className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-green-100 rounded-lg">
@@ -451,30 +713,138 @@ export default function ShippingExportPage() {
                     <p className="text-sm text-muted-foreground">
                       共 {result.orderCount} 个订单
                     </p>
+                    {result.templateName && (
+                      <p className="text-xs text-muted-foreground">
+                        {result.templateName} · {templateSourceLabel(result.templateSource)}
+                      </p>
+                    )}
+                    {result.artifact?.provider && (
+                      <p className="text-xs text-muted-foreground">
+                        {getStorageProviderLabel(result.artifact.provider)} · {getDownloadStrategy(
+                          result.artifact.provider,
+                          isPersistedArtifact(result.artifact)
+                        )}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      {isPreviewMode
+                        ? '预览模式下仅查看内容，确认导出后才会生成可持久化文件。'
+                        : exportSummary?.persistenceMode === 'none'
+                          ? '当前仅完成派发，未生成持久化文件；可下载内存中的整批 ZIP。'
+                        : getDownloadHint(result.artifact?.provider, isPersistedArtifact(result.artifact), '当前会优先回退到整批ZIP')}
+                    </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline">{result.fileName}</Badge>
-                  <Button variant="outline" size="sm">
-                    <FileDown className="h-4 w-4 mr-1" />
-                    下载
-                  </Button>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <Badge variant="outline" className="max-w-full truncate">{result.fileName}</Badge>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    {!isPreviewMode && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void downloadDetailFile(result)}
+                        disabled={isDownloadingDetail(result)}
+                      >
+                        {isDownloadingDetail(result) ? (
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                        ) : (
+                          <FileDown className="h-4 w-4 mr-1" />
+                        )}
+                        {getDownloadActionLabel(result.artifact?.provider, isPersistedArtifact(result.artifact))}明细
+                      </Button>
+                    )}
+                    <Button variant="outline" size="sm" onClick={downloadZipFile} disabled={downloadingZip}>
+                      {downloadingZip ? (
+                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      ) : (
+                        <FileDown className="h-4 w-4 mr-1" />
+                      )}
+                      {getDownloadActionLabel(exportSummary?.artifact?.provider, isPersistedArtifact(exportSummary?.artifact))}ZIP
+                    </Button>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowExportDialog(false)}>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+            <Button variant="outline" onClick={() => setShowExportDialog(false)} className="w-full sm:w-auto">
               关闭
             </Button>
-            <Button>
-              <FileDown className="h-4 w-4 mr-2" />
-              下载全部 (ZIP)
-            </Button>
+            {isPreviewMode ? (
+              <>
+                <Button
+                  variant="outline"
+                  className="w-full sm:w-auto"
+                  onClick={() => {
+                    if (exportSummary?.supplierIds?.length) {
+                      void handleExport(
+                        exportSummary.supplierIds,
+                        'dispatch',
+                        exportSummary.templateId ?? null,
+                        'none'
+                      );
+                    }
+                  }}
+                  disabled={exporting || !exportSummary?.supplierIds?.length}
+                >
+                  {exporting ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Package className="h-4 w-4 mr-2" />
+                  )}
+                  确认仅派发
+                </Button>
+                <Button
+                  className="w-full sm:w-auto"
+                  onClick={() => {
+                    if (exportSummary?.supplierIds?.length) {
+                      void handleExport(
+                        exportSummary.supplierIds,
+                        'dispatch',
+                        exportSummary.templateId ?? null,
+                        'full'
+                      );
+                    }
+                  }}
+                  disabled={exporting || !exportSummary?.supplierIds?.length}
+                >
+                  {exporting ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <FileDown className="h-4 w-4 mr-2" />
+                  )}
+                  确认导出并派发
+                </Button>
+              </>
+            ) : (
+              <>
+                {exportSummary?.recordId && exportSummary.persistenceMode === 'full' && (
+                  <Button
+                    variant="outline"
+                    className="w-full sm:w-auto"
+                    onClick={() => {
+                      router.push(`/export-records?recordId=${exportSummary.recordId}`);
+                    }}
+                  >
+                    <Building2 className="h-4 w-4 mr-2" />
+                    查看导出记录
+                  </Button>
+                )}
+                <Button onClick={downloadZipFile} disabled={downloadingZip} className="w-full sm:w-auto">
+                  {downloadingZip ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <FileDown className="h-4 w-4 mr-2" />
+                  )}
+                  {getDownloadActionLabel(exportSummary?.artifact?.provider, isPersistedArtifact(exportSummary?.artifact))}全部 (ZIP)
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
+    </PageGuard>
   );
 }

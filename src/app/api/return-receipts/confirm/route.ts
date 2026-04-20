@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { syncOrderCostHistoryAfterReturn } from '@/lib/order-cost-history';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { requirePermission } from '@/lib/server-auth';
 
 // 批量确认回单（匹配订单并更新状态）
 export async function POST(request: NextRequest) {
+  const authError = requirePermission(request, 'orders:edit');
+  if (authError) return authError;
   const client = getSupabaseClient();
 
   try {
@@ -21,22 +25,23 @@ export async function POST(request: NextRequest) {
       .from('return_receipts')
       .select('*')
       .in('id', receiptIds)
-      .eq('match_status', 'auto_matched');
+      .in('match_status', ['auto_matched', 'manual_matched']);
 
     if (receiptsError) throw new Error(`查询回单失败: ${receiptsError.message}`);
 
     // 批量更新匹配的订单
     for (const receipt of (receipts || [])) {
       if (receipt.order_id) {
+        const now = new Date().toISOString();
         // 更新订单物流信息
         const { error: updateError } = await client
           .from('orders')
           .update({
             express_company: receipt.express_company,
             tracking_no: receipt.tracking_no,
-            status: 'shipped',
-            shipped_at: receipt.ship_date || new Date().toISOString(),
-            updated_at: new Date().toISOString(),
+            status: 'returned',
+            returned_at: now,
+            updated_at: now,
           })
           .eq('id', receipt.order_id);
 
@@ -47,8 +52,15 @@ export async function POST(request: NextRequest) {
           // 更新回单状态为已确认
           await client
             .from('return_receipts')
-            .update({ matched_at: new Date().toISOString() })
+            .update({ matched_at: now })
             .eq('id', receipt.id);
+
+          await syncOrderCostHistoryAfterReturn(client, {
+            orderId: receipt.order_id,
+            expressCompany: receipt.express_company,
+            trackingNo: receipt.tracking_no,
+            returnedAt: now,
+          });
         }
       }
     }
@@ -70,7 +82,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `成功确认${matchedCount}个回单，${matchedCount}个订单状态已更新为已发货`,
+      message: `成功确认${matchedCount}个回单，${matchedCount}个订单状态已更新为已回单`,
       data: {
         matchedCount,
         updatedOrderIds,

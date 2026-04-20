@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { buildBundleDraftsFromFlatOrders } from '@/lib/order-parse-bundles';
 import { SupabaseClient } from '@supabase/supabase-js';
+import { requirePermission } from '@/lib/server-auth';
+import type { ParsedOrderDraft } from '@/types/order-parse';
 
 // 解析订单文本
 export async function POST(request: NextRequest) {
+  const authError = requirePermission(request, 'orders:create');
+  if (authError) return authError;
   const client = getSupabaseClient();
   
   try {
@@ -48,6 +53,8 @@ export async function POST(request: NextRequest) {
       mappedOrders = await applySkuMappings(client, orders, customerCode);
     }
 
+    const bundleOrders = buildBundleDraftsFromFlatOrders(mappedOrders);
+
     // 记录日志
     if (agent) {
       await client
@@ -57,7 +64,7 @@ export async function POST(request: NextRequest) {
           agent_code: agent.code,
           agent_name: agent.name,
           input: text,
-          output: JSON.stringify(mappedOrders),
+          output: JSON.stringify(bundleOrders),
           status: 'success',
           duration_ms: duration,
           model: agent.model,
@@ -68,11 +75,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        orders: mappedOrders,
-        rawOutput: JSON.stringify(mappedOrders),
+        orders: bundleOrders,
+        rawOutput: JSON.stringify(bundleOrders),
         duration,
       },
-      message: `成功解析出 ${mappedOrders.length} 条订单`
+      message: `成功解析出 ${bundleOrders.length} 条订单`
     });
   } catch (error) {
     console.error('订单解析失败:', error);
@@ -84,8 +91,8 @@ export async function POST(request: NextRequest) {
 }
 
 // 使用规则解析订单
-function parseOrdersByRules(text: string): Array<Record<string, unknown>> {
-  const orders: Array<Record<string, unknown>> = [];
+function parseOrdersByRules(text: string): ParsedOrderDraft[] {
+  const orders: ParsedOrderDraft[] = [];
   
   // 清理文本
   const lines = text.split(/\n/).filter(line => line.trim());
@@ -136,6 +143,7 @@ function parseOrdersByRules(text: string): Array<Record<string, unknown>> {
       if (currentProduct) {
         // 保存上一个商品
         orders.push({
+          id: `text_${Date.now()}_${orders.length}`,
           product_name: currentProduct,
           product_spec: currentSpec,
           quantity: currentQuantity,
@@ -159,6 +167,7 @@ function parseOrdersByRules(text: string): Array<Record<string, unknown>> {
   // 保存最后一个商品
   if (currentProduct) {
     orders.push({
+      id: `text_${Date.now()}_${orders.length}`,
       product_name: currentProduct,
       product_spec: currentSpec,
       quantity: currentQuantity,
@@ -171,6 +180,7 @@ function parseOrdersByRules(text: string): Array<Record<string, unknown>> {
   // 如果没有找到商品，尝试整个文本作为商品
   if (orders.length === 0 && text.length > 0) {
     orders.push({
+      id: `text_${Date.now()}_${orders.length}`,
       product_name: text.substring(0, 100),
       product_spec: '',
       quantity: 1,
@@ -186,9 +196,9 @@ function parseOrdersByRules(text: string): Array<Record<string, unknown>> {
 // 应用SKU映射
 async function applySkuMappings(
   client: SupabaseClient,
-  orders: Array<Record<string, unknown>>,
+  orders: ParsedOrderDraft[],
   customerCode: string
-): Promise<Array<Record<string, unknown>>> {
+): Promise<ParsedOrderDraft[]> {
   // 获取该客户的所有SKU映射
   const { data: mappings } = await client
     .from('product_mappings')
@@ -218,10 +228,10 @@ async function applySkuMappings(
       if (productName.includes(key) || key.includes(productName)) {
         return {
           ...order,
-          mappedProductCode: mapping.product_code,
-          mappedProductName: mapping.product_name,
-          customerSku: mapping.customer_sku,
-          customerPrice: mapping.price,
+          mappedProductCode: typeof mapping.product_code === 'string' ? mapping.product_code : undefined,
+          mappedProductName: typeof mapping.product_name === 'string' ? mapping.product_name : undefined,
+          customerSku: typeof mapping.customer_sku === 'string' ? mapping.customer_sku : undefined,
+          customerPrice: typeof mapping.price === 'number' ? mapping.price : undefined,
         };
       }
     }

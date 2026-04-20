@@ -1,0 +1,30 @@
+{
+  "name": "excel-basic",
+  "description": "基础订单导入样例，表头可被标准规则识别",
+  "headerRow": 0,
+  "headers": ["客户订单号", "商品名称", "规格型号", "数量", "收货人", "收货电话", "收货地址"],
+  "columnMapping": {
+    "0": "order_no",
+    "1": "product_name",
+    "2": "product_spec",
+    "3": "quantity",
+    "4": "receiver_name",
+    "5": "receiver_phone",
+    "6": "receiver_address"
+  },
+  "rows": [
+    ["SO-1001", "保温杯", "白色 500ml", "2", "张三", "13800138000", "上海市浦东新区张江路88号"],
+    ["SO-1002", "便携风扇", "绿色", "1", "李四", "13900139000", "杭州市西湖区文三路18号"]
+  ],
+  "expected": {
+    "coverageRate": 100,
+    "recognizedFieldCount": 7,
+    "unrecognizedHeaders": [],
+    "conflictFields": []
+  },
+  "expectedMetadata": {
+    "normalizedHeaders": ["客户订单号", "商品名称", "规格型号", "数量", "收货人", "收货电话", "收货地址"],
+    "headerFingerprint": "7f43fa650e20cd51",
+    "templateSignature": "e85a9d470f09cab554c8abd6"
+  }
+}

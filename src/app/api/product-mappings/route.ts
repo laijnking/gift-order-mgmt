@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 // 数据库字段转前端格式
@@ -26,6 +27,9 @@ function transformMapping(dbMapping: Record<string, unknown>) {
 
 // 获取SKU映射列表
 export async function GET(request: NextRequest) {
+  const authError = requirePermission(request, 'products:view');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
   const search = searchParams.get('search');
@@ -75,6 +79,9 @@ export async function GET(request: NextRequest) {
 
 // 新增SKU映射
 export async function POST(request: NextRequest) {
+  const authError = requirePermission(request, 'products:edit');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
   
   try {
@@ -120,6 +127,9 @@ export async function POST(request: NextRequest) {
 
 // 批量导入SKU映射
 export async function PUT(request: NextRequest) {
+  const authError = requirePermission(request, 'products:edit');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
   
   try {

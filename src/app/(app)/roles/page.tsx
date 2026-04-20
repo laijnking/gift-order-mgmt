@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { PageGuard } from '@/components/auth/page-guard';
+import { buildUserInfoHeaders, useAuth } from '@/lib/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -65,6 +66,7 @@ const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>
 };
 
 export default function RolesPage() {
+  const { user } = useAuth();
   const [roles, setRoles] = useState<Role[]>([]);
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,10 +84,11 @@ export default function RolesPage() {
     isActive: true,
     permissions: [] as string[],
   });
+  const authHeaders = useCallback(() => buildUserInfoHeaders(user), [user]);
 
   const loadRoles = useCallback(async () => {
     try {
-      const res = await fetch('/api/roles?includePermissions=true');
+      const res = await fetch('/api/roles?includePermissions=true', { headers: authHeaders() });
       const data = await res.json();
       if (data.success) {
         setRoles(data.data || []);
@@ -93,7 +96,7 @@ export default function RolesPage() {
     } catch (error) {
       console.error('获取角色失败:', error);
     }
-  }, []);
+  }, [authHeaders]);
 
   const loadPermissions = useCallback(async () => {
     try {
@@ -192,7 +195,7 @@ export default function RolesPage() {
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify(payload),
       });
 
@@ -213,7 +216,7 @@ export default function RolesPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`/api/roles/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/roles/${id}`, { method: 'DELETE', headers: authHeaders() });
       const data = await res.json();
       if (data.success) {
         toast.success('角色删除成功');
@@ -277,11 +280,11 @@ export default function RolesPage() {
 
   return (
     <PageGuard permission="settings:view" title="无法访问角色与权限">
-      <div className="space-y-6">
+      <div className="space-y-6 px-3 pb-4 sm:px-4">
       {/* 头部 */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold flex items-center gap-2 sm:text-3xl">
             <Shield className="h-8 w-8" />
             角色与权限
           </h1>
@@ -289,7 +292,7 @@ export default function RolesPage() {
             管理系统角色、数据权限和功能权限配置
           </p>
         </div>
-        <Button onClick={() => handleOpenDialog()}>
+        <Button onClick={() => handleOpenDialog()} className="w-full sm:w-auto">
           <Plus className="mr-2 h-4 w-4" />
           新增角色
         </Button>
@@ -298,8 +301,8 @@ export default function RolesPage() {
       {/* 筛选 */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1 max-w-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+            <div className="relative flex-1 sm:max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 placeholder="搜索角色名称/编码..."
@@ -312,7 +315,7 @@ export default function RolesPage() {
               <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               刷新
             </Button>
-            <Badge variant="outline">
+            <Badge variant="outline" className="w-fit">
               共 {filteredRoles.length} 个角色
             </Badge>
           </div>
@@ -322,6 +325,7 @@ export default function RolesPage() {
       {/* 角色列表 */}
       <Card>
         <CardContent className="p-0">
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -404,12 +408,13 @@ export default function RolesPage() {
               )}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 
       {/* 新增/编辑角色对话框 */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogContent className="flex max-h-[90vh] w-[calc(100vw-1.5rem)] max-w-4xl flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle>{editingRole ? '编辑角色' : '新增角色'}</DialogTitle>
             <DialogDescription>
@@ -418,7 +423,7 @@ export default function RolesPage() {
           </DialogHeader>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid h-auto w-full grid-cols-1 sm:grid-cols-3">
               <TabsTrigger value="basic">基本信息</TabsTrigger>
               <TabsTrigger value="permissions">权限配置</TabsTrigger>
               <TabsTrigger value="preview">预览</TabsTrigger>
@@ -426,7 +431,7 @@ export default function RolesPage() {
 
             {/* 基本信息 */}
             <TabsContent value="basic" className="flex-1 overflow-y-auto space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label>角色名称 *</Label>
                   <Input
@@ -462,7 +467,7 @@ export default function RolesPage() {
 
               <div className="space-y-3">
                 <Label>数据权限范围</Label>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                   {DATA_SCOPE_OPTIONS.map((option) => (
                     <div
                       key={option.value}
@@ -508,7 +513,7 @@ export default function RolesPage() {
 
             {/* 权限配置 */}
             <TabsContent value="permissions" className="flex-1 overflow-y-auto space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="space-y-1">
                   <Label>功能权限配置</Label>
                   <p className="text-sm text-muted-foreground">
@@ -542,7 +547,7 @@ export default function RolesPage() {
                     return (
                       <Card key={category.key}>
                         <CardHeader className="pb-2">
-                          <div className="flex items-center justify-between">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex items-center gap-2">
                               <Checkbox
                                 id={`cat-${category.key}`}
@@ -564,7 +569,7 @@ export default function RolesPage() {
                           </div>
                         </CardHeader>
                         <CardContent>
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                             {categoryPerms.map((perm) => (
                               <div
                                 key={perm.id}
@@ -607,7 +612,7 @@ export default function RolesPage() {
                   <CardDescription>{formData.description || '暂无描述'}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
                       <p className="text-sm text-muted-foreground">角色编码</p>
                       <p className="font-medium">{formData.code || '-'}</p>
@@ -648,9 +653,9 @@ export default function RolesPage() {
             </TabsContent>
           </Tabs>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>
-            <Button onClick={handleSubmit} disabled={editingRole?.code === 'admin'}>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setDialogOpen(false)} className="w-full sm:w-auto">取消</Button>
+            <Button onClick={handleSubmit} disabled={editingRole?.code === 'admin'} className="w-full sm:w-auto">
               {editingRole ? '保存修改' : '创建角色'}
             </Button>
           </DialogFooter>
@@ -659,16 +664,16 @@ export default function RolesPage() {
 
       {/* 删除确认 */}
       <Dialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>
-        <DialogContent>
+        <DialogContent className="w-[calc(100vw-1.5rem)] max-w-lg">
           <DialogHeader>
             <DialogTitle>确认删除</DialogTitle>
             <DialogDescription>
               确定要删除此角色吗？删除后，使用此角色的用户将失去对应权限。
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>取消</Button>
-            <Button variant="destructive" onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)}>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setDeleteConfirmId(null)} className="w-full sm:w-auto">取消</Button>
+            <Button variant="destructive" onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)} className="w-full sm:w-auto">
               删除
             </Button>
           </DialogFooter>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { createClient } from '@supabase/supabase-js';
+import { requirePermission } from '@/lib/server-auth';
 
 // 创建指向 public schema 的 client
 function getPublicSupabaseClient() {
@@ -35,6 +36,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authError = requirePermission(request, 'users:view');
+  if (authError) return authError;
+
   const { id } = await params;
   const supabase = getPublicSupabaseClient();
 
@@ -68,6 +72,9 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authError = requirePermission(request, 'users:edit');
+  if (authError) return authError;
+
   const { id } = await params;
   const supabase = getPublicSupabaseClient();
 
@@ -115,6 +122,9 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authError = requirePermission(request, 'users:delete');
+  if (authError) return authError;
+
   const { id } = await params;
   const supabase = getPublicSupabaseClient();
 

@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
+import { PageGuard } from '@/components/auth/page-guard';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Switch } from '@/components/ui/switch';
+import { buildUserInfoHeaders, useAuth, usePermission } from '@/lib/auth';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
@@ -83,6 +85,11 @@ const SETTLEMENT_TYPES = [
 const EXPRESS_OPTIONS = ['极兔速递', '中通快递', '圆通速递', '韵达快递', '申通快递', '顺丰速运', '京东物流', 'EMS'];
 
 export default function ShippersManagePage() {
+  const { user } = useAuth();
+  const { hasPermission } = usePermission();
+  const canCreateSuppliers = hasPermission('suppliers:create');
+  const canEditSuppliers = hasPermission('suppliers:edit');
+  const canDeleteSuppliers = hasPermission('suppliers:delete');
   const [shippers, setShippers] = useState<Shipper[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -125,9 +132,11 @@ export default function ShippersManagePage() {
     fetchShippers();
   }, []);
 
+  const authHeaders = useCallback(() => buildUserInfoHeaders(user), [user]);
+
   const fetchShippers = async () => {
     try {
-      const res = await fetch('/api/shippers');
+      const res = await fetch('/api/shippers', { headers: authHeaders() });
       const data = await res.json();
       if (data.success) {
         setShippers(data.data);
@@ -291,7 +300,10 @@ export default function ShippersManagePage() {
 
       const res = await fetch('/api/shippers/batch', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders(),
+        },
         body: JSON.stringify({ shippers: shippersData }),
       });
 
@@ -343,6 +355,16 @@ export default function ShippersManagePage() {
   };
 
   const handleSubmit = async () => {
+    if (editingShipper && !canEditSuppliers) {
+      setAlert({ type: 'error', message: '当前账号没有编辑发货方的权限' });
+      return;
+    }
+
+    if (!editingShipper && !canCreateSuppliers) {
+      setAlert({ type: 'error', message: '当前账号没有新增发货方的权限' });
+      return;
+    }
+
     if (!formData.name) {
       setAlert({ type: 'error', message: '请填写发货方名称' });
       return;
@@ -354,7 +376,10 @@ export default function ShippersManagePage() {
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders(),
+        },
         body: JSON.stringify(formData),
       });
 
@@ -373,8 +398,16 @@ export default function ShippersManagePage() {
   };
 
   const handleDelete = async (id: string) => {
+    if (!canDeleteSuppliers) {
+      setAlert({ type: 'error', message: '当前账号没有删除发货方的权限' });
+      return;
+    }
+
     try {
-      const res = await fetch(`/api/shippers/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/shippers/${id}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+      });
       const data = await res.json();
       if (data.success) {
         setAlert({ type: 'success', message: '发货方删除成功' });
@@ -436,19 +469,19 @@ export default function ShippersManagePage() {
   };
 
   return (
-    <>
+    <PageGuard permission="suppliers:view">
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
-        <header className="bg-white border-b sticky top-0 z-10">
+        <header className="sticky top-0 z-10 border-b bg-white">
           <div className="container mx-auto px-4 py-4">
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
               <Link href="/archive">
                 <Button variant="ghost" size="sm">
                   <ArrowLeft className="w-4 h-4 mr-1" />
                   返回
                 </Button>
               </Link>
-              <div className="flex items-center gap-3">
+              <div className="flex min-w-0 items-center gap-3">
                 <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
                   <Building2 className="w-6 h-6 text-white" />
                 </div>
@@ -462,9 +495,9 @@ export default function ShippersManagePage() {
         </header>
 
         {/* Navigation */}
-        <div className="bg-white border-b">
+        <div className="border-b bg-white">
           <div className="container mx-auto px-4">
-            <nav className="flex gap-6">
+            <nav className="flex gap-4 overflow-x-auto">
               <Link href="/archive" className="py-4 px-2 border-b-2 border-transparent text-sm font-medium text-gray-600 hover:text-gray-900">
                 总览
               </Link>
@@ -486,7 +519,7 @@ export default function ShippersManagePage() {
 
         <main className="container mx-auto px-4 py-6">
           {/* Stats Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
+          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
             <Card>
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
@@ -558,7 +591,7 @@ export default function ShippersManagePage() {
           {/* Search and Actions */}
           <Card className="mb-6">
             <CardContent className="pt-6">
-              <div className="flex flex-wrap items-center gap-4">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
                 <div className="relative flex-1 min-w-[200px]">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
@@ -569,7 +602,7 @@ export default function ShippersManagePage() {
                   />
                 </div>
                 <Select value={typeFilter || 'all'} onValueChange={(v) => setTypeFilter(v === 'all' ? '' : v)}>
-                  <SelectTrigger className="w-[150px]">
+                  <SelectTrigger className="w-full xl:w-[150px]">
                     <SelectValue placeholder="按类型筛选" />
                   </SelectTrigger>
                   <SelectContent>
@@ -579,7 +612,7 @@ export default function ShippersManagePage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row">
                   <input
                     type="file"
                     ref={fileInputRef}
@@ -587,23 +620,32 @@ export default function ShippersManagePage() {
                     className="hidden"
                     onChange={handleFileUpload}
                   />
-                  <Button variant="outline" onClick={downloadTemplate}>
+                  <Button variant="outline" onClick={downloadTemplate} className="w-full sm:w-auto">
                     <Download className="w-4 h-4 mr-1" />
                     模板下载
                   </Button>
-                  <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+                  <Button
+                    variant="outline"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full sm:w-auto"
+                    disabled={!canCreateSuppliers}
+                  >
                     <Upload className="w-4 h-4 mr-1" />
                     导入
                   </Button>
                 </div>
                 <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button onClick={() => { resetForm(); setDialogOpen(true); }}>
+                    <Button
+                      onClick={() => { resetForm(); setDialogOpen(true); }}
+                      className="w-full xl:w-auto"
+                      disabled={!canCreateSuppliers}
+                    >
                       <Plus className="w-4 h-4 mr-1" />
                       新增发货方
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+                  <DialogContent className="max-h-[85vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-2xl">
                     <DialogHeader>
                       <DialogTitle>{editingShipper ? '编辑发货方' : '新增发货方'}</DialogTitle>
                       <DialogDescription>
@@ -615,9 +657,9 @@ export default function ShippersManagePage() {
                         <AlertDescription>{alert.message}</AlertDescription>
                       </Alert>
                     )}
-                    <div className="grid grid-cols-2 gap-4 py-4">
+                    <div className="grid gap-4 py-4 sm:grid-cols-2">
                       {/* 基本信息 */}
-                      <div className="col-span-2">
+                      <div className="sm:col-span-2">
                         <h3 className="text-sm font-semibold text-gray-700 mb-2">基本信息</h3>
                       </div>
                       <div className="space-y-2">
@@ -659,7 +701,7 @@ export default function ShippersManagePage() {
                       </div>
 
                       {/* 联系信息 */}
-                      <div className="col-span-2">
+                      <div className="sm:col-span-2">
                         <h3 className="text-sm font-semibold text-gray-700 mb-2 mt-4">联系信息</h3>
                       </div>
                       <div className="space-y-2">
@@ -694,7 +736,7 @@ export default function ShippersManagePage() {
                           placeholder="如: 深圳"
                         />
                       </div>
-                      <div className="col-span-2 space-y-2">
+                      <div className="space-y-2 sm:col-span-2">
                         <Label>详细地址</Label>
                         <Input 
                           value={formData.address} 
@@ -704,7 +746,7 @@ export default function ShippersManagePage() {
                       </div>
 
                       {/* 发货设置 */}
-                      <div className="col-span-2">
+                      <div className="sm:col-span-2">
                         <h3 className="text-sm font-semibold text-gray-700 mb-2 mt-4">发货设置</h3>
                       </div>
                       <div className="space-y-2">
@@ -745,10 +787,10 @@ export default function ShippersManagePage() {
                       </div>
 
                       {/* 渠道配置 */}
-                      <div className="col-span-2">
+                      <div className="sm:col-span-2">
                         <h3 className="text-sm font-semibold text-gray-700 mb-2 mt-4">渠道配置</h3>
                       </div>
-                      <div className="col-span-2 space-y-3">
+                      <div className="space-y-3 sm:col-span-2">
                         <div className="flex items-center justify-between">
                           <Label>支持京东发货</Label>
                           <Switch 
@@ -765,7 +807,7 @@ export default function ShippersManagePage() {
                           />
                         )}
                       </div>
-                      <div className="col-span-2 space-y-3">
+                      <div className="space-y-3 sm:col-span-2">
                         <div className="flex items-center justify-between">
                           <Label>支持拼多多发货</Label>
                           <Switch 
@@ -784,10 +826,10 @@ export default function ShippersManagePage() {
                       </div>
 
                       {/* 快递限制 */}
-                      <div className="col-span-2">
+                      <div className="sm:col-span-2">
                         <h3 className="text-sm font-semibold text-gray-700 mb-2 mt-4">快递限制</h3>
                       </div>
-                      <div className="col-span-2 space-y-2">
+                      <div className="space-y-2 sm:col-span-2">
                         <div className="flex flex-wrap gap-2">
                           {EXPRESS_OPTIONS.map(express => (
                             <Button
@@ -796,6 +838,7 @@ export default function ShippersManagePage() {
                               variant={formData.expressRestrictions.includes(express) ? "destructive" : "outline"}
                               size="sm"
                               onClick={() => toggleExpressRestriction(express)}
+                              disabled={editingShipper ? !canEditSuppliers : !canCreateSuppliers}
                             >
                               {express}
                             </Button>
@@ -805,10 +848,10 @@ export default function ShippersManagePage() {
                       </div>
 
                       {/* 其他设置 */}
-                      <div className="col-span-2">
+                      <div className="sm:col-span-2">
                         <h3 className="text-sm font-semibold text-gray-700 mb-2 mt-4">其他设置</h3>
                       </div>
-                      <div className="col-span-2 space-y-3">
+                      <div className="space-y-3 sm:col-span-2">
                         <div className="flex items-center justify-between">
                           <Label>启用状态</Label>
                           <Switch 
@@ -817,7 +860,7 @@ export default function ShippersManagePage() {
                           />
                         </div>
                       </div>
-                      <div className="col-span-2 space-y-2">
+                      <div className="space-y-2 sm:col-span-2">
                         <Label>备注</Label>
                         <Input 
                           value={formData.remark} 
@@ -826,9 +869,15 @@ export default function ShippersManagePage() {
                         />
                       </div>
                     </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>
-                      <Button onClick={handleSubmit}>{editingShipper ? '保存修改' : '创建发货方'}</Button>
+                    <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                      <Button variant="outline" onClick={() => setDialogOpen(false)} className="w-full sm:w-auto">取消</Button>
+                      <Button
+                        onClick={handleSubmit}
+                        disabled={editingShipper ? !canEditSuppliers : !canCreateSuppliers}
+                        className="w-full sm:w-auto"
+                      >
+                        {editingShipper ? '保存修改' : '创建发货方'}
+                      </Button>
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
@@ -839,6 +888,7 @@ export default function ShippersManagePage() {
           {/* Shipper List */}
           <Card>
             <CardContent className="p-0">
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -916,26 +966,36 @@ export default function ShippersManagePage() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(shipper)}>
+                          <div className="flex flex-wrap justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleOpenDialog(shipper)}
+                              disabled={!canEditSuppliers}
+                            >
                               <Edit className="w-4 h-4" />
                             </Button>
                             <Dialog open={deleteConfirmId === shipper.id} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
                               <DialogTrigger asChild>
-                                <Button variant="ghost" size="sm" onClick={() => setDeleteConfirmId(shipper.id)}>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setDeleteConfirmId(shipper.id)}
+                                  disabled={!canDeleteSuppliers}
+                                >
                                   <Trash2 className="w-4 h-4 text-red-500" />
                                 </Button>
                               </DialogTrigger>
-                              <DialogContent>
+                              <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-lg">
                                 <DialogHeader>
                                   <DialogTitle>确认删除</DialogTitle>
                                   <DialogDescription>
                                     确定要删除发货方 &quot;{shipper.name}&quot; 吗？此操作无法撤销。
                                   </DialogDescription>
                                 </DialogHeader>
-                                <DialogFooter>
-                                  <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>取消</Button>
-                                  <Button variant="destructive" onClick={() => handleDelete(shipper.id)}>删除</Button>
+                                <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                                  <Button variant="outline" onClick={() => setDeleteConfirmId(null)} className="w-full sm:w-auto">取消</Button>
+                                  <Button variant="destructive" onClick={() => handleDelete(shipper.id)} disabled={!canDeleteSuppliers} className="w-full sm:w-auto">删除</Button>
                                 </DialogFooter>
                               </DialogContent>
                             </Dialog>
@@ -946,6 +1006,7 @@ export default function ShippersManagePage() {
                   )}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
 
@@ -960,7 +1021,7 @@ export default function ShippersManagePage() {
 
           {/* Excel导入预览对话框 */}
           <Dialog open={excelImportDialogOpen} onOpenChange={setExcelImportDialogOpen}>
-            <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+            <DialogContent className="flex max-h-[80vh] w-[calc(100vw-1.5rem)] flex-col overflow-hidden sm:max-w-4xl">
               <DialogHeader>
                 <DialogTitle>导入发货方数据预览</DialogTitle>
                 <DialogDescription>
@@ -968,6 +1029,7 @@ export default function ShippersManagePage() {
                 </DialogDescription>
               </DialogHeader>
               <div className="flex-1 overflow-auto">
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -992,15 +1054,16 @@ export default function ShippersManagePage() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
                 {excelImportData.length > 20 && (
                   <p className="text-sm text-gray-500 text-center py-2">
                     仅显示前20条数据...
                   </p>
                 )}
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setExcelImportDialogOpen(false)}>取消</Button>
-                <Button onClick={confirmExcelImport} disabled={importing}>
+              <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button variant="outline" onClick={() => setExcelImportDialogOpen(false)} className="w-full sm:w-auto">取消</Button>
+                <Button onClick={confirmExcelImport} disabled={importing || !canCreateSuppliers} className="w-full sm:w-auto">
                   {importing ? '导入中...' : `确认导入 ${excelImportData.length} 条`}
                 </Button>
               </DialogFooter>
@@ -1008,6 +1071,6 @@ export default function ShippersManagePage() {
           </Dialog>
         </main>
       </div>
-    </>
+    </PageGuard>
   );
 }

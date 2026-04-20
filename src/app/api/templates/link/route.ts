@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 // 关联模板到客户或供应商
 export async function POST(request: NextRequest) {
+  const authError = requirePermission(request, 'settings:edit');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
 
   try {
@@ -60,6 +64,9 @@ export async function POST(request: NextRequest) {
 
 // 取消关联
 export async function DELETE(request: NextRequest) {
+  const authError = requirePermission(request, 'settings:edit');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
 
   try {
@@ -93,6 +100,9 @@ export async function DELETE(request: NextRequest) {
 
 // 获取模板的关联列表
 export async function GET(request: NextRequest) {
+  const authError = requirePermission(request, 'settings:view');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
   const templateId = searchParams.get('templateId');

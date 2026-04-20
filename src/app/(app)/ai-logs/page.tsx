@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { PageGuard } from '@/components/auth/page-guard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +31,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { buildUserInfoHeaders } from '@/lib/auth';
 import { toast } from 'sonner';
 import {
   FileText,
@@ -111,9 +113,10 @@ export default function AiLogsPage() {
   const loadData = async () => {
     setLoading(true);
     try {
+      const headers = buildUserInfoHeaders();
       const [logsRes, agentsRes] = await Promise.all([
-        fetch('/api/ai-logs?limit=100'),
-        fetch('/api/agent-configs'),
+        fetch('/api/ai-logs?limit=100', { headers }),
+        fetch('/api/agent-configs', { headers }),
       ]);
 
       const logsData = await logsRes.json();
@@ -214,24 +217,24 @@ export default function AiLogsPage() {
   }
 
   return (
-    <>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <FileText className="h-8 w-8" />
+    <PageGuard permission="ai_logs:view" title="无权查看 AI 日志" description="当前账号没有查看 AI 执行日志的权限。">
+      <div className="space-y-6 px-3 py-4 sm:px-4 sm:py-6">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <h1 className="flex items-center gap-2 text-2xl font-bold sm:text-3xl">
+              <FileText className="h-7 w-7 sm:h-8 sm:w-8" />
               AI执行日志
-          </h1>
-          <p className="text-muted-foreground">
-            查看AI Agent的执行记录和结果
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleExport}>
+            </h1>
+            <p className="text-sm text-muted-foreground sm:text-base">
+              查看 AI Agent 的执行记录和结果
+            </p>
+          </div>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button variant="outline" onClick={handleExport} className="w-full sm:w-auto">
             <Download className="mr-2 h-4 w-4" />
             导出
           </Button>
-          <Button variant="outline" onClick={loadData}>
+          <Button variant="outline" onClick={loadData} className="w-full sm:w-auto">
             <RefreshCw className="mr-2 h-4 w-4" />
             刷新
           </Button>
@@ -239,7 +242,7 @@ export default function AiLogsPage() {
       </div>
 
       {/* 统计卡片 */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">总执行次数</CardTitle>
@@ -279,7 +282,7 @@ export default function AiLogsPage() {
       </div>
 
       {/* 筛选器 */}
-      <div className="flex gap-4">
+      <div className="flex flex-col gap-3 lg:flex-row">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -290,7 +293,7 @@ export default function AiLogsPage() {
           />
         </div>
         <Select value={agentFilter || 'all'} onValueChange={(v) => setAgentFilter(v === 'all' ? '' : v)}>
-          <SelectTrigger className="w-[200px]">
+          <SelectTrigger className="w-full lg:w-[200px]">
             <SelectValue placeholder="筛选Agent" />
           </SelectTrigger>
           <SelectContent>
@@ -303,7 +306,7 @@ export default function AiLogsPage() {
           </SelectContent>
         </Select>
         <Select value={statusFilter || 'all'} onValueChange={(v) => setStatusFilter(v === 'all' ? '' : v)}>
-          <SelectTrigger className="w-[150px]">
+          <SelectTrigger className="w-full lg:w-[150px]">
             <SelectValue placeholder="筛选状态" />
           </SelectTrigger>
           <SelectContent>
@@ -317,6 +320,7 @@ export default function AiLogsPage() {
       {/* 日志列表 */}
       <Card>
         <CardContent className="p-0">
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -376,6 +380,7 @@ export default function AiLogsPage() {
               )}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 
@@ -385,7 +390,7 @@ export default function AiLogsPage() {
 
       {/* 详情对话框 */}
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>日志详情</DialogTitle>
             <DialogDescription>
@@ -395,7 +400,7 @@ export default function AiLogsPage() {
           {selectedLog && (
             <div className="grid gap-4 py-4">
               {/* 基本信息 */}
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Agent</p>
                   <p className="font-medium">{selectedLog.agent_name || selectedLog.agent_code}</p>
@@ -490,7 +495,7 @@ export default function AiLogsPage() {
         </DialogContent>
       </Dialog>
     </div>
-    </>
+    </PageGuard>
   );
 }
 

@@ -669,7 +669,7 @@ interface BatchShippingExportDetail {
 | 接口 | 方法 | 说明 |
 |------|------|------|
 | `/api/shipping-exports/batch` | POST | 批量导出发货通知单 |
-| `/api/shipping-exports/batch/[id]` | GET | 获取批量导出详情 |
+| `/api/shipping-exports/batch/[id]` | GET | 兼容入口：按导出记录获取批量导出详情 |
 
 ---
 

@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { requirePermission } from '@/lib/server-auth';
 
 // 获取回单时效分析数据
 export async function GET(request: NextRequest) {
+  const authError = requirePermission(request, 'dashboard:view');
+  if (authError) return authError;
   try {
     const supabase = await getSupabaseClient();
     const searchParams = request.nextUrl.searchParams;
@@ -13,7 +16,7 @@ export async function GET(request: NextRequest) {
     let orderQuery = supabase
       .from('orders')
       .select('*')
-      .in('status', ['completed', 'returned', 'partial_returned', 'assigned']);
+      .in('status', ['completed', 'feedbacked', 'returned', 'partial_returned', 'assigned']);
 
     if (startDate) {
       orderQuery = orderQuery

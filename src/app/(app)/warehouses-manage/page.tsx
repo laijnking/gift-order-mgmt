@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { PageGuard } from '@/components/auth/page-guard';
+import { buildUserInfoHeaders, useAuth, usePermission } from '@/lib/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,6 +48,8 @@ interface StockItem {
 }
 
 export default function WarehousesManagePage() {
+  const { user } = useAuth();
+  const { hasPermission } = usePermission();
   const [warehouses, setWarehouses] = useState<WarehouseType[]>([]);
   const [stocks, setStocks] = useState<StockItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,12 +77,17 @@ export default function WarehousesManagePage() {
     fetchData();
   }, []);
 
+  const authHeaders = () => buildUserInfoHeaders(user);
+  const canCreateSuppliers = hasPermission('suppliers:create');
+  const canEditSuppliers = hasPermission('suppliers:edit');
+  const canDeleteSuppliers = hasPermission('suppliers:delete');
+
   const fetchData = async () => {
     try {
       const [warehousesRes, stocksRes, suppliersRes] = await Promise.all([
-        fetch('/api/warehouses'),
-        fetch('/api/stocks'),
-        fetch('/api/suppliers'),
+        fetch('/api/warehouses', { headers: authHeaders() }),
+        fetch('/api/stocks', { headers: authHeaders() }),
+        fetch('/api/suppliers', { headers: authHeaders() }),
       ]);
 
       const [warehousesData, stocksData, suppliersData] = await Promise.all([
@@ -165,7 +174,7 @@ export default function WarehousesManagePage() {
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify(formData),
       });
 
@@ -185,8 +194,12 @@ export default function WarehousesManagePage() {
 
   const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`/api/warehouses/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/warehouses/${id}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+      });
       const data = await res.json();
+      
       if (data.success) {
         setAlert({ type: 'success', message: '仓库删除成功' });
         setDeleteConfirmId(null);
@@ -234,19 +247,19 @@ export default function WarehousesManagePage() {
   };
 
   return (
-    <>
+    <PageGuard permission="suppliers:view">
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
         <header className="bg-white border-b sticky top-0 z-10">
           <div className="container mx-auto px-4 py-4">
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
               <Link href="/archive">
               <Button variant="ghost" size="sm">
                 <ArrowLeft className="w-4 h-4 mr-1" />
                 返回
               </Button>
             </Link>
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
                 <Warehouse className="w-6 h-6 text-white" />
               </div>
@@ -262,7 +275,7 @@ export default function WarehousesManagePage() {
       {/* Navigation */}
       <div className="bg-white border-b">
         <div className="container mx-auto px-4">
-          <nav className="flex gap-6">
+          <nav className="flex gap-6 overflow-x-auto">
             <Link href="/archive" className="py-4 px-2 border-b-2 border-transparent text-sm font-medium text-gray-600 hover:text-gray-900">
               总览
             </Link>
@@ -332,10 +345,11 @@ export default function WarehousesManagePage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-4 mb-6">
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row">
           <Button
             variant={activeTab === 'warehouses' ? 'default' : 'outline'}
             onClick={() => setActiveTab('warehouses')}
+            className="w-full sm:w-auto"
           >
             <Warehouse className="w-4 h-4 mr-1" />
             仓库档案
@@ -343,6 +357,7 @@ export default function WarehousesManagePage() {
           <Button
             variant={activeTab === 'stocks' ? 'default' : 'outline'}
             onClick={() => setActiveTab('stocks')}
+            className="w-full sm:w-auto"
           >
             <Package className="w-4 h-4 mr-1" />
             库存管理
@@ -354,7 +369,7 @@ export default function WarehousesManagePage() {
             {/* Warehouse Search and Actions */}
             <Card className="mb-6">
               <CardContent className="pt-6">
-                <div className="flex flex-wrap items-center gap-4">
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
                   <div className="relative flex-1 min-w-[200px]">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <Input
@@ -365,7 +380,7 @@ export default function WarehousesManagePage() {
                     />
                   </div>
                   <Select value={typeFilter || 'all'} onValueChange={(v) => setTypeFilter(v === 'all' ? '' : v)}>
-                    <SelectTrigger className="w-[150px]">
+                    <SelectTrigger className="w-full xl:w-[150px]">
                       <SelectValue placeholder="按类型筛选" />
                     </SelectTrigger>
                     <SelectContent>
@@ -377,12 +392,16 @@ export default function WarehousesManagePage() {
                   </Select>
                   <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                     <DialogTrigger asChild>
-                      <Button onClick={() => { resetForm(); setDialogOpen(true); }}>
+                      <Button
+                        onClick={() => { resetForm(); setDialogOpen(true); }}
+                        disabled={!canCreateSuppliers}
+                        className="w-full xl:w-auto"
+                      >
                         <Plus className="w-4 h-4 mr-1" />
                         新增仓库
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                    <DialogContent className="max-h-[80vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-2xl">
                       <DialogHeader>
                         <DialogTitle>{editingWarehouse ? '编辑仓库' : '新增仓库'}</DialogTitle>
                         <DialogDescription>
@@ -394,7 +413,7 @@ export default function WarehousesManagePage() {
                           <AlertDescription>{alert.message}</AlertDescription>
                         </Alert>
                       )}
-                      <div className="grid grid-cols-2 gap-4 py-4">
+                      <div className="grid gap-4 py-4 sm:grid-cols-2">
                         <div className="space-y-2">
                           <Label>仓库编码 *</Label>
                           <Input 
@@ -464,7 +483,7 @@ export default function WarehousesManagePage() {
                             placeholder="如: 广州"
                           />
                         </div>
-                        <div className="col-span-2 space-y-2">
+                        <div className="space-y-2 sm:col-span-2">
                           <Label>详细地址</Label>
                           <Input 
                             value={formData.address} 
@@ -472,7 +491,7 @@ export default function WarehousesManagePage() {
                             placeholder="详细街道地址"
                           />
                         </div>
-                        <div className="col-span-2 space-y-2">
+                        <div className="space-y-2 sm:col-span-2">
                           <Label>备注</Label>
                           <Input 
                             value={formData.remark} 
@@ -481,9 +500,15 @@ export default function WarehousesManagePage() {
                           />
                         </div>
                       </div>
-                      <DialogFooter>
-                        <Button variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>
-                        <Button onClick={handleSubmit}>{editingWarehouse ? '保存修改' : '创建仓库'}</Button>
+                      <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                        <Button variant="outline" onClick={() => setDialogOpen(false)} className="w-full sm:w-auto">取消</Button>
+                        <Button
+                          onClick={handleSubmit}
+                          disabled={editingWarehouse ? !canEditSuppliers : !canCreateSuppliers}
+                          className="w-full sm:w-auto"
+                        >
+                          {editingWarehouse ? '保存修改' : '创建仓库'}
+                        </Button>
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>
@@ -494,6 +519,7 @@ export default function WarehousesManagePage() {
             {/* Warehouse List */}
             <Card>
               <CardContent className="p-0">
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -541,26 +567,43 @@ export default function WarehousesManagePage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(warehouse)}>
+                            <div className="flex flex-wrap justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleOpenDialog(warehouse)}
+                                disabled={!canEditSuppliers}
+                              >
                                 <Edit className="w-4 h-4" />
                               </Button>
                               <Dialog open={deleteConfirmId === warehouse.id} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
                                 <DialogTrigger asChild>
-                                  <Button variant="ghost" size="sm" onClick={() => setDeleteConfirmId(warehouse.id)}>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setDeleteConfirmId(warehouse.id)}
+                                    disabled={!canDeleteSuppliers}
+                                  >
                                     <Trash2 className="w-4 h-4 text-red-500" />
                                   </Button>
                                 </DialogTrigger>
-                                <DialogContent>
+                                <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-lg">
                                   <DialogHeader>
                                     <DialogTitle>确认删除</DialogTitle>
                                     <DialogDescription>
                                       确定要删除仓库 &quot;{warehouse.name}&quot; 吗？此操作无法撤销。
                                     </DialogDescription>
                                   </DialogHeader>
-                                  <DialogFooter>
-                                    <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>取消</Button>
-                                    <Button variant="destructive" onClick={() => handleDelete(warehouse.id)}>删除</Button>
+                                  <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                                    <Button variant="outline" onClick={() => setDeleteConfirmId(null)} className="w-full sm:w-auto">取消</Button>
+                                    <Button
+                                      variant="destructive"
+                                      onClick={() => handleDelete(warehouse.id)}
+                                      disabled={!canDeleteSuppliers}
+                                      className="w-full sm:w-auto"
+                                    >
+                                      删除
+                                    </Button>
                                   </DialogFooter>
                                 </DialogContent>
                               </Dialog>
@@ -571,6 +614,7 @@ export default function WarehousesManagePage() {
                     )}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
           </>
@@ -583,6 +627,7 @@ export default function WarehousesManagePage() {
                 <CardDescription>显示各仓库/供应商的商品库存情况</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -623,6 +668,7 @@ export default function WarehousesManagePage() {
                     )}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
           </>
@@ -640,6 +686,6 @@ export default function WarehousesManagePage() {
         )}
       </main>
     </div>
-    </>
+    </PageGuard>
   );
 }

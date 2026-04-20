@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isReturnProgressStatus } from '@/lib/order-status';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { requirePermission } from '@/lib/server-auth';
 
 // 获取销售业绩数据
 export async function GET(request: NextRequest) {
+  const authError = requirePermission(request, 'dashboard:view');
+  if (authError) return authError;
   try {
     const supabase = await getSupabaseClient();
     const searchParams = request.nextUrl.searchParams;
@@ -111,28 +115,21 @@ export async function GET(request: NextRequest) {
       byCustomer[customer].orderCount++;
 
       // 状态统计
-      switch (order.status) {
-        case 'pending':
-          bySalesperson[salesperson].pendingCount++;
-          byOperator[operator].pendingCount++;
-          break;
-        case 'assigned':
-          bySalesperson[salesperson].assignedCount++;
-          byOperator[operator].assignedCount++;
-          break;
-        case 'returned':
-        case 'partial_returned':
-          bySalesperson[salesperson].returnedCount++;
-          byOperator[operator].returnedCount++;
-          break;
-        case 'completed':
-          bySalesperson[salesperson].completedCount++;
-          byOperator[operator].completedCount++;
-          break;
-        case 'cancelled':
-          bySalesperson[salesperson].cancelledCount++;
-          byOperator[operator].cancelledCount++;
-          break;
+      if (order.status === 'pending') {
+        bySalesperson[salesperson].pendingCount++;
+        byOperator[operator].pendingCount++;
+      } else if (order.status === 'assigned') {
+        bySalesperson[salesperson].assignedCount++;
+        byOperator[operator].assignedCount++;
+      } else if (isReturnProgressStatus(order.status)) {
+        bySalesperson[salesperson].returnedCount++;
+        byOperator[operator].returnedCount++;
+      } else if (order.status === 'completed') {
+        bySalesperson[salesperson].completedCount++;
+        byOperator[operator].completedCount++;
+      } else if (order.status === 'cancelled') {
+        bySalesperson[salesperson].cancelledCount++;
+        byOperator[operator].cancelledCount++;
       }
 
       // 商品数量

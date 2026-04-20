@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { PageGuard } from '@/components/auth/page-guard';
+import { buildUserInfoHeaders, useAuth } from '@/lib/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -156,6 +157,7 @@ const TEMPLATE_TYPES = [
 ];
 
 export default function TemplatesPage() {
+  const { user } = useAuth();
   const [templates, setTemplates] = useState<ExportTemplate[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -193,6 +195,7 @@ export default function TemplatesPage() {
   const [mappings, setMappings] = useState<{ excelColumn: string; systemField: string }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
+  const authHeaders = () => buildUserInfoHeaders(user);
 
   useEffect(() => {
     loadData();
@@ -206,7 +209,7 @@ export default function TemplatesPage() {
 
   const loadTemplates = async () => {
     try {
-      const res = await fetch('/api/templates');
+      const res = await fetch('/api/templates', { headers: authHeaders() });
       const data = await res.json();
       if (data.success) {
         setTemplates(data.data || []);
@@ -386,7 +389,7 @@ export default function TemplatesPage() {
 
       const res = await fetch('/api/templates', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({
           name: parsed.name,
           code: parsed.code ? `${parsed.code}-IMPORT-${Date.now()}` : '',
@@ -438,7 +441,7 @@ export default function TemplatesPage() {
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({
           ...formData,
           fieldMappings,
@@ -461,7 +464,7 @@ export default function TemplatesPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`/api/templates/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/templates/${id}`, { method: 'DELETE', headers: authHeaders() });
       const data = await res.json();
       if (data.success) {
         toast.success('模板删除成功');
@@ -477,7 +480,7 @@ export default function TemplatesPage() {
     try {
       const res = await fetch(`/api/templates/${template.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ ...template, isDefault: true }),
       });
       const data = await res.json();
@@ -494,7 +497,7 @@ export default function TemplatesPage() {
     try {
       const res = await fetch('/api/templates', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({
           ...template,
           name: `${template.name} (副本)`,
@@ -516,7 +519,7 @@ export default function TemplatesPage() {
     try {
       const res = await fetch(`/api/templates/${template.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ ...template, isActive: !template.isActive }),
       });
       const data = await res.json();
@@ -569,11 +572,11 @@ export default function TemplatesPage() {
 
   return (
     <PageGuard permission="settings:view" title="无法访问模板配置">
-      <div className="space-y-6">
+      <div className="space-y-6 px-3 pb-4 sm:px-4">
       {/* 头部 */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="flex items-center gap-2 text-2xl font-bold sm:text-3xl">
             <FileSpreadsheet className="h-8 w-8" />
             模板配置中心
           </h1>
@@ -581,22 +584,22 @@ export default function TemplatesPage() {
             管理导出模板，支持关联客户或供应商，可快速设置字段映射
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
-            <Upload className="mr-2 h-4 w-4" />
-            导入模板
-          </Button>
-          <Button onClick={() => handleOpenDialog()}>
-            <Plus className="mr-2 h-4 w-4" />
-            新增模板
-          </Button>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <Button variant="outline" onClick={() => setImportDialogOpen(true)} className="w-full sm:w-auto">
+              <Upload className="mr-2 h-4 w-4" />
+              导入模板
+            </Button>
+            <Button onClick={() => handleOpenDialog()} className="w-full sm:w-auto">
+              <Plus className="mr-2 h-4 w-4" />
+              新增模板
+            </Button>
         </div>
       </div>
 
       {/* 筛选区 */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
             {/* 搜索框 */}
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -610,7 +613,7 @@ export default function TemplatesPage() {
             
             {/* 模板类型 */}
             <Select value={typeFilter || 'all'} onValueChange={(v) => setTypeFilter(v === 'all' ? '' : v)}>
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger className="w-full xl:w-[140px]">
                 <SelectValue placeholder="模板类型" />
               </SelectTrigger>
               <SelectContent>
@@ -623,7 +626,7 @@ export default function TemplatesPage() {
             
             {/* 关联对象 */}
             <Select value={targetTypeFilter || 'all'} onValueChange={(v) => setTargetTypeFilter(v === 'all' ? '' : v)}>
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger className="w-full xl:w-[140px]">
                 <SelectValue placeholder="关联对象" />
               </SelectTrigger>
               <SelectContent>
@@ -636,7 +639,7 @@ export default function TemplatesPage() {
             
             {/* 状态 */}
             <Select value={statusFilter || 'all'} onValueChange={(v) => setStatusFilter(v === 'all' ? '' : v)}>
-              <SelectTrigger className="w-[120px]">
+              <SelectTrigger className="w-full xl:w-[120px]">
                 <SelectValue placeholder="状态" />
               </SelectTrigger>
               <SelectContent>
@@ -648,12 +651,12 @@ export default function TemplatesPage() {
             </Select>
             
             {/* 刷新 */}
-            <Button variant="outline" size="icon" onClick={loadData}>
+            <Button variant="outline" size="icon" onClick={loadData} className="w-full xl:w-10">
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             </Button>
             
             {/* 统计 */}
-            <Badge variant="outline" className="ml-auto">
+            <Badge variant="outline" className="w-fit xl:ml-auto">
               共 {filteredTemplates.length} 个模板
             </Badge>
           </div>
@@ -663,6 +666,7 @@ export default function TemplatesPage() {
       {/* 模板列表 */}
       <Card>
         <CardContent className="p-0">
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -700,9 +704,9 @@ export default function TemplatesPage() {
                         {template.isDefault && (
                           <Star className="h-4 w-4 text-yellow-500 fill-yellow-500 flex-shrink-0" />
                         )}
-                        <div>
+                        <div className="min-w-0">
                           <p className="font-medium">{template.name}</p>
-                          <p className="text-xs text-muted-foreground">{template.code}</p>
+                          <p className="break-all text-xs text-muted-foreground">{template.code}</p>
                         </div>
                       </div>
                     </TableCell>
@@ -767,9 +771,9 @@ export default function TemplatesPage() {
                         <Button variant="ghost" size="sm" onClick={() => handleToggleActive(template)}>
                           {template.isActive ? <X className="h-4 w-4" /> : <Check className="h-4 w-4" />}
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(template)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(template)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
                         <Button variant="ghost" size="sm" onClick={() => setDeleteConfirmId(template.id)}>
                           <Trash2 className="h-4 w-4 text-red-500" />
                         </Button>
@@ -780,12 +784,13 @@ export default function TemplatesPage() {
               )}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 
       {/* 新增/编辑模板对话框 */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="flex max-h-[90vh] w-[calc(100vw-1.5rem)] flex-col overflow-hidden sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>{editingTemplate ? '编辑模板' : '新增模板'}</DialogTitle>
             <DialogDescription>
@@ -794,7 +799,7 @@ export default function TemplatesPage() {
           </DialogHeader>
           
           <Tabs defaultValue="basic" className="flex-1 overflow-hidden flex flex-col">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid h-auto w-full grid-cols-1 sm:grid-cols-3">
               <TabsTrigger value="basic">基本信息</TabsTrigger>
               <TabsTrigger value="mapping">字段映射</TabsTrigger>
               <TabsTrigger value="preview">预览</TabsTrigger>
@@ -802,7 +807,7 @@ export default function TemplatesPage() {
             
             {/* 基本信息 */}
             <TabsContent value="basic" className="flex-1 overflow-y-auto space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>模板名称 *</Label>
                   <Input 
@@ -915,7 +920,7 @@ export default function TemplatesPage() {
                 />
               </div>
               
-              <div className="flex items-center gap-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
                 <Checkbox 
                   id="isDefault"
                   checked={formData.isDefault}
@@ -949,7 +954,7 @@ export default function TemplatesPage() {
               {/* 导入Excel */}
               <div className="space-y-2">
                 <Label>从Excel导入列名</Label>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <input
                     type="file"
                     accept=".xlsx,.xls"
@@ -969,9 +974,9 @@ export default function TemplatesPage() {
               
               {/* 映射配置 */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>字段映射配置</Label>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <Label>字段映射配置</Label>
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm text-muted-foreground">
                       {mappings.filter(m => m.excelColumn && m.systemField).length} 个映射
                     </span>
@@ -984,7 +989,7 @@ export default function TemplatesPage() {
                     </Button>
                   </div>
                 </div>
-                <div className="border rounded-lg overflow-hidden">
+                <div className="overflow-x-auto rounded-lg border">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -1053,7 +1058,7 @@ export default function TemplatesPage() {
                       {formData.targetName || '通用'}
                     </Badge>
                   </div>
-                  <div className="border rounded-lg overflow-hidden">
+                  <div className="overflow-x-auto rounded-lg border">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -1084,32 +1089,32 @@ export default function TemplatesPage() {
             </TabsContent>
           </Tabs>
           
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>
-            <Button onClick={handleSubmit}>{editingTemplate ? '保存修改' : '创建模板'}</Button>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setDialogOpen(false)} className="w-full sm:w-auto">取消</Button>
+            <Button onClick={handleSubmit} className="w-full sm:w-auto">{editingTemplate ? '保存修改' : '创建模板'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* 删除确认 */}
       <Dialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>
-        <DialogContent>
+        <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>确认删除</DialogTitle>
             <DialogDescription>
               确定要删除此模板吗？此操作无法撤销。
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>取消</Button>
-            <Button variant="destructive" onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)}>删除</Button>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setDeleteConfirmId(null)} className="w-full sm:w-auto">取消</Button>
+            <Button variant="destructive" onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)} className="w-full sm:w-auto">删除</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* 预览对话框 */}
       <Dialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>模板预览 - {previewTemplate?.name}</DialogTitle>
           </DialogHeader>
@@ -1130,7 +1135,7 @@ export default function TemplatesPage() {
                   </Badge>
                 )}
               </div>
-              <div className="border rounded-lg overflow-hidden">
+              <div className="overflow-x-auto rounded-lg border">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -1150,15 +1155,15 @@ export default function TemplatesPage() {
               </div>
             </div>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPreviewDialogOpen(false)}>关闭</Button>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setPreviewDialogOpen(false)} className="w-full sm:w-auto">关闭</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* 导入对话框 */}
       <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-        <DialogContent>
+        <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>导入模板配置</DialogTitle>
             <DialogDescription>
@@ -1177,14 +1182,15 @@ export default function TemplatesPage() {
               支持从之前导出的模板配置文件(.json)导入。
             </p>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button
               onClick={() => importFileInputRef.current?.click()}
               disabled={importingTemplate}
+              className="w-full sm:w-auto"
             >
               {importingTemplate ? '导入中...' : '选择 JSON 文件'}
             </Button>
-            <Button variant="outline" onClick={() => setImportDialogOpen(false)}>关闭</Button>
+            <Button variant="outline" onClick={() => setImportDialogOpen(false)} className="w-full sm:w-auto">关闭</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

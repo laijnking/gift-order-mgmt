@@ -29,6 +29,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
+import { PageGuard } from '@/components/auth/page-guard';
+import { buildUserInfoHeaders, usePermission } from '@/lib/auth';
 
 interface ReceiptRecord {
   id: string;
@@ -40,6 +42,14 @@ interface ReceiptRecord {
   unmatchedCount: number;
   importedAt: string;
   importedBy: string;
+  reviewCount?: number;
+  conflictCount?: number;
+  reviewStatus?: 'clean' | 'needs_review' | 'has_conflict';
+  reviewSummary?: {
+    matchedCount: number;
+    needsReviewCount: number;
+    conflictCount: number;
+  };
 }
 
 interface Receipt {
@@ -50,10 +60,19 @@ interface Receipt {
   expressCompany: string;
   trackingNo: string;
   shipDate: string | null;
-  matchStatus: 'pending' | 'auto_matched' | 'manual_matched';
+  matchStatus: 'pending' | 'auto_matched' | 'manual_matched' | 'conflict';
   orderId: string | null;
   orderNo: string | null;
   createdAt: string;
+  reviewStatus?: 'matched' | 'needs_review' | 'conflict';
+  reviewReason?: 'matched' | 'unmatched' | 'conflict';
+}
+
+interface MatchResultPayload {
+  totalCount: number;
+  autoMatchedCount: number;
+  conflictCount?: number;
+  unmatchedCount: number;
 }
 
 interface Order {
@@ -97,6 +116,8 @@ interface ImportedReceiptRow {
 }
 
 export default function ReturnReceiptPage() {
+  const { hasPermission } = usePermission();
+  const canEditOrders = hasPermission('orders:edit');
 
   const [loading, setLoading] = useState(false);
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
@@ -113,12 +134,23 @@ export default function ReturnReceiptPage() {
   const [showOrderPicker, setShowOrderPicker] = useState(false);
   const [currentReceipt, setCurrentReceipt] = useState<Receipt | null>(null);
   const [unmatchedOrders, setUnmatchedOrders] = useState<Order[]>([]);
+  const [receiptFilter, setReceiptFilter] = useState<'all' | 'needs_review' | 'conflict' | 'matched'>('all');
+  const [manualMatching, setManualMatching] = useState(false);
 
   // 加载供应商列表
   useEffect(() => {
     loadSuppliers();
     loadRecords();
   }, []);
+
+  const authHeaders = useCallback(() => buildUserInfoHeaders(), []);
+  const jsonHeaders = useCallback(
+    () => ({
+      'Content-Type': 'application/json',
+      ...buildUserInfoHeaders(),
+    }),
+    []
+  );
 
   const loadSuppliers = async () => {
     try {
@@ -135,7 +167,7 @@ export default function ReturnReceiptPage() {
   const loadRecords = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/return-receipts/history');
+      const response = await fetch('/api/return-receipts/history', { headers: authHeaders() });
       const data = await response.json();
       if (data.success) {
         setRecords(data.data || []);
@@ -191,7 +223,7 @@ export default function ReturnReceiptPage() {
       const supplier = suppliers.find(s => s.id === selectedSupplier);
       const response = await fetch('/api/return-receipts/history', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonHeaders(),
         body: JSON.stringify({
           supplierId: selectedSupplier,
           supplierName: supplier?.name || '',
@@ -230,7 +262,7 @@ export default function ReturnReceiptPage() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '未知错误');
     }
-  }, [selectedSupplier, suppliers, toast]);
+  }, [authHeaders, jsonHeaders, selectedSupplier, suppliers, toast]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -249,7 +281,7 @@ export default function ReturnReceiptPage() {
       setMatching(true);
       
       // 获取未匹配的 回单
-      const response = await fetch(`/api/return-receipts/history?recordId=${currentRecord.id}`);
+      const response = await fetch(`/api/return-receipts/history?recordId=${currentRecord.id}`, { headers: authHeaders() });
       const data = await response.json();
       
       if (!data.success) throw new Error(data.error);
@@ -266,7 +298,7 @@ export default function ReturnReceiptPage() {
       // 执行自动匹配
       const matchResponse = await fetch('/api/return-receipts/match', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonHeaders(),
         body: JSON.stringify({
           receiptIds: pendingReceipts.map((r: Receipt) => r.id),
         }),
@@ -275,10 +307,21 @@ export default function ReturnReceiptPage() {
       const matchResult = await matchResponse.json();
       
       if (matchResult.success) {
-        toast.success('匹配完成');
+        const payload = (matchResult.data || {}) as MatchResultPayload;
+        const conflictCount = payload.conflictCount || 0;
+        const unmatchedCount = payload.unmatchedCount || 0;
+
+        toast.success(
+          conflictCount > 0
+            ? `匹配完成：自动匹配 ${payload.autoMatchedCount || 0} 条，冲突 ${conflictCount} 条，请进入复核`
+            : `匹配完成：自动匹配 ${payload.autoMatchedCount || 0} 条，待复核 ${unmatchedCount} 条`
+        );
         
         // 刷新记录详情
         await loadRecordDetail(currentRecord.id);
+        if (conflictCount > 0) {
+          setReceiptFilter('conflict');
+        }
         
         // 关闭对话框
         setShowMatchDialog(false);
@@ -303,7 +346,7 @@ export default function ReturnReceiptPage() {
       setConfirming(true);
       const response = await fetch('/api/return-receipts/confirm', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonHeaders(),
         body: JSON.stringify({
           receiptIds: selectedReceipts,
           importedBy: 'current_user',
@@ -334,12 +377,14 @@ export default function ReturnReceiptPage() {
   // 加载记录详情
   const loadRecordDetail = async (recordId: string) => {
     try {
-      const response = await fetch(`/api/return-receipts/history?recordId=${recordId}`);
+      const response = await fetch(`/api/return-receipts/history?recordId=${recordId}`, { headers: authHeaders() });
       const data = await response.json();
       
       if (data.success) {
         setCurrentRecord(data.data);
         setReceipts(data.data.receipts || []);
+        setSelectedReceipts([]);
+        setReceiptFilter('all');
       }
     } catch (error) {
       console.error('加载记录详情失败:', error);
@@ -352,13 +397,33 @@ export default function ReturnReceiptPage() {
     
     try {
       // 加载待匹配订单列表
-      const response = await fetch(`/api/orders?status=assigned&supplierId=${receipt.supplierId || ''}`);
+      const response = await fetch(`/api/orders?status=assigned&supplierId=${receipt.supplierId || ''}`, { headers: authHeaders() });
       const data = await response.json();
       
       if (data.success) {
-        setUnmatchedOrders(data.data.filter((o: Order) => 
-          o.status === 'assigned' && !receipts.some(r => r.orderId === o.id)
-        ));
+        const availableOrders = data.data.filter((o: Order) => 
+          o.status === 'assigned' && !receipts.some(r => r.orderId === o.id && r.id !== receipt.id)
+        );
+
+        const sortedOrders = [...availableOrders].sort((a: Order, b: Order) => {
+          const aExact = a.customerOrderNo === receipt.customerOrderNo || a.orderNo === receipt.customerOrderNo;
+          const bExact = b.customerOrderNo === receipt.customerOrderNo || b.orderNo === receipt.customerOrderNo;
+          if (aExact !== bExact) return aExact ? -1 : 1;
+
+          const aIncludes = Boolean(receipt.customerOrderNo) && (
+            a.customerOrderNo?.includes(receipt.customerOrderNo) ||
+            a.orderNo?.includes(receipt.customerOrderNo)
+          );
+          const bIncludes = Boolean(receipt.customerOrderNo) && (
+            b.customerOrderNo?.includes(receipt.customerOrderNo) ||
+            b.orderNo?.includes(receipt.customerOrderNo)
+          );
+          if (aIncludes !== bIncludes) return aIncludes ? -1 : 1;
+
+          return a.orderNo.localeCompare(b.orderNo);
+        });
+
+        setUnmatchedOrders(sortedOrders);
       }
     } catch (error) {
       console.error('加载订单列表失败:', error);
@@ -372,9 +437,11 @@ export default function ReturnReceiptPage() {
     if (!currentReceipt || !currentRecord) return;
 
     try {
+      setManualMatching(true);
+      const isResolvingConflict = currentReceipt.reviewStatus === 'conflict';
       const response = await fetch(`/api/return-receipts/${currentReceipt.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonHeaders(),
         body: JSON.stringify({
           orderId: currentReceipt.orderId,
         }),
@@ -383,7 +450,11 @@ export default function ReturnReceiptPage() {
       const data = await response.json();
       
       if (data.success) {
-        toast.success(`已将回单与订单 ${data.data.orderNo} 关联`);
+        toast.success(
+          isResolvingConflict
+            ? `冲突已处理，回单已关联到订单 ${data.data.orderNo}`
+            : `已将回单与订单 ${data.data.orderNo} 关联`
+        );
         
         // 刷新记录详情
         await loadRecordDetail(currentRecord.id);
@@ -394,6 +465,9 @@ export default function ReturnReceiptPage() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '未知错误');
     }
+    finally {
+      setManualMatching(false);
+    }
   };
 
   // 过滤记录
@@ -403,20 +477,37 @@ export default function ReturnReceiptPage() {
     return true;
   });
 
+  const filteredReceipts = receipts.filter((receipt) => {
+    if (receiptFilter === 'all') return true;
+    return receipt.reviewStatus === receiptFilter;
+  });
+
+  const matchedReceipts = receipts.filter((receipt) => receipt.reviewStatus === 'matched');
+  const reviewReceipts = receipts.filter((receipt) => receipt.reviewStatus === 'needs_review');
+  const conflictReceipts = receipts.filter((receipt) => receipt.reviewStatus === 'conflict');
+
+  const reviewFilterOptions = [
+    { value: 'all', label: '全部' },
+    { value: 'needs_review', label: '待复核' },
+    { value: 'conflict', label: '冲突' },
+    { value: 'matched', label: '已匹配' },
+  ] as const;
+
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <PageGuard permission="orders:view" title="无权查看回单" description="当前账号没有查看物流回单的权限。">
+    <div className="container mx-auto space-y-6 px-3 py-4 sm:px-4 sm:py-6">
       {/* 页面标题 */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0 flex items-start gap-3">
           <div className="p-2 bg-primary/10 rounded-lg">
             <Package className="h-6 w-6 text-primary" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-2xl font-bold">回单导入</h1>
             <p className="text-sm text-muted-foreground">导入供应商回传快递单号，自动匹配订单</p>
           </div>
         </div>
-        <Button variant="outline" onClick={loadRecords} disabled={loading}>
+        <Button variant="outline" onClick={loadRecords} disabled={loading} className="w-full sm:w-auto">
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
           刷新
         </Button>
@@ -425,12 +516,12 @@ export default function ReturnReceiptPage() {
       {/* 搜索栏 */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <Input
               placeholder="搜索文件名..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="max-w-xs"
+              className="w-full sm:max-w-xs"
             />
             <div className="text-sm text-muted-foreground">
               共 {filteredRecords.length} 条记录
@@ -464,32 +555,36 @@ export default function ReturnReceiptPage() {
                 </select>
               </div>
               
-              {/* 拖放上传区域 */}
-              <div
-                {...getRootProps()}
-                className={`
-                  relative border-2 border-dashed rounded-lg p-8 text-center cursor-pointer
-                  transition-colors
-                  ${!selectedSupplier ? 'opacity-50 cursor-not-allowed' : ''}
-                  ${isDragActive ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50'}
-                `}
-              >
-                {/* 隐藏的input元素需要正确定位 */}
-                <input 
-                  {...getInputProps()} 
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                />
-                <Upload className="h-10 w-10 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">
-                  {isDragActive ? '放下文件开始导入' : '拖放Excel文件到这里，或点击选择'}
-                </p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  支持 .xlsx, .xls 格式
-                </p>
-                {!selectedSupplier && (
-                  <p className="text-xs text-orange-500 mt-2">请先选择供应商</p>
-                )}
-              </div>
+              {canEditOrders ? (
+                <div
+                  {...getRootProps()}
+                  className={`
+                    relative border-2 border-dashed rounded-lg p-8 text-center cursor-pointer
+                    transition-colors
+                    ${!selectedSupplier ? 'opacity-50 cursor-not-allowed' : ''}
+                    ${isDragActive ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50'}
+                  `}
+                >
+                  <input
+                    {...getInputProps()}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <Upload className="h-10 w-10 mx-auto mb-4 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">
+                    {isDragActive ? '放下文件开始导入' : '拖放Excel文件到这里，或点击选择'}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    支持 .xlsx, .xls 格式
+                  </p>
+                  {!selectedSupplier && (
+                    <p className="text-xs text-orange-500 mt-2">请先选择供应商</p>
+                  )}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  当前账号可以查看回单记录，但没有导入和处理回单的权限。
+                </div>
+              )}
 
               {/* Excel格式说明 */}
               <div className="mt-4 p-3 bg-muted rounded-lg">
@@ -549,6 +644,13 @@ export default function ReturnReceiptPage() {
                           <AlertTriangle className="h-3 w-3 text-yellow-500" />
                           <span>待匹配: {record.unmatchedCount}</span>
                         </div>
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className={`h-3 w-3 ${(record.conflictCount || 0) > 0 ? 'text-red-500' : 'text-orange-500'}`} />
+                          <span>
+                            待复核: {record.reviewCount || 0}
+                            {(record.conflictCount || 0) > 0 ? `（冲突 ${record.conflictCount}）` : ''}
+                          </span>
+                        </div>
                       </div>
                       <div className="text-xs text-muted-foreground mt-2">
                         {new Date(record.importedAt).toLocaleString()}
@@ -565,7 +667,7 @@ export default function ReturnReceiptPage() {
         <div className="lg:col-span-2">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <CardTitle className="text-lg">回单明细</CardTitle>
                   {currentRecord && (
@@ -574,12 +676,27 @@ export default function ReturnReceiptPage() {
                     </CardDescription>
                   )}
                 </div>
-                {selectedReceipts.length > 0 && (
-                  <Button onClick={handleBatchConfirm} disabled={confirming}>
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                    批量确认 ({selectedReceipts.length})
-                  </Button>
-                )}
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  {currentRecord && (
+                    <select
+                      value={receiptFilter}
+                      onChange={(e) => setReceiptFilter(e.target.value as typeof receiptFilter)}
+                      className="h-9 rounded-md border bg-background px-3 text-sm"
+                    >
+                      {reviewFilterOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {selectedReceipts.length > 0 && (
+                    <Button onClick={handleBatchConfirm} disabled={confirming || !canEditOrders} className="w-full sm:w-auto">
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      批量确认 ({selectedReceipts.length})
+                    </Button>
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -596,36 +713,57 @@ export default function ReturnReceiptPage() {
               ) : (
                 <>
                   {/* 统计信息 */}
-                  <div className="grid grid-cols-3 gap-4 mb-6">
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                      人工复核池：待复核 {reviewReceipts.length}
+                    </Badge>
+                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                      冲突 {conflictReceipts.length}
+                    </Badge>
+                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                      已匹配 {matchedReceipts.length}
+                    </Badge>
+                  </div>
+                  <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <div className="p-4 bg-muted rounded-lg">
                       <div className="text-2xl font-bold">{receipts.length}</div>
                       <div className="text-sm text-muted-foreground">总数量</div>
                     </div>
                     <div className="p-4 bg-green-50 rounded-lg">
                       <div className="text-2xl font-bold text-green-600">
-                        {receipts.filter(r => r.matchStatus !== 'pending').length}
+                        {matchedReceipts.length}
                       </div>
                       <div className="text-sm text-green-600">已匹配</div>
                     </div>
-                    <div className="p-4 bg-yellow-50 rounded-lg">
-                      <div className="text-2xl font-bold text-yellow-600">
-                        {receipts.filter(r => r.matchStatus === 'pending').length}
+                    <div className="p-4 bg-orange-50 rounded-lg">
+                      <div className="text-2xl font-bold text-orange-600">
+                        {reviewReceipts.length}
                       </div>
-                      <div className="text-sm text-yellow-600">待匹配</div>
+                      <div className="text-sm text-orange-600">待复核</div>
+                    </div>
+                    <div className="p-4 bg-red-50 rounded-lg">
+                      <div className="text-2xl font-bold text-red-600">
+                        {conflictReceipts.length}
+                      </div>
+                      <div className="text-sm text-red-600">冲突</div>
                     </div>
                   </div>
 
+                  <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-[50px]">
-                          {receipts.some(r => r.matchStatus === 'pending') && (
+                          {filteredReceipts.some(r => r.reviewStatus === 'matched') && (
                             <input
                               type="checkbox"
-                              checked={selectedReceipts.length === receipts.filter(r => r.matchStatus !== 'pending').length}
+                              checked={
+                                filteredReceipts.filter(r => r.reviewStatus === 'matched').length > 0 &&
+                                selectedReceipts.length === filteredReceipts.filter(r => r.reviewStatus === 'matched').length
+                              }
                               onChange={(e) => {
                                 if (e.target.checked) {
-                                  setSelectedReceipts(receipts.filter(r => r.matchStatus !== 'pending').map(r => r.id));
+                                  setSelectedReceipts(filteredReceipts.filter(r => r.reviewStatus === 'matched').map(r => r.id));
                                 } else {
                                   setSelectedReceipts([]);
                                 }
@@ -643,10 +781,10 @@ export default function ReturnReceiptPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {receipts.map((receipt) => (
+                      {filteredReceipts.map((receipt) => (
                         <TableRow key={receipt.id}>
                           <TableCell>
-                            {receipt.matchStatus !== 'pending' && (
+                            {receipt.reviewStatus === 'matched' && (
                               <input
                                 type="checkbox"
                                 checked={selectedReceipts.includes(receipt.id)}
@@ -665,9 +803,13 @@ export default function ReturnReceiptPage() {
                           <TableCell className="font-mono">{receipt.trackingNo}</TableCell>
                           <TableCell>{receipt.shipDate || '-'}</TableCell>
                           <TableCell>
-                            {receipt.matchStatus === 'pending' ? (
+                            {receipt.reviewStatus === 'conflict' ? (
+                              <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200">
+                                冲突
+                              </Badge>
+                            ) : receipt.reviewStatus === 'needs_review' ? (
                               <Badge variant="outline" className="bg-yellow-50 text-yellow-600 border-yellow-200">
-                                待匹配
+                                待复核
                               </Badge>
                             ) : (
                               <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200">
@@ -687,15 +829,21 @@ export default function ReturnReceiptPage() {
                               variant="ghost" 
                               size="sm"
                               onClick={() => handleManualMatch(receipt)}
+                              disabled={!canEditOrders}
                             >
                               <Link2 className="h-4 w-4 mr-1" />
-                              {receipt.matchStatus === 'pending' ? '手动匹配' : '重匹配'}
+                              {receipt.reviewStatus === 'matched'
+                                ? '重匹配'
+                                : receipt.reviewStatus === 'conflict'
+                                  ? '处理冲突'
+                                  : '进入复核'}
                             </Button>
                           </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
                 </>
               )}
             </CardContent>
@@ -705,11 +853,11 @@ export default function ReturnReceiptPage() {
 
       {/* 自动匹配对话框 */}
       <Dialog open={showMatchDialog} onOpenChange={setShowMatchDialog}>
-        <DialogContent>
+        <DialogContent className="w-[calc(100vw-1.5rem)] max-w-lg">
           <DialogHeader>
             <DialogTitle>自动匹配</DialogTitle>
             <DialogDescription>
-              系统将根据客户订单号自动匹配回单与订单
+              系统将根据客户订单号自动匹配回单与订单，未命中或冲突的记录会进入人工复核池
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -723,11 +871,11 @@ export default function ReturnReceiptPage() {
               </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowMatchDialog(false)}>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setShowMatchDialog(false)} className="w-full sm:w-auto">
               稍后处理
             </Button>
-            <Button onClick={handleAutoMatch} disabled={matching}>
+            <Button onClick={handleAutoMatch} disabled={matching || !canEditOrders} className="w-full sm:w-auto">
               {matching && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               开始匹配
             </Button>
@@ -737,7 +885,7 @@ export default function ReturnReceiptPage() {
 
       {/* 手动匹配订单选择对话框 */}
       <Dialog open={showOrderPicker} onOpenChange={setShowOrderPicker}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-auto">
+        <DialogContent className="w-[calc(100vw-1.5rem)] max-w-3xl max-h-[80vh] overflow-auto">
           <DialogHeader>
             <DialogTitle>选择关联订单</DialogTitle>
             <DialogDescription>
@@ -748,7 +896,7 @@ export default function ReturnReceiptPage() {
           <div className="space-y-4">
             {/* 回单信息 */}
             <div className="p-4 bg-muted rounded-lg">
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
                 <div>
                   <span className="text-muted-foreground">快递公司：</span>
                   <span className="font-medium">{currentReceipt?.expressCompany}</span>
@@ -760,8 +908,15 @@ export default function ReturnReceiptPage() {
               </div>
             </div>
 
+            {currentReceipt?.reviewStatus === 'conflict' && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                这条回单存在多个候选订单，请人工确认正确订单后完成处理。系统会在保存后把这条记录从冲突池移出。
+              </div>
+            )}
+
             {/* 订单列表 */}
             <div className="border rounded-lg">
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -804,22 +959,26 @@ export default function ReturnReceiptPage() {
                   )}
                 </TableBody>
               </Table>
+              </div>
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowOrderPicker(false)}>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setShowOrderPicker(false)} className="w-full sm:w-auto">
               取消
             </Button>
             <Button 
               onClick={handleConfirmManualMatch}
-              disabled={!currentReceipt?.orderId}
+              disabled={!currentReceipt?.orderId || manualMatching || !canEditOrders}
+              className="w-full sm:w-auto"
             >
-              确认匹配
+              {manualMatching && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {currentReceipt?.reviewStatus === 'conflict' ? '确认处理冲突' : '确认匹配'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
+    </PageGuard>
   );
 }

@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 export async function POST(request: NextRequest) {
+  const authError = requirePermission(request, 'suppliers:create');
+  if (authError) return authError;
+
   try {
     const { shippers } = await request.json();
     

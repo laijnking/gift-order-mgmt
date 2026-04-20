@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requirePermission } from '@/lib/server-auth';
 
 interface ProductLookup {
   id: string;
@@ -21,6 +22,9 @@ function getPublicSupabaseClient() {
 }
 
 export async function POST(request: NextRequest) {
+  const authError = requirePermission(request, 'products:edit');
+  if (authError) return authError;
+
   try {
     const { data } = await request.json();
     

@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { requirePermission } from '@/lib/server-auth';
 
 // 获取库存版本历史
 export async function GET(request: NextRequest) {
+  const authError = requirePermission(request, 'stocks:view');
+  if (authError) return authError;
   const client = getSupabaseClient();
   
   try {
@@ -70,6 +73,8 @@ export async function GET(request: NextRequest) {
 
 // 创建库存版本记录（自动在库存变更时调用）
 export async function POST(request: NextRequest) {
+  const authError = requirePermission(request, 'stocks:edit');
+  if (authError) return authError;
   const client = getSupabaseClient();
   
   try {

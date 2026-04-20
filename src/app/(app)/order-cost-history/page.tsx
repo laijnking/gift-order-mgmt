@@ -33,6 +33,8 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { PageGuard } from '@/components/auth/page-guard';
+import { buildUserInfoHeaders } from '@/lib/auth';
 import { toast } from 'sonner';
 import {
   FileText,
@@ -72,6 +74,11 @@ interface OrderCostRecord {
   expressFee: number;
   otherFee: number;
   totalAmount: number;
+  orderExpressFee?: number;
+  orderOtherFee?: number;
+  orderTotalAmount?: number;
+  orderGoodsCost?: number;
+  orderLineCount?: number;
   expressCompany: string;
   trackingNo: string;
   receiverName: string;
@@ -158,6 +165,7 @@ export default function OrderCostHistoryPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
+      const headers = buildUserInfoHeaders();
       const params = new URLSearchParams();
       if (searchOrderNo) params.set('orderNo', searchOrderNo);
       if (searchProductCode) params.set('productCode', searchProductCode);
@@ -169,8 +177,8 @@ export default function OrderCostHistoryPage() {
       params.set('pageSize', String(pagination.pageSize));
 
       const [recordsRes, suppliersRes] = await Promise.all([
-        fetch(`/api/order-cost-history?${params.toString()}`),
-        fetch('/api/suppliers?active=true'),
+        fetch(`/api/order-cost-history?${params.toString()}`, { headers }),
+        fetch('/api/suppliers?active=true', { headers }),
       ]);
 
       const recordsData = await recordsRes.json();
@@ -224,7 +232,10 @@ export default function OrderCostHistoryPage() {
 
       const res = await fetch('/api/order-cost-history', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          ...buildUserInfoHeaders(),
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(body),
       });
 
@@ -309,8 +320,8 @@ export default function OrderCostHistoryPage() {
   // 打开费用编辑对话框
   const handleOpenFeeDialog = (record: OrderCostRecord) => {
     setEditingRecord(record);
-    setExpressFee(record.expressFee);
-    setOtherFee(record.otherFee);
+    setExpressFee(record.orderExpressFee ?? record.expressFee);
+    setOtherFee(record.orderOtherFee ?? record.otherFee);
     setFeeRemark(record.remark || '');
     setIsFeeDialogOpen(true);
   };
@@ -323,7 +334,10 @@ export default function OrderCostHistoryPage() {
     try {
       const res = await fetch('/api/order-cost-history/fee', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          ...buildUserInfoHeaders(),
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           orderId: editingRecord.orderId,
           orderNo: editingRecord.orderNo,
@@ -350,26 +364,32 @@ export default function OrderCostHistoryPage() {
   };
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <PageGuard
+      permission="orders:view"
+      title="无权查看历史成本"
+      description="当前账号没有查看历史成本库的权限。"
+    >
+    <div className="container mx-auto space-y-6 px-3 py-4 sm:px-4 sm:py-6">
       {/* 页面标题 */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap">
           <History className="h-6 w-6" />
           <h1 className="text-2xl font-bold">历史成本库</h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <Button
             variant="outline"
             onClick={() => setIsImportDialogOpen(true)}
+            className="w-full sm:w-auto"
           >
             <Plus className="h-4 w-4 mr-2" />
             导入成本数据
           </Button>
-          <Button variant="outline" onClick={handleExport}>
+          <Button variant="outline" onClick={handleExport} className="w-full sm:w-auto">
             <Download className="h-4 w-4 mr-2" />
             导出Excel
           </Button>
-          <Button variant="outline" onClick={loadData}>
+          <Button variant="outline" onClick={loadData} className="w-full sm:w-auto">
             <RefreshCw className="h-4 w-4 mr-2" />
             刷新
           </Button>
@@ -377,7 +397,7 @@ export default function OrderCostHistoryPage() {
       </div>
 
       {/* 统计卡片 */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <Card>
           <CardContent className="pt-4">
             <div className="flex items-center gap-2">
@@ -441,7 +461,7 @@ export default function OrderCostHistoryPage() {
           <CardTitle className="text-lg">筛选条件</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
             <div className="space-y-2">
               <Label>订单号</Label>
               <Input
@@ -515,8 +535,8 @@ export default function OrderCostHistoryPage() {
               />
             </div>
           </div>
-          <div className="flex justify-end mt-4">
-            <Button variant="outline" onClick={handleReset}>
+          <div className="mt-4 flex justify-end">
+            <Button variant="outline" onClick={handleReset} className="w-full sm:w-auto">
               <X className="h-4 w-4 mr-2" />
               重置筛选
             </Button>
@@ -535,7 +555,7 @@ export default function OrderCostHistoryPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
+          <div className="overflow-x-auto rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -608,11 +628,11 @@ export default function OrderCostHistoryPage() {
 
           {/* 分页 */}
           {pagination.totalPages > 1 && (
-            <div className="flex items-center justify-between mt-4">
+            <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="text-sm text-muted-foreground">
                 共 {pagination.total} 条记录，每页 {pagination.pageSize} 条
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <Button
                   variant="outline"
                   size="sm"
@@ -640,7 +660,7 @@ export default function OrderCostHistoryPage() {
 
       {/* 导入对话框 */}
       <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-md">
           <DialogHeader>
             <DialogTitle>导入历史成本数据</DialogTitle>
             <DialogDescription>
@@ -698,11 +718,11 @@ export default function OrderCostHistoryPage() {
             </TabsContent>
           </Tabs>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsImportDialogOpen(false)}>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setIsImportDialogOpen(false)} className="w-full sm:w-auto">
               取消
             </Button>
-            <Button onClick={handleImport} disabled={importing}>
+            <Button onClick={handleImport} disabled={importing} className="w-full sm:w-auto">
               {importing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               确认导入
             </Button>
@@ -712,7 +732,7 @@ export default function OrderCostHistoryPage() {
 
       {/* 更新费用对话框 */}
       <Dialog open={isFeeDialogOpen} onOpenChange={setIsFeeDialogOpen}>
-        <DialogContent>
+        <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>编辑费用信息</DialogTitle>
             <DialogDescription>
@@ -721,7 +741,7 @@ export default function OrderCostHistoryPage() {
           </DialogHeader>
           {editingRecord && (
             <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>订单号</Label>
                   <Input value={editingRecord.orderNo} disabled />
@@ -731,17 +751,17 @@ export default function OrderCostHistoryPage() {
                   <Input value={editingRecord.productName} disabled />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>数量</Label>
                   <Input value={editingRecord.quantity} disabled />
                 </div>
                 <div className="space-y-2">
                   <Label>商品成本</Label>
-                  <Input value={`¥${editingRecord.totalCost?.toFixed(2) || '0.00'}`} disabled />
+                  <Input value={`¥${(editingRecord.orderGoodsCost ?? editingRecord.totalCost ?? 0).toFixed(2)}`} disabled />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>快递费用</Label>
                   <Input
@@ -774,7 +794,7 @@ export default function OrderCostHistoryPage() {
               <div className="bg-gray-50 p-4 rounded-lg space-y-2">
                 <div className="flex justify-between text-sm">
                   <span>商品成本:</span>
-                  <span>¥{(editingRecord.unitCost * editingRecord.quantity).toFixed(2)}</span>
+                  <span>¥{(editingRecord.orderGoodsCost ?? editingRecord.totalCost ?? 0).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span>快递费用:</span>
@@ -787,17 +807,17 @@ export default function OrderCostHistoryPage() {
                 <div className="flex justify-between font-bold border-t pt-2">
                   <span>总成本:</span>
                   <span className="text-red-600">
-                    ¥{((editingRecord.unitCost * editingRecord.quantity) + expressFee + otherFee).toFixed(2)}
+                    ¥{((editingRecord.orderGoodsCost ?? editingRecord.totalCost ?? 0) + expressFee + otherFee).toFixed(2)}
                   </span>
                 </div>
               </div>
             </div>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsFeeDialogOpen(false)}>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setIsFeeDialogOpen(false)} className="w-full sm:w-auto">
               取消
             </Button>
-            <Button onClick={handleUpdateFee} disabled={updatingFee}>
+            <Button onClick={handleUpdateFee} disabled={updatingFee} className="w-full sm:w-auto">
               {updatingFee && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               保存
             </Button>
@@ -805,5 +825,6 @@ export default function OrderCostHistoryPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </PageGuard>
   );
 }

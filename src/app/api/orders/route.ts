@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import * as XLSX from 'xlsx';
 import crypto from 'crypto';
+import { requirePermission } from '@/lib/server-auth';
+
+interface DuplicateOrderDetail {
+  orderNo: string;
+  receiverName: string;
+  reason: 'batch_duplicate' | 'existing_order';
+  existingSysOrderNo?: string;
+}
 
 // 数据库字段转前端格式
 function transformOrder(dbOrder: Record<string, unknown>, options?: {
@@ -411,12 +419,15 @@ async function matchProduct(
 
 // 获取所有订单
 export async function GET(request: NextRequest) {
+  const authError = requirePermission(request, 'orders:view');
+  if (authError) return authError;
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
   const status = searchParams.get('status');
   const customerCode = searchParams.get('customerCode');
   const supplierId = searchParams.get('supplierId');
   const search = searchParams.get('search');
+  const importBatch = searchParams.get('importBatch');
 
   // 获取当前用户信息用于数据权限过滤
   const currentUser = getCurrentUser(request);
@@ -477,6 +488,10 @@ export async function GET(request: NextRequest) {
       query = query.eq('supplier_id', supplierId);
     }
 
+    if (importBatch) {
+      query = query.eq('import_batch', importBatch);
+    }
+
     if (search) {
       query = query.or(`order_no.ilike.%${search}%,sys_order_no.ilike.%${search}%,receiver_name.ilike.%${search}%,receiver_phone.ilike.%${search}%`);
     }
@@ -514,6 +529,8 @@ export async function GET(request: NextRequest) {
 
 // 导入订单（支持JSON格式创建和Excel文件上传）
 export async function POST(request: NextRequest) {
+  const authError = requirePermission(request, 'orders:create');
+  if (authError) return authError;
   const client = getSupabaseClient();
   
   try {
@@ -522,7 +539,18 @@ export async function POST(request: NextRequest) {
     // JSON格式：从AI解析结果创建订单
     if (contentType.includes('application/json')) {
       const body = await request.json();
-      const { customerCode, customerName, salespersonName, operatorName, items, receiver, supplierId, supplierName } = body;
+      const {
+        customerCode,
+        customerName,
+        salespersonId: inputSalespersonId,
+        salespersonName,
+        operatorId: inputOperatorId,
+        operatorName,
+        items,
+        receiver,
+        supplierId,
+        supplierName
+      } = body;
 
       if (!items || !Array.isArray(items) || items.length === 0) {
         return NextResponse.json({
@@ -534,8 +562,8 @@ export async function POST(request: NextRequest) {
       // 预查找档案ID（只查询一次，避免循环中重复查询）
       const [customerInfo, salespersonId, operatorId, supplierInfo] = await Promise.all([
         findCustomerIdByCode(client, customerCode),
-        findUserIdByName(client, salespersonName || ''),
-        findUserIdByName(client, operatorName || ''),
+        inputSalespersonId ? Promise.resolve(inputSalespersonId) : findUserIdByName(client, salespersonName || ''),
+        inputOperatorId ? Promise.resolve(inputOperatorId) : findUserIdByName(client, operatorName || ''),
         supplierId && supplierId !== 'none' ? findSupplierIdByName(client, supplierName || '') : Promise.resolve(null),
       ]);
 
@@ -547,8 +575,8 @@ export async function POST(request: NextRequest) {
         if (!item.productName) continue;
 
         // 逐行查找档案ID（如果有变化的话）
-        const itemSalespersonId = item.salesperson ? await findUserIdByName(client, item.salesperson) : salespersonId;
-        const itemOperatorId = item.operator ? await findUserIdByName(client, item.operator) : operatorId;
+        const itemSalespersonId = item.salespersonId || (item.salesperson ? await findUserIdByName(client, item.salesperson) : salespersonId);
+        const itemOperatorId = item.operatorId || (item.operator ? await findUserIdByName(client, item.operator) : operatorId);
         const itemWarehouseInfo = item.warehouse ? await findWarehouseIdByName(client, item.warehouse) : null;
         const itemSupplierInfo = item.supplierId && item.supplierId !== 'none' 
           ? { id: item.supplierId, name: item.supplierName || '' } 
@@ -647,7 +675,97 @@ export async function POST(request: NextRequest) {
         }, { status: 400 });
       }
 
-      const { data, error } = await client.from('orders').insert(ordersToInsert).select();
+      const duplicateDetails: DuplicateOrderDetail[] = [];
+      const batchSeen = new Set<string>();
+      const deduplicatedOrders = ordersToInsert.filter((order) => {
+        const orderNo = String(order.order_no || '').trim();
+        if (!orderNo) {
+          return true;
+        }
+
+        const key = buildDuplicateOrderKey(String(order.customer_code || ''), orderNo);
+        if (batchSeen.has(key)) {
+          duplicateDetails.push({
+            orderNo,
+            receiverName: String(order.receiver_name || ''),
+            reason: 'batch_duplicate',
+          });
+          return false;
+        }
+
+        batchSeen.add(key);
+        return true;
+      });
+
+      const candidateOrderNos = Array.from(
+        new Set(
+          deduplicatedOrders
+            .map((order) => String(order.order_no || '').trim())
+            .filter(Boolean)
+        )
+      );
+      const existingOrderMap = new Map<string, { sysOrderNo: string }>();
+
+      if (candidateOrderNos.length > 0 && customerCode) {
+        const { data: existingOrders, error: existingError } = await client
+          .from('orders')
+          .select('order_no, sys_order_no, customer_code')
+          .eq('customer_code', customerCode)
+          .in('order_no', candidateOrderNos);
+
+        if (existingError) {
+          throw new Error(`查询重复订单失败: ${existingError.message}`);
+        }
+
+        for (const existing of existingOrders || []) {
+          const key = buildDuplicateOrderKey(
+            String(existing.customer_code || ''),
+            String(existing.order_no || '')
+          );
+          existingOrderMap.set(key, {
+            sysOrderNo: String(existing.sys_order_no || ''),
+          });
+        }
+      }
+
+      const freshOrders = deduplicatedOrders.filter((order) => {
+        const orderNo = String(order.order_no || '').trim();
+        if (!orderNo) {
+          return true;
+        }
+
+        const key = buildDuplicateOrderKey(String(order.customer_code || ''), orderNo);
+        const existing = existingOrderMap.get(key);
+        if (!existing) {
+          return true;
+        }
+
+        duplicateDetails.push({
+          orderNo,
+          receiverName: String(order.receiver_name || ''),
+          reason: 'existing_order',
+          existingSysOrderNo: existing.sysOrderNo,
+        });
+        return false;
+      });
+
+      if (freshOrders.length === 0) {
+        return NextResponse.json({
+          success: true,
+          data: [],
+          total: 0,
+          importBatch,
+          duplicateSummary: {
+            totalSkipped: duplicateDetails.length,
+            batchDuplicateCount: duplicateDetails.filter((item) => item.reason === 'batch_duplicate').length,
+            existingDuplicateCount: duplicateDetails.filter((item) => item.reason === 'existing_order').length,
+            details: duplicateDetails,
+          },
+          message: `没有创建新订单，${duplicateDetails.length} 条记录因重复被跳过`
+        });
+      }
+
+      const { data, error } = await client.from('orders').insert(freshOrders).select();
       if (error) throw new Error(`创建订单失败: ${error.message}`);
 
       return NextResponse.json({
@@ -655,7 +773,16 @@ export async function POST(request: NextRequest) {
         data: data || [],
         total: data?.length || 0,
         importBatch,
-        message: `成功创建 ${data?.length || 0} 条订单`
+        duplicateSummary: {
+          totalSkipped: duplicateDetails.length,
+          batchDuplicateCount: duplicateDetails.filter((item) => item.reason === 'batch_duplicate').length,
+          existingDuplicateCount: duplicateDetails.filter((item) => item.reason === 'existing_order').length,
+          details: duplicateDetails,
+        },
+        message:
+          duplicateDetails.length > 0
+            ? `成功创建 ${data?.length || 0} 条订单，另有 ${duplicateDetails.length} 条重复记录已跳过`
+            : `成功创建 ${data?.length || 0} 条订单`
       });
     }
 
@@ -822,8 +949,107 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    const duplicateDetails: DuplicateOrderDetail[] = [];
+    const batchSeen = new Set<string>();
+    const deduplicatedOrders = ordersToInsert.filter((order) => {
+      const orderNo = String(order.order_no || '').trim();
+      if (!orderNo) {
+        return true;
+      }
+
+      const key = buildDuplicateOrderKey(String(order.customer_code || ''), orderNo);
+      if (batchSeen.has(key)) {
+        duplicateDetails.push({
+          orderNo,
+          receiverName: String(order.receiver_name || ''),
+          reason: 'batch_duplicate',
+        });
+        return false;
+      }
+
+      batchSeen.add(key);
+      return true;
+    });
+
+    const candidateOrderNos = Array.from(
+      new Set(
+        deduplicatedOrders
+          .map((order) => String(order.order_no || '').trim())
+          .filter(Boolean)
+      )
+    );
+    const existingOrderMap = new Map<string, { sysOrderNo: string }>();
+
+    if (candidateOrderNos.length > 0 && customerCode) {
+      const { data: existingOrders, error: existingError } = await client
+        .from('orders')
+        .select('order_no, sys_order_no, customer_code')
+        .eq('customer_code', customerCode)
+        .in('order_no', candidateOrderNos);
+
+      if (existingError) {
+        throw new Error(`查询重复订单失败: ${existingError.message}`);
+      }
+
+      for (const existing of existingOrders || []) {
+        const key = buildDuplicateOrderKey(
+          String(existing.customer_code || ''),
+          String(existing.order_no || '')
+        );
+        existingOrderMap.set(key, {
+          sysOrderNo: String(existing.sys_order_no || ''),
+        });
+      }
+    }
+
+    const freshOrders = deduplicatedOrders.filter((order) => {
+      const orderNo = String(order.order_no || '').trim();
+      if (!orderNo) {
+        return true;
+      }
+
+      const key = buildDuplicateOrderKey(String(order.customer_code || ''), orderNo);
+      const existing = existingOrderMap.get(key);
+      if (!existing) {
+        return true;
+      }
+
+      duplicateDetails.push({
+        orderNo,
+        receiverName: String(order.receiver_name || ''),
+        reason: 'existing_order',
+        existingSysOrderNo: existing.sysOrderNo,
+      });
+      return false;
+    });
+
+    if (freshOrders.length === 0) {
+      return NextResponse.json({
+        success: true,
+        data: [],
+        total: 0,
+        importBatch,
+        duplicateSummary: {
+          totalSkipped: duplicateDetails.length,
+          batchDuplicateCount: duplicateDetails.filter((item) => item.reason === 'batch_duplicate').length,
+          existingDuplicateCount: duplicateDetails.filter((item) => item.reason === 'existing_order').length,
+          details: duplicateDetails,
+        },
+        matchStats: {
+          total: 0,
+          bySpec: matchStats.spec,
+          byName: matchStats.name,
+          byMapping: matchStats.mapping,
+          none: matchStats.none,
+          matched: 0,
+          matchRate: '0.0%'
+        },
+        message: `没有导入新订单，${duplicateDetails.length} 条记录因重复被跳过`
+      });
+    }
+
     // 批量插入
-    const { data, error } = await client.from('orders').insert(ordersToInsert).select();
+    const { data, error } = await client.from('orders').insert(freshOrders).select();
     if (error) throw new Error(`导入订单失败: ${error.message}`);
 
     return NextResponse.json({
@@ -831,17 +1057,28 @@ export async function POST(request: NextRequest) {
       data: data || [],
       total: data?.length || 0,
       importBatch,
+      duplicateSummary: {
+        totalSkipped: duplicateDetails.length,
+        batchDuplicateCount: duplicateDetails.filter((item) => item.reason === 'batch_duplicate').length,
+        existingDuplicateCount: duplicateDetails.filter((item) => item.reason === 'existing_order').length,
+        details: duplicateDetails,
+      },
       // 商品匹配统计
       matchStats: {
-        total: ordersToInsert.length,
+        total: freshOrders.length,
         bySpec: matchStats.spec,
         byName: matchStats.name,
         byMapping: matchStats.mapping,
         none: matchStats.none,
-        matched: ordersToInsert.length - matchStats.none,
-        matchRate: ((ordersToInsert.length - matchStats.none) / ordersToInsert.length * 100).toFixed(1) + '%'
+        matched: Math.max(freshOrders.length - matchStats.none, 0),
+        matchRate: freshOrders.length > 0
+          ? ((Math.max(freshOrders.length - matchStats.none, 0) / freshOrders.length) * 100).toFixed(1) + '%'
+          : '0.0%'
       },
-      message: `成功导入 ${data?.length || 0} 条订单，其中 ${ordersToInsert.length - matchStats.none} 条已匹配商品档案`
+      message:
+        duplicateDetails.length > 0
+          ? `成功导入 ${data?.length || 0} 条订单，另有 ${duplicateDetails.length} 条重复记录已跳过`
+          : `成功导入 ${data?.length || 0} 条订单，其中 ${Math.max(freshOrders.length - matchStats.none, 0)} 条已匹配商品档案`
     });
 
   } catch (error) {
@@ -855,6 +1092,8 @@ export async function POST(request: NextRequest) {
 
 // 更新订单状态
 export async function PATCH(request: NextRequest) {
+  const authError = requirePermission(request, 'orders:edit');
+  if (authError) return authError;
   const client = getSupabaseClient();
   
   try {
@@ -980,6 +1219,8 @@ export async function PATCH(request: NextRequest) {
 
 // 删除订单
 export async function DELETE(request: NextRequest) {
+  const authError = requirePermission(request, 'orders:delete');
+  if (authError) return authError;
   const client = getSupabaseClient();
   
   try {
@@ -1060,6 +1301,10 @@ function findHeader(headers: string[], candidates: string[]): number | null {
 function generateMatchCode(customerCode: string, receiverName: string, productCode: string, quantity: number): string {
   const raw = `${customerCode}-${receiverName}-${productCode}-${quantity}`;
   return crypto.createHash('md5').update(raw).digest('hex').slice(0, 8).toUpperCase();
+}
+
+function buildDuplicateOrderKey(customerCode: string, orderNo: string): string {
+  return `${customerCode}::${orderNo.trim().toUpperCase()}`;
 }
 
 // 解析收货地址

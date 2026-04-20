@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { normalizeTemplateType, syncTemplateTargetLink, transformTemplateRecord, type TemplateRecord } from '@/lib/template-utils';
+import { requirePermission } from '@/lib/server-auth';
 
 // 获取模板列表
 export async function GET(request: NextRequest) {
+  const authError = requirePermission(request, 'settings:view');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
   const type = searchParams.get('type');
@@ -43,6 +47,9 @@ export async function GET(request: NextRequest) {
 
 // 创建模板
 export async function POST(request: NextRequest) {
+  const authError = requirePermission(request, 'settings:view');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
   
   try {

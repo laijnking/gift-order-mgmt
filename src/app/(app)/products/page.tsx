@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
+import { PageGuard } from '@/components/auth/page-guard';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { buildUserInfoHeaders, useAuth, usePermission } from '@/lib/auth';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { ArrowLeft, Search, Plus, Edit, Package, Tag, Trash2, Check, Upload, Download, ChevronDown, Loader2, AlertCircle, X } from 'lucide-react';
@@ -73,6 +75,11 @@ interface Product {
 }
 
 export default function ProductsPage() {
+  const { user } = useAuth();
+  const { hasPermission } = usePermission();
+  const canCreateProducts = hasPermission('products:create');
+  const canEditProducts = hasPermission('products:edit');
+  const canDeleteProducts = hasPermission('products:delete');
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -118,9 +125,11 @@ export default function ProductsPage() {
     fetchProducts();
   }, []);
 
+  const authHeaders = useCallback(() => buildUserInfoHeaders(user), [user]);
+
   const fetchProducts = async () => {
     try {
-      const res = await fetch('/api/products');
+      const res = await fetch('/api/products', { headers: authHeaders() });
       const data = await res.json();
       if (data.success) {
         setProducts(data.data);
@@ -211,7 +220,7 @@ export default function ProductsPage() {
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify(formData),
       });
 
@@ -231,7 +240,7 @@ export default function ProductsPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/products/${id}`, { method: 'DELETE', headers: authHeaders() });
       const data = await res.json();
       if (data.success) {
         setAlert({ type: 'success', message: '商品删除成功' });
@@ -366,7 +375,7 @@ export default function ProductsPage() {
         
         const res = await fetch('/api/import/products', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
           body: JSON.stringify({ data: batch }),
         });
         const result = await res.json();
@@ -457,19 +466,19 @@ export default function ProductsPage() {
   }, [searchTerm, brandFilter, selectedBrands.length, lifecycleFilter]);
 
   return (
-    <>
+    <PageGuard permission="products:view" title="无权查看商品" description="当前账号没有查看商品管理的权限。">
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
-        <header className="bg-white border-b sticky top-0 z-10">
+        <header className="sticky top-0 z-10 border-b bg-white">
           <div className="container mx-auto px-4 py-4">
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
               <Link href="/archive">
               <Button variant="ghost" size="sm">
                 <ArrowLeft className="w-4 h-4 mr-1" />
                 返回
               </Button>
             </Link>
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
                 <Package className="w-6 h-6 text-white" />
               </div>
@@ -483,9 +492,9 @@ export default function ProductsPage() {
       </header>
 
       {/* Navigation */}
-      <div className="bg-white border-b">
+      <div className="border-b bg-white">
         <div className="container mx-auto px-4">
-          <nav className="flex gap-6">
+          <nav className="flex gap-4 overflow-x-auto">
             <Link href="/archive" className="py-4 px-2 border-b-2 border-transparent text-sm font-medium text-gray-600 hover:text-gray-900">
               总览
             </Link>
@@ -509,7 +518,7 @@ export default function ProductsPage() {
         {/* Search and Filters */}
         <Card className="mb-6">
           <CardContent className="pt-6">
-            <div className="flex flex-wrap items-center gap-4">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
@@ -521,7 +530,7 @@ export default function ProductsPage() {
               </div>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="w-[150px] justify-between">
+                  <Button variant="outline" size="sm" className="w-full justify-between xl:w-[150px]">
                     {selectedBrands.length > 0 ? (
                       <span className="truncate">已选 {selectedBrands.length} 个</span>
                     ) : brandFilter ? (
@@ -580,7 +589,7 @@ export default function ProductsPage() {
                 </PopoverContent>
               </Popover>
               <Select value={lifecycleFilter || 'all'} onValueChange={(v) => setLifecycleFilter(v === 'all' ? '' : v)}>
-                <SelectTrigger className="w-[150px]">
+                <SelectTrigger className="w-full xl:w-[150px]">
                   <SelectValue placeholder="按状态筛选" />
                 </SelectTrigger>
                 <SelectContent>
@@ -598,26 +607,26 @@ export default function ProductsPage() {
                 style={{ display: 'none' }}
                 onChange={handleFileUpload}
               />
-              <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+              <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="w-full xl:w-auto" disabled={!canCreateProducts}>
                 <Upload className="w-4 h-4 mr-1" />
                 导入
               </Button>
-              <Button variant="outline" onClick={downloadTemplate}>
+              <Button variant="outline" onClick={downloadTemplate} className="w-full xl:w-auto">
                 <Download className="w-4 h-4 mr-1" />
                 模板下载
               </Button>
-              <Button variant="outline" onClick={handleExport} disabled={filteredProducts.length === 0}>
+              <Button variant="outline" onClick={handleExport} disabled={filteredProducts.length === 0} className="w-full xl:w-auto">
                 <Download className="w-4 h-4 mr-1" />
                 导出
               </Button>
               <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button onClick={() => { resetForm(); setDialogOpen(true); }}>
+                  <Button onClick={() => { resetForm(); setDialogOpen(true); }} className="w-full xl:w-auto" disabled={!canCreateProducts}>
                     <Plus className="w-4 h-4 mr-1" />
                     新增商品
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                <DialogContent className="max-h-[80vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-2xl">
                   <DialogHeader>
                     <DialogTitle>{editingProduct ? '编辑商品' : '新增商品'}</DialogTitle>
                     <DialogDescription>
@@ -629,7 +638,7 @@ export default function ProductsPage() {
                       <AlertDescription>{alert.message}</AlertDescription>
                     </Alert>
                   )}
-                  <div className="grid grid-cols-2 gap-4 py-4">
+                  <div className="grid gap-4 py-4 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label>商品编码 *</Label>
                       <Input 
@@ -646,7 +655,7 @@ export default function ProductsPage() {
                         placeholder="商品条码"
                       />
                     </div>
-                    <div className="col-span-2 space-y-2">
+                    <div className="space-y-2 sm:col-span-2">
                       <Label>商品名称 *</Label>
                       <Input 
                         value={formData.name} 
@@ -723,7 +732,7 @@ export default function ProductsPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="col-span-2 space-y-2">
+                    <div className="space-y-2 sm:col-span-2">
                       <Label>备注</Label>
                       <Input 
                         value={formData.remark} 
@@ -732,7 +741,7 @@ export default function ProductsPage() {
                       />
                     </div>
                     {/* 尺寸和重量字段 */}
-                    <div className="col-span-2">
+                    <div className="sm:col-span-2">
                       <h3 className="text-sm font-semibold text-gray-700 mb-2 mt-4">尺寸与重量（用于运费计算）</h3>
                     </div>
                     <div className="space-y-2">
@@ -772,9 +781,9 @@ export default function ProductsPage() {
                       />
                     </div>
                   </div>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>
-                    <Button onClick={handleSubmit}>{editingProduct ? '保存修改' : '创建商品'}</Button>
+                  <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                    <Button variant="outline" onClick={() => setDialogOpen(false)} className="w-full sm:w-auto">取消</Button>
+                    <Button onClick={handleSubmit} disabled={editingProduct ? !canEditProducts : !canCreateProducts} className="w-full sm:w-auto">{editingProduct ? '保存修改' : '创建商品'}</Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
@@ -784,7 +793,7 @@ export default function ProductsPage() {
                 if (importing && !open) return;
                 setImportDialogOpen(open);
               }}>
-                <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                <DialogContent className="max-h-[80vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-4xl">
                   <DialogHeader>
                     <DialogTitle>
                       {importing ? '正在导入商品数据...' : '确认导入商品数据'}
@@ -860,17 +869,19 @@ export default function ProductsPage() {
                     </div>
                   )}
                   
-                  <DialogFooter>
+                  <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                     <Button 
                       variant="outline" 
                       onClick={() => setImportDialogOpen(false)}
                       disabled={importing}
+                      className="w-full sm:w-auto"
                     >
                       {importing ? '导入中，请稍候...' : '取消'}
                     </Button>
                     <Button 
                       onClick={confirmImport} 
                       disabled={importing}
+                      className="w-full sm:w-auto"
                     >
                       {importing ? (
                         <>
@@ -894,6 +905,7 @@ export default function ProductsPage() {
         {/* Product List */}
         <Card>
           <CardContent className="p-0">
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -948,26 +960,26 @@ export default function ProductsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(product)}>
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(product)} disabled={!canEditProducts}>
                             <Edit className="w-4 h-4" />
                           </Button>
                           <Dialog open={deleteConfirmId === product.id} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
                             <DialogTrigger asChild>
-                              <Button variant="ghost" size="sm" onClick={() => setDeleteConfirmId(product.id)}>
+                              <Button variant="ghost" size="sm" onClick={() => setDeleteConfirmId(product.id)} disabled={!canDeleteProducts}>
                                 <Trash2 className="w-4 h-4 text-red-500" />
                               </Button>
                             </DialogTrigger>
-                            <DialogContent>
+                            <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-lg">
                               <DialogHeader>
                                 <DialogTitle>确认删除</DialogTitle>
                                 <DialogDescription>
                                 确定要删除商品 &quot;{product.name}&quot; 吗？此操作无法撤销。
                                 </DialogDescription>
                               </DialogHeader>
-                              <DialogFooter>
-                                <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>取消</Button>
-                                <Button variant="destructive" onClick={() => handleDelete(product.id)}>删除</Button>
+                              <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                                <Button variant="outline" onClick={() => setDeleteConfirmId(null)} className="w-full sm:w-auto">取消</Button>
+                                <Button variant="destructive" onClick={() => handleDelete(product.id)} disabled={!canDeleteProducts} className="w-full sm:w-auto">删除</Button>
                               </DialogFooter>
                             </DialogContent>
                           </Dialog>
@@ -978,10 +990,11 @@ export default function ProductsPage() {
                 )}
               </TableBody>
             </Table>
+            </div>
             {/* Pagination */}
             {totalItems > 0 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t">
-                <div className="flex items-center gap-4">
+              <div className="flex flex-col gap-3 border-t px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-4">
                   <div className="text-sm text-muted-foreground">
                     共 {totalItems} 条，第 {startIndex + 1}-{endIndex} 条
                   </div>
@@ -992,9 +1005,9 @@ export default function ProductsPage() {
                     </div>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}>
-                    <SelectTrigger className="w-[100px]">
+                    <SelectTrigger className="w-full sm:w-[100px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1003,7 +1016,7 @@ export default function ProductsPage() {
                       <SelectItem value="100">100条/页</SelectItem>
                     </SelectContent>
                   </Select>
-                  <div className="flex items-center gap-1">
+                  <div className="flex flex-wrap items-center gap-1">
                     <Button 
                       variant="outline" 
                       size="sm" 
@@ -1047,6 +1060,6 @@ export default function ProductsPage() {
         </Card>
       </main>
     </div>
-    </>
+    </PageGuard>
   );
 }

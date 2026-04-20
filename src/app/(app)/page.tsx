@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageGuard } from '@/components/auth/page-guard';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { getOrderStatusBadgeClass, getOrderStatusLabel } from '@/lib/order-status';
+import { buildUserInfoHeaders } from '@/lib/auth';
+import { getOrderStatusBadgeClass, getOrderStatusLabel, isReturnProgressStatus } from '@/lib/order-status';
 import {
   Select,
   SelectContent,
@@ -35,8 +37,10 @@ interface OrderStats {
   total: number;
   pending: number;
   assigned: number;
+  partialReturned: number;
   returned: number;
   feedbacked: number;
+  returnProgress: number;
   completed: number;
   cancelled: number;
 }
@@ -106,12 +110,13 @@ export default function HomePage() {
       }
       
       const params = startDate ? `?startDate=${startDate}` : '';
+      const headers = buildUserInfoHeaders();
       
       const [ordersRes, customersRes, suppliersRes, stocksRes] = await Promise.all([
-        fetch(`/api/orders${params}`),
-        fetch('/api/customers'),
-        fetch('/api/suppliers'),
-        fetch('/api/stocks'),
+        fetch(`/api/orders${params}`, { headers }),
+        fetch('/api/customers', { headers }),
+        fetch('/api/suppliers', { headers }),
+        fetch('/api/stocks', { headers }),
       ]);
 
       const [ordersData, customersData, suppliersData, stocksData] = await Promise.all([
@@ -126,8 +131,10 @@ export default function HomePage() {
         total: orders.length,
         pending: orders.filter((o: Record<string, unknown>) => o.status === 'pending').length,
         assigned: orders.filter((o: Record<string, unknown>) => o.status === 'assigned').length,
-        returned: orders.filter((o: Record<string, unknown>) => o.status === 'returned' || o.status === 'partial_returned').length,
+        partialReturned: orders.filter((o: Record<string, unknown>) => o.status === 'partial_returned').length,
+        returned: orders.filter((o: Record<string, unknown>) => o.status === 'returned').length,
         feedbacked: orders.filter((o: Record<string, unknown>) => o.status === 'feedbacked').length,
+        returnProgress: orders.filter((o: Record<string, unknown>) => isReturnProgressStatus(String(o.status || ''))).length,
         completed: orders.filter((o: Record<string, unknown>) => o.status === 'completed').length,
         cancelled: orders.filter((o: Record<string, unknown>) => o.status === 'cancelled').length,
       };
@@ -151,7 +158,7 @@ export default function HomePage() {
       });
       const supplierStats: SupplierStats = {
         total: suppliers.length,
-        active: suppliers.filter((s: Record<string, unknown>) => s.status === 'active').length,
+        active: suppliers.filter((s: Record<string, unknown>) => s.isActive !== false && s.is_active !== false).length,
         types: supplierTypes,
       };
 
@@ -161,7 +168,7 @@ export default function HomePage() {
         lowStock: stocks.filter((s: Record<string, unknown>) => (s.quantity as number) <= 2 && (s.quantity as number) > 0).length,
         outOfStock: stocks.filter((s: Record<string, unknown>) => (s.quantity as number) === 0).length,
         totalValue: stocks.reduce((sum: number, s: Record<string, unknown>) => {
-          return sum + ((s.quantity as number) || 0) * ((s.price as number) || 0);
+          return sum + ((s.quantity as number) || 0) * (((s.unitPrice as number) || (s.unit_price as number) || (s.price as number)) || 0);
         }, 0),
       };
 
@@ -236,8 +243,10 @@ export default function HomePage() {
       ['总订单数', data.orders.total],
       ['待派发', data.orders.pending],
       ['已派发', data.orders.assigned],
+      ['部分回单', data.orders.partialReturned],
       ['已回单', data.orders.returned],
       ['已反馈', data.orders.feedbacked],
+      ['回单阶段合计', data.orders.returnProgress],
       ['已导金蝶', data.orders.completed],
       ['已取消', data.orders.cancelled],
       [],
@@ -284,6 +293,7 @@ export default function HomePage() {
   }
 
   return (
+    <PageGuard permission="dashboard:view" title="无权查看首页" description="当前账号没有查看首页数据概览的权限。">
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div>
@@ -355,7 +365,7 @@ export default function HomePage() {
                 </div>
                 <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-400 text-green-900 text-xs font-bold shadow-sm">
                   <CheckCircle className="h-3 w-3" />
-                  {data.orders.returned} 已回单
+                  {data.orders.returnProgress} 回单阶段
                 </div>
               </div>
             </div>
@@ -472,8 +482,8 @@ export default function HomePage() {
                       className="text-blue-500"
                     />
                   )}
-                  {/* 已回单 - 绿色 */}
-                  {data.orders.returned > 0 && (
+                  {/* 回单阶段 - 绿色 */}
+                  {data.orders.returnProgress > 0 && (
                     <circle
                       cx="50"
                       cy="50"
@@ -481,7 +491,7 @@ export default function HomePage() {
                       fill="none"
                       stroke="currentColor"
                       strokeWidth="12"
-                      strokeDasharray={`${(data.orders.returned / data.orders.total) * 251.2} 251.2`}
+                      strokeDasharray={`${(data.orders.returnProgress / data.orders.total) * 251.2} 251.2`}
                       strokeDashoffset={`${-((data.orders.pending + data.orders.assigned) / data.orders.total) * 251.2}`}
                       className="text-emerald-500"
                     />
@@ -498,8 +508,7 @@ export default function HomePage() {
                 {([
                   { key: 'pending', label: '待派发', color: 'bg-yellow-400' },
                   { key: 'assigned', label: '已派发', color: 'bg-blue-500' },
-                  { key: 'returned', label: '已回单', color: 'bg-emerald-500' },
-                  { key: 'feedbacked', label: '已反馈', color: 'bg-teal-400' },
+                  { key: 'returnProgress', label: '回单阶段', color: 'bg-emerald-500' },
                   { key: 'completed', label: '已导金蝶', color: 'bg-gray-400' },
                   { key: 'cancelled', label: '已取消', color: 'bg-red-400' },
                 ] as const).map(({ key, label, color }) => {
@@ -632,5 +641,6 @@ export default function HomePage() {
         </CardContent>
       </Card>
     </div>
+    </PageGuard>
   );
 }

@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { FetchClient, Config, HeaderUtils } from 'coze-coding-dev-sdk';
+import { requirePermission } from '@/lib/server-auth';
 
 const config = new Config();
 
 export async function POST(request: NextRequest) {
+  const authError = requirePermission(request, 'settings:edit');
+  if (authError) return authError;
+
   try {
     const { url } = await request.json();
     

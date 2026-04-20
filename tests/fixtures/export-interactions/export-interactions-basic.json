@@ -1,0 +1,45 @@
+{
+  "cases": [
+    {
+      "name": "local-persisted-download",
+      "provider": "local",
+      "hasArtifact": true,
+      "expected": {
+        "strategy": "本地下载",
+        "actionLabel": "下载",
+        "hint": "将直接下载已落盘文件"
+      }
+    },
+    {
+      "name": "s3-persisted-download",
+      "provider": "s3",
+      "hasArtifact": true,
+      "expected": {
+        "strategy": "直链下载",
+        "actionLabel": "直链下载",
+        "hint": "将跳转到对象存储下载链接"
+      }
+    },
+    {
+      "name": "regenerate-default-hint",
+      "provider": "local",
+      "hasArtifact": false,
+      "expected": {
+        "strategy": "按需重生成",
+        "actionLabel": "重新生成下载",
+        "hint": "当前会先重新生成再下载"
+      }
+    },
+    {
+      "name": "regenerate-custom-hint",
+      "provider": "s3",
+      "hasArtifact": false,
+      "customHint": "当前会优先回退到整批ZIP",
+      "expected": {
+        "strategy": "按需重生成",
+        "actionLabel": "重新生成下载",
+        "hint": "当前会优先回退到整批ZIP"
+      }
+    }
+  ]
+}

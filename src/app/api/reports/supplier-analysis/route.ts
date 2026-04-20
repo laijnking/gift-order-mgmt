@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isReturnProgressStatus } from '@/lib/order-status';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { requirePermission } from '@/lib/server-auth';
 
 // 获取供应商分析数据
 export async function GET(request: NextRequest) {
+  const authError = requirePermission(request, 'dashboard:view');
+  if (authError) return authError;
   try {
     const supabase = await getSupabaseClient();
     const searchParams = request.nextUrl.searchParams;
@@ -134,23 +138,16 @@ export async function GET(request: NextRequest) {
         });
 
         // 状态统计
-        switch (order.status) {
-          case 'pending':
-            bySupplier[matchedSupplierId].statusBreakdown.pending++;
-            break;
-          case 'assigned':
-            bySupplier[matchedSupplierId].statusBreakdown.assigned++;
-            break;
-          case 'returned':
-          case 'partial_returned':
-            bySupplier[matchedSupplierId].statusBreakdown.returned++;
-            break;
-          case 'completed':
-            bySupplier[matchedSupplierId].statusBreakdown.completed++;
-            break;
-          case 'cancelled':
-            bySupplier[matchedSupplierId].statusBreakdown.cancelled++;
-            break;
+        if (order.status === 'pending') {
+          bySupplier[matchedSupplierId].statusBreakdown.pending++;
+        } else if (order.status === 'assigned') {
+          bySupplier[matchedSupplierId].statusBreakdown.assigned++;
+        } else if (isReturnProgressStatus(order.status)) {
+          bySupplier[matchedSupplierId].statusBreakdown.returned++;
+        } else if (order.status === 'completed') {
+          bySupplier[matchedSupplierId].statusBreakdown.completed++;
+        } else if (order.status === 'cancelled') {
+          bySupplier[matchedSupplierId].statusBreakdown.cancelled++;
         }
 
         // 最后订单时间

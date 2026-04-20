@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { requirePermission } from '@/lib/server-auth';
 
 // 获取报表统计数据
 export async function GET(request: NextRequest) {
+  const authError = requirePermission(request, 'dashboard:view');
+  if (authError) return authError;
   try {
     const supabase = await getSupabaseClient();
     
@@ -105,7 +108,7 @@ export async function GET(request: NextRequest) {
 
     const supplierStats = {
       total: allSuppliers.length,
-      active: allSuppliers.filter(s => s.status === 'active').length,
+      active: allSuppliers.filter(s => s.is_active !== false).length,
       byType: supplierTypeStats,
     };
 
@@ -120,7 +123,7 @@ export async function GET(request: NextRequest) {
       totalQuantity: allStocks.reduce((sum, s) => sum + (s.quantity || 0), 0),
       lowStock: allStocks.filter(s => s.quantity <= 2 && s.quantity > 0).length,
       outOfStock: allStocks.filter(s => s.quantity === 0).length,
-      totalValue: allStocks.reduce((sum, s) => sum + ((s.quantity || 0) * (s.price || 0)), 0),
+      totalValue: allStocks.reduce((sum, s) => sum + ((s.quantity || 0) * (s.unit_price || s.price || 0)), 0),
     };
 
     // 6. 商品销售排行

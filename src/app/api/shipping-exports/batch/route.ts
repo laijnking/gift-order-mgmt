@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { saveExportArtifact } from '@/lib/export-artifacts';
+import { buildExportRecordDownloadPath } from '@/lib/export-download';
+import { recordOrderCostFromDispatch } from '@/lib/order-cost-history';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { parseTemplateFieldMappings, resolvePreferredTemplate, type TemplateRecord } from '@/lib/template-utils';
+import { requirePermission } from '@/lib/server-auth';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 
@@ -22,12 +26,6 @@ function parseItems(value: unknown): OrderItem[] {
 function toNumber(value: unknown, fallback = 0): number {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
-}
-
-function toDateOnly(value?: unknown): string {
-  const date = value ? new Date(String(value)) : new Date();
-  if (Number.isNaN(date.getTime())) return new Date().toISOString().slice(0, 10);
-  return date.toISOString().slice(0, 10);
 }
 
 const DEFAULT_SHIPPING_FIELD_MAPPINGS: Record<string, string> = {
@@ -86,12 +84,72 @@ async function findStockForItem(
   return ((stocks || []) as Record<string, unknown>[]).find((stock) => stockMatchesItem(stock, item)) || null;
 }
 
+async function getExistingDispatchContext(
+  client: ReturnType<typeof getSupabaseClient>,
+  orderId: string
+) {
+  const { data: latestDispatch } = await client
+    .from('dispatch_records')
+    .select('batch_no, items, dispatch_at')
+    .eq('order_id', orderId)
+    .order('dispatch_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { count: costCount } = await client
+    .from('order_cost_history')
+    .select('*', { count: 'exact', head: true })
+    .eq('order_id', orderId);
+
+  const { count: stockVersionCount } = await client
+    .from('stock_versions')
+    .select('*', { count: 'exact', head: true })
+    .eq('reference_id', orderId)
+    .eq('change_type', 'order');
+
+  const hasExistingSideEffects = Boolean(latestDispatch) || (costCount || 0) > 0 || (stockVersionCount || 0) > 0;
+
+  return {
+    hasExistingSideEffects,
+    latestDispatch: latestDispatch as { batch_no?: string; items?: unknown; dispatch_at?: string } | null,
+  };
+}
+
 async function dispatchPendingOrder(
   client: ReturnType<typeof getSupabaseClient>,
   order: Record<string, unknown>,
   supplier: Record<string, unknown>,
   batchNo: string
 ) {
+  const existingDispatch = await getExistingDispatchContext(client, String(order.id));
+  if (existingDispatch.hasExistingSideEffects) {
+    const reusedBatchNo =
+      String(existingDispatch.latestDispatch?.batch_no || order.assigned_batch || batchNo);
+    const existingItems = parseItems(existingDispatch.latestDispatch?.items).map((item) => ({
+      productCode: itemText(item, 'productCode', 'product_code'),
+      productName: itemText(item, 'productName', 'product_name'),
+      quantity: toNumber(item.quantity, 1),
+      unitCost: toNumber(item.unitCost || item.unit_cost),
+      warehouseName: itemText(item, 'warehouseName', 'warehouse_name'),
+    }));
+
+    await client
+      .from('orders')
+      .update({
+        status: 'assigned',
+        assigned_batch: String(order.assigned_batch || reusedBatchNo),
+        assigned_at: order.assigned_at || existingDispatch.latestDispatch?.dispatch_at || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', order.id);
+
+    return {
+      dispatchItems: existingItems,
+      dispatchBatch: String(order.assigned_batch || reusedBatchNo),
+      reusedExistingDispatch: true,
+    };
+  }
+
   const dispatchItems: Array<Record<string, unknown>> = [];
   const items = parseItems(order.items);
   if (items.length === 0) throw new Error(`订单 ${order.order_no || order.id} 没有商品明细`);
@@ -138,33 +196,14 @@ async function dispatchPendingOrder(
       operator: 'system',
     });
 
-    await client.from('order_cost_history').insert({
-      order_id: order.id,
-      order_no: order.order_no,
-      match_code: order.match_code || null,
-      supplier_id: supplier.id,
-      supplier_name: supplier.name,
-      warehouse_id: stock.warehouse_id || null,
-      warehouse_name: stock.warehouse_name || null,
-      product_code: stock.product_code || itemText(item, 'product_code', 'productCode'),
-      product_name: stock.product_name || itemText(item, 'product_name', 'productName'),
+    await recordOrderCostFromDispatch(client, {
+      order,
+      supplier,
+      stock,
+      item,
       quantity,
-      unit_cost: unitCost,
-      total_cost: unitCost * quantity,
-      express_fee: 0,
-      other_fee: 0,
-      total_amount: unitCost * quantity,
-      receiver_name: order.receiver_name || null,
-      receiver_phone: order.receiver_phone || null,
-      receiver_address: order.receiver_address || null,
-      customer_code: order.customer_code || null,
-      customer_name: order.customer_name || null,
-      salesperson: order.salesperson || null,
-      operator_name: order.operator_name || null,
-      order_date: toDateOnly(order.created_at),
-      shipped_date: toDateOnly(),
-      dispatch_batch: batchNo,
-      remark: order.remark || null,
+      unitCost,
+      batchNo,
     });
 
     dispatchItems.push({
@@ -197,7 +236,11 @@ async function dispatchPendingOrder(
     })
     .eq('id', order.id);
 
-  return dispatchItems;
+  return {
+    dispatchItems,
+    dispatchBatch: batchNo,
+    reusedExistingDispatch: false,
+  };
 }
 
 function rowsForOrder(
@@ -249,11 +292,23 @@ function rowsForOrder(
 }
 
 export async function POST(request: NextRequest) {
+  const authError = requirePermission(request, 'orders:export');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
 
   try {
     const body = await request.json();
-    const { supplierIds, templateId, exportedBy } = body;
+    const { supplierIds, templateId, exportedBy, dispatchMode, persistenceMode } = body;
+    const exportMode: 'preview' | 'dispatch' = dispatchMode === 'preview' ? 'preview' : 'dispatch';
+    const resolvedPersistenceMode: 'none' | 'full' =
+      exportMode === 'preview' ? 'none' : persistenceMode === 'none' ? 'none' : 'full';
+    const executionMode: 'preview' | 'dispatch_only' | 'dispatch_with_persistence' =
+      exportMode === 'preview'
+        ? 'preview'
+        : resolvedPersistenceMode === 'none'
+          ? 'dispatch_only'
+          : 'dispatch_with_persistence';
 
     if (!Array.isArray(supplierIds) || supplierIds.length === 0) {
       return NextResponse.json({ success: false, error: '请选择至少一个供应商' }, { status: 400 });
@@ -262,24 +317,28 @@ export async function POST(request: NextRequest) {
     let resolvedTemplateId = templateId || null;
     let resolvedTemplate: TemplateRecord | null = null;
     let templateName = '默认发货通知模板';
+    let templateSource: 'explicit' | 'default' | 'first' = 'default';
     if (resolvedTemplateId) {
       const { data: template } = await client.from('templates').select('*').eq('id', resolvedTemplateId).maybeSingle();
       if (template) {
         resolvedTemplate = template as TemplateRecord;
         if (template.name) templateName = String(template.name);
+        templateSource = 'explicit';
       }
     } else {
-      const { template } = await resolvePreferredTemplate(client, { type: 'shipping' });
+      const { template, source } = await resolvePreferredTemplate(client, { type: 'shipping' });
       if (template) {
         resolvedTemplate = template;
         if (template.id) resolvedTemplateId = template.id;
         if (template.name) templateName = String(template.name);
+        templateSource = source === 'first' ? 'first' : 'default';
       }
     }
     const fieldMappings = resolvedTemplate ? parseTemplateFieldMappings(resolvedTemplate) : DEFAULT_SHIPPING_FIELD_MAPPINGS;
     const exportFieldMappings = Object.keys(fieldMappings).length > 0 ? fieldMappings : DEFAULT_SHIPPING_FIELD_MAPPINGS;
 
     const batchId = crypto.randomUUID();
+    const recordId = crypto.randomUUID();
     const batchNo = `SHIP-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Date.now().toString().slice(-5)}`;
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const zip = new JSZip();
@@ -287,6 +346,10 @@ export async function POST(request: NextRequest) {
     const allOrderIds: string[] = [];
     const errors: string[] = [];
     let totalOrderCount = 0;
+    let newDispatchCount = 0;
+    let reusedDispatchCount = 0;
+    let assignedOnlyCount = 0;
+    let persistedDetailCount = 0;
 
     for (const supplierId of supplierIds) {
       const { data: supplier } = await client.from('suppliers').select('*').eq('id', supplierId).maybeSingle();
@@ -309,10 +372,18 @@ export async function POST(request: NextRequest) {
 
       for (const order of orders as Record<string, unknown>[]) {
         try {
-          const dispatchItems = order.status === 'pending'
+          const dispatchResult = exportMode === 'dispatch' && order.status === 'pending'
             ? await dispatchPendingOrder(client, order, supplier as Record<string, unknown>, batchNo)
             : undefined;
-          exportRows.push(...rowsForOrder(order, exportFieldMappings, batchNo, dispatchItems));
+          if (dispatchResult?.reusedExistingDispatch) {
+            reusedDispatchCount += 1;
+          } else if (dispatchResult) {
+            newDispatchCount += 1;
+          } else {
+            assignedOnlyCount += 1;
+          }
+          const exportBatchNo = dispatchResult?.dispatchBatch || batchNo;
+          exportRows.push(...rowsForOrder(order, exportFieldMappings, exportBatchNo, dispatchResult?.dispatchItems));
           allOrderIds.push(String(order.id));
           supplierSuccessCount += 1;
         } catch (error) {
@@ -330,7 +401,15 @@ export async function POST(request: NextRequest) {
       worksheet['!cols'] = headers.map((header) => ({ wch: Math.max(12, Math.min(48, header.length * 2 + 4)) }));
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, '发货通知单');
-      zip.file(fileName, XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }));
+      const workbookBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+      zip.file(fileName, workbookBuffer);
+      const detailIndex = results.length;
+      const detailArtifact = exportMode === 'dispatch' && resolvedPersistenceMode === 'full'
+        ? await saveExportArtifact(recordId, fileName, workbookBuffer)
+        : null;
+      if (detailArtifact) {
+        persistedDetailCount += 1;
+      }
 
       results.push({
         supplierId,
@@ -338,8 +417,16 @@ export async function POST(request: NextRequest) {
         orderCount: supplierSuccessCount,
         templateId: resolvedTemplateId,
         templateName,
+        templateSource,
         fileName,
-        fileUrl: `/exports/${fileName}`,
+        fileUrl: detailArtifact ? buildExportRecordDownloadPath(recordId, detailIndex) : null,
+        artifact: detailArtifact
+          ? {
+              relative_path: detailArtifact.relativePath,
+              file_name: detailArtifact.fileName,
+              provider: detailArtifact.provider,
+            }
+          : null,
         status: 'success',
       });
       totalOrderCount += supplierSuccessCount;
@@ -350,23 +437,114 @@ export async function POST(request: NextRequest) {
     }
 
     const zipFileName = `发货通知单批量导出+${today}.zip`;
-    const zipBase64 = (await zip.generateAsync({ type: 'nodebuffer' })).toString('base64');
+    const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+    const zipBase64 = zipBuffer.toString('base64');
+    if (exportMode === 'preview') {
+      return NextResponse.json({
+        success: errors.length === 0,
+        message: `已生成预览内容：${results.length}个供应商，共${totalOrderCount}个订单${errors.length ? `，失败${errors.length}条` : ''}`,
+        data: {
+          batchId,
+          batchNo,
+          zipFileName,
+          zipBase64,
+          zipFileUrl: null,
+          artifact: null,
+          totalSupplierCount: results.length,
+          totalOrderCount,
+          templateId: resolvedTemplateId,
+          templateName,
+          templateSource,
+          dispatchSummary: {
+            mode: exportMode,
+            newDispatchCount: 0,
+            reusedDispatchCount: 0,
+            assignedOnlyCount: totalOrderCount,
+          },
+          persistenceSummary: {
+            exportRecordCreated: false,
+            zipArtifactPersisted: false,
+            detailArtifactPersistedCount: 0,
+          },
+          executionMode,
+          persistenceMode: resolvedPersistenceMode,
+          details: results,
+          errors,
+          dispatchMode: exportMode,
+          supplierIds,
+        },
+      });
+    }
+
+    if (resolvedPersistenceMode === 'none') {
+      return NextResponse.json({
+        success: errors.length === 0,
+        message: `成功派发${results.length}个供应商，共${totalOrderCount}个订单${errors.length ? `，失败${errors.length}条` : ''}，未写入导出记录`,
+        data: {
+          batchId,
+          recordId: null,
+          batchNo,
+          zipFileName,
+          zipFileUrl: null,
+          zipBase64,
+          artifact: null,
+          totalSupplierCount: results.length,
+          totalOrderCount,
+          templateId: resolvedTemplateId,
+          templateName,
+          templateSource,
+          dispatchSummary: {
+            mode: exportMode,
+            newDispatchCount,
+            reusedDispatchCount,
+            assignedOnlyCount,
+          },
+          persistenceSummary: {
+            exportRecordCreated: false,
+            zipArtifactPersisted: false,
+            detailArtifactPersistedCount: 0,
+          },
+          executionMode,
+          persistenceMode: resolvedPersistenceMode,
+          dispatchMode: exportMode,
+          supplierIds,
+          details: results,
+          errors,
+        },
+      });
+    }
+
+    const artifact = await saveExportArtifact(recordId, zipFileName, zipBuffer);
 
     const { error: recordError } = await client.from('export_records').insert({
+      id: recordId,
       export_type: 'shipping_notice',
       business_type: 'dispatch',
       supplier_id: supplierIds.length === 1 ? supplierIds[0] : null,
       order_ids: allOrderIds,
       template_id: resolvedTemplateId,
       template_name: templateName,
-      file_url: `/exports/${zipFileName}`,
+      file_url: artifact.downloadPath,
       file_name: zipFileName,
-      zip_file_url: `/exports/${zipFileName}`,
+      zip_file_url: artifact.downloadPath,
       zip_file_name: zipFileName,
       total_count: totalOrderCount,
       exported_by: exportedBy || 'system',
       exported_at: new Date().toISOString(),
-      metadata: { batch_id: batchId, batch_no: batchNo, supplier_ids: supplierIds, details: results, errors },
+      metadata: {
+        batch_id: batchId,
+        batch_no: batchNo,
+        supplier_ids: supplierIds,
+        download_mode: 'regenerate',
+        artifact: {
+          relative_path: artifact.relativePath,
+          file_name: artifact.fileName,
+          provider: artifact.provider,
+        },
+        template_source: templateSource,
+        details: results,
+        errors,
+      },
     });
     if (recordError) throw new Error(`保存导出记录失败: ${recordError.message}`);
 
@@ -375,12 +553,36 @@ export async function POST(request: NextRequest) {
       message: `成功导出${results.length}个供应商，共${totalOrderCount}个订单${errors.length ? `，失败${errors.length}条` : ''}`,
       data: {
         batchId,
+        recordId,
         batchNo,
         zipFileName,
-        zipFileUrl: `/exports/${zipFileName}`,
+        zipFileUrl: artifact.downloadPath,
         zipBase64,
+        artifact: {
+          relative_path: artifact.relativePath,
+          file_name: artifact.fileName,
+          provider: artifact.provider,
+        },
         totalSupplierCount: results.length,
         totalOrderCount,
+        templateId: resolvedTemplateId,
+        templateName,
+        templateSource,
+        dispatchSummary: {
+          mode: exportMode,
+          newDispatchCount,
+          reusedDispatchCount,
+          assignedOnlyCount,
+        },
+        persistenceSummary: {
+          exportRecordCreated: true,
+          zipArtifactPersisted: true,
+          detailArtifactPersistedCount: persistedDetailCount,
+        },
+        executionMode,
+        persistenceMode: resolvedPersistenceMode,
+        dispatchMode: exportMode,
+        supplierIds,
         details: results,
         errors,
       },

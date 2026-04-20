@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { PageGuard } from '@/components/auth/page-guard';
+import { buildUserInfoHeaders, useAuth } from '@/lib/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -95,7 +96,11 @@ interface AlertStats {
 }
 
 export default function AlertsPage() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<string>('records');
+  const authHeaders = () => buildUserInfoHeaders(user);
+  const [executingRuleId, setExecutingRuleId] = useState<string | null>(null);
+  const [executingAllRules, setExecutingAllRules] = useState(false);
   
   // 预警记录相关状态
   const [records, setRecords] = useState<AlertRecord[]>([]);
@@ -147,7 +152,7 @@ export default function AlertsPage() {
         params.set('orderNo', recordFilters.search);
       }
 
-      const res = await fetch(`/api/alert-records?${params.toString()}`);
+      const res = await fetch(`/api/alert-records?${params.toString()}`, { headers: authHeaders() });
       const data = await res.json();
       if (data.success) {
         setRecords(data.data || []);
@@ -167,7 +172,7 @@ export default function AlertsPage() {
   const loadRules = async () => {
     setLoadingRules(true);
     try {
-      const res = await fetch('/api/alert-rules');
+      const res = await fetch('/api/alert-rules', { headers: authHeaders() });
       const data = await res.json();
       if (data.success) {
         setRules(data.data || []);
@@ -187,7 +192,7 @@ export default function AlertsPage() {
     try {
       const res = await fetch('/api/alert-records', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ ids, isRead: true }),
       });
       const data = await res.json();
@@ -208,7 +213,7 @@ export default function AlertsPage() {
     try {
       const res = await fetch('/api/alert-records', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ ids, isResolved: true }),
       });
       const data = await res.json();
@@ -229,7 +234,7 @@ export default function AlertsPage() {
     try {
       const res = await fetch(`/api/alert-rules/${rule.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ isEnabled: !rule.isEnabled }),
       });
       const data = await res.json();
@@ -286,7 +291,7 @@ export default function AlertsPage() {
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({
           ...ruleForm,
           config,
@@ -302,6 +307,37 @@ export default function AlertsPage() {
       }
     } catch (error) {
       toast.error('操作失败');
+    }
+  };
+
+  const handleExecuteRules = async (rule?: AlertRule) => {
+    const isSingleRule = Boolean(rule);
+
+    try {
+      if (isSingleRule) {
+        setExecutingRuleId(rule!.id);
+      } else {
+        setExecutingAllRules(true);
+      }
+
+      const res = await fetch('/api/alert-rules/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify(rule ? { ruleId: rule.id } : {}),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        toast.success(data.message || '预警规则执行完成');
+        await Promise.all([loadRules(), loadRecords()]);
+      } else {
+        toast.error(data.error || '执行预警规则失败');
+      }
+    } catch (error) {
+      toast.error('执行预警规则失败');
+    } finally {
+      setExecutingRuleId(null);
+      setExecutingAllRules(false);
     }
   };
 
@@ -348,11 +384,11 @@ export default function AlertsPage() {
           <RefreshCw className="h-8 w-8 animate-spin text-primary" />
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-6 px-3 pb-4 sm:px-4">
       {/* 页面标题 */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold flex items-center gap-2 sm:text-3xl">
             <Bell className="h-8 w-8" />
             预警中心
           </h1>
@@ -360,14 +396,14 @@ export default function AlertsPage() {
             系统预警信息集中管理
           </p>
         </div>
-        <Button variant="outline" onClick={() => loadRecords()}>
+        <Button variant="outline" onClick={() => loadRecords()} className="w-full sm:w-auto">
           <RefreshCw className="mr-2 h-4 w-4" />
           刷新
         </Button>
       </div>
 
       {/* 统计卡片 */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card className={stats.critical > 0 ? 'border-red-500 bg-red-50' : ''}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className={`text-sm font-medium ${stats.critical > 0 ? 'text-red-800' : ''}`}>
@@ -416,7 +452,7 @@ export default function AlertsPage() {
 
       {/* 标签页 */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
+        <TabsList className="grid w-full grid-cols-2 sm:inline-flex sm:w-auto">
           <TabsTrigger value="records" className="gap-1">
             <BellRing className="h-4 w-4" />
             预警记录
@@ -435,7 +471,7 @@ export default function AlertsPage() {
           {/* 筛选器 */}
           <Card>
             <CardContent className="pt-4 pb-3">
-              <div className="flex flex-wrap items-end gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">搜索</Label>
                   <div className="relative">
@@ -444,7 +480,7 @@ export default function AlertsPage() {
                       placeholder="搜索订单号、标题..."
                       value={recordFilters.search}
                       onChange={(e) => setRecordFilters(prev => ({ ...prev, search: e.target.value }))}
-                      className="pl-10 w-[200px] h-8"
+                      className="h-8 w-full pl-10 sm:w-[200px]"
                     />
                   </div>
                 </div>
@@ -454,7 +490,7 @@ export default function AlertsPage() {
                     value={recordFilters.alertLevel}
                     onValueChange={(v) => setRecordFilters(prev => ({ ...prev, alertLevel: v }))}
                   >
-                    <SelectTrigger className="w-[120px] h-8">
+                    <SelectTrigger className="h-8 w-full sm:w-[120px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -471,7 +507,7 @@ export default function AlertsPage() {
                     value={recordFilters.isRead}
                     onValueChange={(v) => setRecordFilters(prev => ({ ...prev, isRead: v }))}
                   >
-                    <SelectTrigger className="w-[120px] h-8">
+                    <SelectTrigger className="h-8 w-full sm:w-[120px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -481,7 +517,7 @@ export default function AlertsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <Button onClick={loadRecords} variant="outline" size="sm">
+                <Button onClick={loadRecords} variant="outline" size="sm" className="w-full sm:w-auto">
                   <RefreshCw className="mr-2 h-4 w-4" />
                   查询
                 </Button>
@@ -493,7 +529,7 @@ export default function AlertsPage() {
           {selectedRecords.length > 0 && (
             <Card className="bg-muted/50">
               <CardContent className="pt-4 pb-3">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm">已选择 {selectedRecords.length} 条</span>
                   <Button size="sm" variant="outline" onClick={() => handleMarkAsRead(selectedRecords)}>
                     <CheckCheck className="mr-2 h-4 w-4" />
@@ -514,6 +550,7 @@ export default function AlertsPage() {
           {/* 预警记录列表 */}
           <Card>
             <CardContent className="p-0">
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -601,6 +638,7 @@ export default function AlertsPage() {
                   )}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -609,18 +647,30 @@ export default function AlertsPage() {
         <TabsContent value="rules" className="space-y-4">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <CardTitle>预警规则配置</CardTitle>
                   <CardDescription>管理系统预警规则</CardDescription>
                 </div>
-                <Button onClick={() => openRuleDialog()}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  新建规则
-                </Button>
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => handleExecuteRules()}
+                    disabled={executingAllRules || loadingRules}
+                    className="w-full sm:w-auto"
+                  >
+                    <RefreshCw className={`mr-2 h-4 w-4 ${executingAllRules ? 'animate-spin' : ''}`} />
+                    执行全部规则
+                  </Button>
+                  <Button onClick={() => openRuleDialog()} className="w-full sm:w-auto">
+                    <Plus className="mr-2 h-4 w-4" />
+                    新建规则
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-0">
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -667,7 +717,16 @@ export default function AlertsPage() {
                           {rule.description || '-'}
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
+                          <div className="flex flex-wrap justify-end gap-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleExecuteRules(rule)}
+                              disabled={executingAllRules || executingRuleId === rule.id}
+                            >
+                              <RefreshCw className={`mr-1 h-4 w-4 ${executingRuleId === rule.id ? 'animate-spin' : ''}`} />
+                              执行
+                            </Button>
                             <Button size="sm" variant="ghost" onClick={() => openRuleDialog(rule)}>
                               编辑
                             </Button>
@@ -678,6 +737,7 @@ export default function AlertsPage() {
                   )}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -685,7 +745,7 @@ export default function AlertsPage() {
 
       {/* 详情对话框 */}
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {detailRecord && getAlertLevelBadge(detailRecord.alertLevel)}
@@ -694,7 +754,7 @@ export default function AlertsPage() {
           </DialogHeader>
           {detailRecord && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
                 <div>
                   <Label className="text-muted-foreground">预警规则</Label>
                   <p className="font-medium">{detailRecord.ruleName}</p>
@@ -746,7 +806,7 @@ export default function AlertsPage() {
               )}
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             {!detailRecord?.isResolved && detailRecord && (
               <Button
                 variant="outline"
@@ -754,12 +814,13 @@ export default function AlertsPage() {
                   handleMarkAsResolved([detailRecord.id]);
                   setIsDetailOpen(false);
                 }}
+                className="w-full sm:w-auto"
               >
                 <CheckCircle className="mr-2 h-4 w-4" />
                 标记已处理
               </Button>
             )}
-            <Button variant="outline" onClick={() => setIsDetailOpen(false)}>
+            <Button variant="outline" onClick={() => setIsDetailOpen(false)} className="w-full sm:w-auto">
               关闭
             </Button>
           </DialogFooter>
@@ -768,7 +829,7 @@ export default function AlertsPage() {
 
       {/* 规则编辑对话框 */}
       <Dialog open={isRuleDialogOpen} onOpenChange={setIsRuleDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>
               {editingRule ? '编辑预警规则' : '新建预警规则'}
@@ -797,7 +858,7 @@ export default function AlertsPage() {
                 disabled={!!editingRule}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label htmlFor="type">规则类型</Label>
                 <Select
@@ -846,13 +907,14 @@ export default function AlertsPage() {
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsRuleDialogOpen(false)}>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setIsRuleDialogOpen(false)} className="w-full sm:w-auto">
               取消
             </Button>
             <Button
               onClick={handleSaveRule}
               disabled={!ruleForm.name || !ruleForm.code}
+              className="w-full sm:w-auto"
             >
               {editingRule ? '保存' : '创建'}
             </Button>

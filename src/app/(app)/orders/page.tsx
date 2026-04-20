@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,7 +33,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
-import { getOrderStatusBadgeClass, getOrderStatusLabel, ORDER_STATUS_OPTIONS } from '@/lib/order-status';
+import { getOrderStatusBadgeClass, getOrderStatusLabel, isReturnProgressStatus, ORDER_STATUS_OPTIONS } from '@/lib/order-status';
 import { toast } from 'sonner';
 import {
   Package,
@@ -74,7 +75,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { getCurrentUser, getUserDataScope } from '@/lib/auth';
+import { PageGuard } from '@/components/auth/page-guard';
+import { buildUserInfoHeaders, getCurrentUser, getUserDataScope } from '@/lib/auth';
 
 interface Order {
   id: string;
@@ -126,6 +128,7 @@ interface Order {
   operatorName?: string;
   supplierId?: string;
   supplierName?: string;
+  importBatch?: string;
   assignedBatch?: string;
   expressCompany?: string;
   trackingNo?: string;
@@ -194,6 +197,7 @@ const FILTERABLE_FIELDS = [
 ];
 
 export default function OrdersPage() {
+  const searchParams = useSearchParams();
   const [orders, setOrders] = useState<Order[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -361,10 +365,86 @@ export default function OrdersPage() {
   const [deleteOrderIds, setDeleteOrderIds] = useState<string[]>([]);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
+  const authHeaders = useCallback(
+    () => ({
+      'Content-Type': 'application/json',
+      ...buildUserInfoHeaders(),
+    }),
+    []
+  );
+
+  useEffect(() => {
+    const importBatch = searchParams.get('importBatch')?.trim() || '';
+    const status = searchParams.get('status')?.trim() || '';
+
+    if (importBatch) {
+      setAdvancedFields((prev) => {
+        if (prev.importBatch === importBatch) {
+          return prev;
+        }
+        return {
+          ...prev,
+          importBatch,
+        };
+      });
+
+      setShowAdvancedFilter(true);
+    }
+
+    if (status && ORDER_STATUS_OPTIONS.some((option) => option.value === status)) {
+      setStatusFilter((prev) => (prev === status ? prev : status));
+      setSelectedStatuses((prev) => (prev.length === 0 ? prev : []));
+    } else if (status === 'all') {
+      setStatusFilter('');
+      setSelectedStatuses([]);
+    }
+  }, [searchParams]);
+
+  const fetchOrders = useCallback(async () => {
+    try {
+      // 获取当前用户信息用于数据权限过滤
+      const currentUser = getCurrentUser();
+      const userInfo = {
+        username: currentUser?.username || '',
+        role: currentUser?.role || '',
+        dataScope: getUserDataScope(currentUser),
+      };
+
+      const params = new URLSearchParams();
+      const importBatch = searchParams.get('importBatch')?.trim();
+      const status = searchParams.get('status')?.trim();
+      if (importBatch) {
+        params.set('importBatch', importBatch);
+      }
+      if (status && status !== 'all') {
+        params.set('status', status);
+      }
+
+      const res = await fetch(`/api/orders${params.toString() ? `?${params.toString()}` : ''}`, {
+        headers: {
+          'x-user-info': JSON.stringify(userInfo),
+        },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setOrders(data.data || []);
+      } else {
+        toast.error(data.error || '获取订单失败');
+      }
+    } catch (error) {
+      console.error('获取订单失败:', error);
+      toast.error('获取订单失败');
+    } finally {
+      setLoading(false);
+    }
+  }, [searchParams]);
+
   // 获取预警记录
   const fetchAlerts = useCallback(async () => {
     try {
-      const res = await fetch('/api/alert-records?isResolved=false&limit=50');
+      const res = await fetch('/api/alert-records?isResolved=false&limit=50', {
+        headers: buildUserInfoHeaders(),
+      });
       const data = await res.json();
       if (data.success) {
         setAlerts(data.data || []);
@@ -380,15 +460,15 @@ export default function OrdersPage() {
     try {
       await fetch('/api/alert-records', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: alertId, isRead: true }),
+        headers: authHeaders(),
+        body: JSON.stringify({ ids: [alertId], isRead: true }),
       });
       setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, isRead: true } : a));
       setUnreadAlertCount(prev => Math.max(0, prev - 1));
     } catch (error) {
       console.error('标记已读失败');
     }
-  }, []);
+  }, [authHeaders]);
 
   // 标记所有预警为已读
   const markAllAlertsAsRead = useCallback(async () => {
@@ -397,8 +477,8 @@ export default function OrdersPage() {
       await Promise.all(unreadIds.map(id =>
         fetch('/api/alert-records', {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id, isRead: true }),
+          headers: authHeaders(),
+          body: JSON.stringify({ ids: [id], isRead: true }),
         })
       ));
       setAlerts(prev => prev.map(a => ({ ...a, isRead: true })));
@@ -407,7 +487,7 @@ export default function OrdersPage() {
     } catch (error) {
       console.error('批量标记已读失败');
     }
-  }, [alerts]);
+  }, [alerts, authHeaders]);
 
 // 预警类型定义
 interface OrderAlertSummary {
@@ -542,35 +622,6 @@ useEffect(() => {
     return index;
   }, [orders]);
 
-  const fetchOrders = useCallback(async () => {
-    try {
-      // 获取当前用户信息用于数据权限过滤
-      const currentUser = getCurrentUser();
-      const userInfo = {
-        username: currentUser?.username || '',
-        role: currentUser?.role || '',
-        dataScope: getUserDataScope(currentUser),
-      };
-
-      const res = await fetch('/api/orders', {
-        headers: {
-          'x-user-info': JSON.stringify(userInfo),
-        },
-      });
-      const data = await res.json();
-      if (data.success) {
-        setOrders(data.data || []);
-      } else {
-        toast.error(data.error || '获取订单失败');
-      }
-    } catch (error) {
-      console.error('获取订单失败:', error);
-      toast.error('获取订单失败');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   // 新增订单
   const handleCreateOrder = async () => {
     if (!createForm.orderNo || !createForm.receiverName || !createForm.receiverPhone) {
@@ -604,7 +655,7 @@ useEffect(() => {
 
       const res = await fetch('/api/orders', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify(orderData),
       });
       const data = await res.json();
@@ -668,7 +719,7 @@ useEffect(() => {
     try {
       const res = await fetch(`/api/orders?id=${editForm.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify({
           customerCode: editForm.customerCode || 'UNKNOWN',
           items: [{
@@ -711,6 +762,7 @@ useEffect(() => {
       const idsParam = deleteOrderIds.join(',');
       const res = await fetch(`/api/orders?ids=${idsParam}`, {
         method: 'DELETE',
+        headers: buildUserInfoHeaders(),
       });
       const data = await res.json();
       
@@ -898,6 +950,7 @@ useEffect(() => {
           matched = fuzzyMatch(order.expressCompany, q);
           break;
         case 'importBatch':
+          matched = fuzzyMatch(order.assignedBatch, q) || fuzzyMatch((order as Order & { importBatch?: string }).importBatch, q);
           break;
       }
       if (!matched) return false;
@@ -942,7 +995,7 @@ useEffect(() => {
       // 导出发货通知单后才进入"已派发"状态（assigned）
       const res = await fetch('/api/orders', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify({
           id: assigningOrderId,
           supplierId: selectedSupplierId,
@@ -977,7 +1030,7 @@ useEffect(() => {
       const promises = orderIds.map((orderId) =>
         fetch('/api/orders', {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders(),
           body: JSON.stringify({
             id: orderId,
             supplierId: selectedSupplierId,
@@ -1012,7 +1065,7 @@ useEffect(() => {
         const supplier = suppliers.find((s) => s.id === supplierId);
         return fetch('/api/orders', {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders(),
           body: JSON.stringify({
             id: orderId,
             supplierId: supplierId,
@@ -1052,7 +1105,7 @@ useEffect(() => {
     try {
       const res = await fetch('/api/match', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify({ orderIds: targetOrderIds }),
       });
       const data = await res.json();
@@ -1145,7 +1198,7 @@ useEffect(() => {
     try {
       const res = await fetch('/api/match', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify({ orderIds: [orderId] }),
       });
       const data = await res.json();
@@ -1218,7 +1271,7 @@ useEffect(() => {
             try {
               const res = await fetch('/api/orders', {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
+                headers: authHeaders(),
                 body: JSON.stringify({
                   id: orderId,
                   trackingNo: trackingNo || '',
@@ -1301,7 +1354,7 @@ useEffect(() => {
       const promises = targetIds.map((id) =>
         fetch('/api/orders', {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders(),
           body: JSON.stringify({ id, status: 'completed' }),
         })
       );
@@ -1354,7 +1407,7 @@ useEffect(() => {
       const promises = targetOrders.map((order) =>
         fetch('/api/orders', {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders(),
           body: JSON.stringify({ id: order.id, status: 'feedbacked' }),
         })
       );
@@ -1471,6 +1524,47 @@ useEffect(() => {
 
   // 统计未归档订单数
   const unarchivedCount = orders.filter(o => !['completed', 'cancelled'].includes(o.status)).length;
+  const activeImportBatch = advancedFields.importBatch?.trim() || '';
+  const activeImportBatchSummary = useMemo(() => {
+    if (!activeImportBatch) {
+      return null;
+    }
+
+    const batchOrders = orders.filter((order) => order.importBatch === activeImportBatch);
+    const statusCounts = ORDER_STATUS_OPTIONS.map((option) => ({
+      value: option.value,
+      label: option.label,
+      count: batchOrders.filter((order) => order.status === option.value).length,
+    })).filter((item) => item.count > 0);
+
+    return {
+      total: batchOrders.length,
+      pending: batchOrders.filter((order) => order.status === 'pending').length,
+      assigned: batchOrders.filter((order) => order.status === 'assigned').length,
+      returned: batchOrders.filter((order) => isReturnProgressStatus(order.status)).length,
+      completed: batchOrders.filter((order) =>
+        order.status === 'completed' || order.status === 'cancelled'
+      ).length,
+      statusCounts,
+    };
+  }, [activeImportBatch, orders]);
+
+  const applyBatchStatusFilter = (statuses: string[]) => {
+    if (statuses.length === 0) {
+      setStatusFilter('');
+      setSelectedStatuses([]);
+      return;
+    }
+
+    if (statuses.length === 1) {
+      setStatusFilter(statuses[0]);
+      setSelectedStatuses([]);
+      return;
+    }
+
+    setStatusFilter('');
+    setSelectedStatuses(statuses);
+  };
 
   if (loading) {
     return (
@@ -1481,11 +1575,12 @@ useEffect(() => {
   }
 
   return (
-    <div className={`space-y-4 transition-all duration-300 ${alertPanelOpen ? 'pr-80' : ''}`}>
+    <PageGuard permission="orders:view" title="无权查看订单" description="当前账号没有查看订单中心的权限。">
+    <div className={`space-y-4 px-3 pb-4 transition-all duration-300 sm:px-4 ${alertPanelOpen ? 'lg:pr-80' : ''}`}>
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="flex items-center gap-2 text-xl font-bold sm:text-2xl">
             <Package className="h-6 w-6 text-primary" />
             订单管理
           </h1>
@@ -1493,16 +1588,16 @@ useEffect(() => {
             共 {orders.length} 条订单，其中 {unarchivedCount} 条未归档，{orders.filter((o) => o.status === 'pending').length} 条待派发
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={fetchOrders}>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <Button variant="outline" size="sm" onClick={fetchOrders} className="w-full sm:w-auto">
             <RefreshCw className="w-4 h-4 mr-1" />
             刷新
           </Button>
-          <Button variant="outline" size="sm" onClick={handleExport}>
+          <Button variant="outline" size="sm" onClick={handleExport} className="w-full sm:w-auto">
             <Download className="w-4 h-4 mr-1" />
             导出
           </Button>
-          <Button variant="outline" size="sm" onClick={() => {
+          <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => {
             // 打开对话框时自动生成订单号
             const today = new Date();
             const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
@@ -1518,6 +1613,7 @@ useEffect(() => {
             <Button 
               variant="destructive" 
               size="sm" 
+              className="w-full sm:w-auto"
               onClick={() => openDeleteConfirm()}
               disabled={Array.from(selectedOrders).some(order => !canDeleteOrder(order))}
             >
@@ -1528,11 +1624,91 @@ useEffect(() => {
         </div>
       </div>
 
+      {activeImportBatch && (
+        <Alert className="border-primary/30 bg-primary/5">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>当前正在回看导入批次</AlertTitle>
+          <AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <span className="break-all font-mono text-xs">{activeImportBatch}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 self-start sm:self-auto"
+              onClick={() => removeAdvancedField('importBatch')}
+            >
+              <X className="mr-1 h-3.5 w-3.5" />
+              清除此批次筛选
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {activeImportBatch && activeImportBatchSummary && (
+        <Card className="border-primary/20">
+          <CardContent className="pt-4">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <Upload className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">本批次复盘摘要</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+                <button
+                  type="button"
+                  className="rounded border bg-muted/30 px-3 py-2 text-left transition-colors hover:bg-muted"
+                  onClick={() => applyBatchStatusFilter([])}
+                >
+                  <div className="text-muted-foreground">总订单</div>
+                  <div className="font-medium">{activeImportBatchSummary.total}</div>
+                </button>
+                <button
+                  type="button"
+                  className="rounded border bg-muted/30 px-3 py-2 text-left transition-colors hover:bg-amber-50"
+                  onClick={() => applyBatchStatusFilter(['pending'])}
+                >
+                  <div className="text-muted-foreground">待派发</div>
+                  <div className="font-medium text-amber-700">{activeImportBatchSummary.pending}</div>
+                </button>
+                <button
+                  type="button"
+                  className="rounded border bg-muted/30 px-3 py-2 text-left transition-colors hover:bg-blue-50"
+                  onClick={() => applyBatchStatusFilter(['partial_returned', 'returned', 'feedbacked'])}
+                >
+                  <div className="text-muted-foreground">回单阶段</div>
+                  <div className="font-medium text-blue-700">{activeImportBatchSummary.returned}</div>
+                </button>
+                <button
+                  type="button"
+                  className="rounded border bg-muted/30 px-3 py-2 text-left transition-colors hover:bg-green-50"
+                  onClick={() => applyBatchStatusFilter(['completed', 'cancelled'])}
+                >
+                  <div className="text-muted-foreground">已归档</div>
+                  <div className="font-medium text-green-700">{activeImportBatchSummary.completed}</div>
+                </button>
+              </div>
+              {activeImportBatchSummary.statusCounts.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {activeImportBatchSummary.statusCounts.map((item) => (
+                    <Badge
+                      key={item.value}
+                      variant="outline"
+                      className="cursor-pointer"
+                      onClick={() => applyBatchStatusFilter([item.value])}
+                    >
+                      {item.label} {item.count}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* 预警面板切换按钮 - 始终显示 */}
       <Button
         variant="ghost"
         size="sm"
-        className="fixed right-0 top-1/2 -translate-y-1/2 z-50 h-24 w-6 rounded-l-lg rounded-r-none shadow-lg bg-card border-l-0"
+        className="fixed right-0 top-1/2 z-50 hidden h-24 w-6 -translate-y-1/2 rounded-l-lg rounded-r-none border-l-0 bg-card shadow-lg lg:flex"
         onClick={() => setAlertPanelOpen(!alertPanelOpen)}
       >
         {alertPanelOpen ? (
@@ -1550,7 +1726,7 @@ useEffect(() => {
       </Button>
 
       {/* 右侧预警面板 */}
-      <div className={`fixed right-0 top-0 h-full w-80 bg-background border-l shadow-lg z-40 transform transition-transform duration-300 ease-in-out ${alertPanelOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div className={`fixed right-0 top-0 z-40 h-full w-full transform border-l bg-background shadow-lg transition-transform duration-300 ease-in-out sm:w-[380px] lg:w-80 ${alertPanelOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         <div className="flex flex-col h-full">
           {/* 预警面板头部 */}
           <div className="flex items-center justify-between p-4 border-b">
@@ -1682,6 +1858,7 @@ useEffect(() => {
               <Button
                 variant="outline"
                 size="sm"
+                className="w-full sm:w-auto"
                 onClick={() => (window.location.href = '/order-parse')}
               >
                 <FileInput className="w-4 h-4 mr-1.5" />
@@ -1690,6 +1867,7 @@ useEffect(() => {
               <Button
                 variant="outline"
                 size="sm"
+                className="w-full sm:w-auto"
                 onClick={() => openAssignDialog(null)}
                 disabled={selectedOrders.size === 0 || selectedPendingCount === 0}
               >
@@ -1704,6 +1882,7 @@ useEffect(() => {
               <Button
                 variant="default"
                 size="sm"
+                className="w-full sm:w-auto"
                 onClick={handleShipNotice}
                 disabled={selectedOrders.size === 0 || selectedAssignedCount === 0}
               >
@@ -1718,6 +1897,7 @@ useEffect(() => {
               <Button
                 variant="outline"
                 size="sm"
+                className="w-full sm:w-auto"
                 onClick={() => setReturnDialogOpen(true)}
                 disabled={selectedOrders.size === 0 || selectedAssignedCount === 0}
               >
@@ -1727,6 +1907,7 @@ useEffect(() => {
               <Button
                 variant="outline"
                 size="sm"
+                className="w-full sm:w-auto"
                 onClick={handleFeedback}
                 disabled={selectedOrders.size > 0 && selectedReturnableCount === 0}
               >
@@ -1736,6 +1917,7 @@ useEffect(() => {
               <Button
                 variant="outline"
                 size="sm"
+                className="w-full sm:w-auto"
                 onClick={handleExportKingdee}
                 disabled={selectedOrders.size > 0 && selectedFeedbackedCount === 0}
               >
@@ -1803,12 +1985,12 @@ useEffect(() => {
           </div>
 
           {/* Row 2: Status + Customer + Supplier dropdowns + More button */}
-          <div className="flex flex-wrap items-end gap-3 mt-3">
+          <div className="mt-3 flex flex-col gap-3 xl:flex-row xl:flex-wrap xl:items-end">
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">订单状态</Label>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-8 min-w-[140px] justify-between font-normal">
+                  <Button variant="outline" size="sm" className="h-8 w-full justify-between font-normal sm:min-w-[140px] sm:w-auto">
                     {selectedStatuses.length > 0 ? (
                       <span className="truncate">
                         已选 {selectedStatuses.length} 个状态
@@ -1912,7 +2094,7 @@ useEffect(() => {
                 value={customerFilter || 'all'}
                 onValueChange={(v) => setCustomerFilter(v === 'all' ? '' : v)}
               >
-                <SelectTrigger className="w-[160px] h-8 text-sm">
+                <SelectTrigger className="h-8 w-full text-sm sm:w-[160px]">
                   <SelectValue placeholder="全部客户" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1932,13 +2114,13 @@ useEffect(() => {
                 placeholder="搜索供应商..."
                 value={supplierSearch}
                 onChange={(e) => setSupplierSearch(e.target.value)}
-                className="h-8 text-sm w-[160px]"
+                className="h-8 w-full text-sm sm:w-[160px]"
               />
               <Select
                 value={supplierFilter || 'all'}
                 onValueChange={(v) => setSupplierFilter(v === 'all' ? '' : v)}
               >
-                <SelectTrigger className="h-8 text-sm w-[160px]">
+                <SelectTrigger className="h-8 w-full text-sm sm:w-[160px]">
                   <SelectValue placeholder="全部供应商" />
                 </SelectTrigger>
                 <SelectContent className="max-h-[200px]">
@@ -1981,7 +2163,7 @@ useEffect(() => {
               </Button>
             )}
 
-            <div className="flex-1" />
+            <div className="hidden flex-1 xl:block" />
 
             {selectedOrders.size > 0 && (
               <Badge variant="secondary" className="text-sm">
@@ -2122,7 +2304,12 @@ useEffect(() => {
                       />
                     </TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground max-w-[80px] truncate" title={order.sysOrderNo || '-'}>
-                      {order.sysOrderNo ? order.sysOrderNo.split('-').slice(-1)[0] : '-'}
+                      <div>{order.sysOrderNo ? order.sysOrderNo.split('-').slice(-1)[0] : '-'}</div>
+                      {order.importBatch && (
+                        <div className="mt-1 text-[10px] text-muted-foreground/80" title={order.importBatch}>
+                          批次 {order.importBatch.slice(-8)}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell className="font-mono text-sm text-muted-foreground max-w-[120px] truncate">
                       {order.orderNo}
@@ -2250,7 +2437,7 @@ useEffect(() => {
 
       {/* Details Dialog */}
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="w-[calc(100vw-1.5rem)] max-w-2xl">
           <DialogHeader>
             <DialogTitle>订单详情</DialogTitle>
             <DialogDescription>系统单号：{selectedOrder?.sysOrderNo}</DialogDescription>
@@ -2314,6 +2501,10 @@ useEffect(() => {
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground mb-1">客户</h4>
                   <p>{selectedOrder.customerName || '-'}</p>
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-1">导入批次</h4>
+                  <p className="font-mono break-all text-xs">{selectedOrder.importBatch || '-'}</p>
                 </div>
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground mb-1">业务员</h4>
@@ -3155,5 +3346,6 @@ useEffect(() => {
         </DialogContent>
       </Dialog>
     </div>
+    </PageGuard>
   );
 }

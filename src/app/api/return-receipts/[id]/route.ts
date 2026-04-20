@@ -1,13 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { syncOrderCostHistoryAfterReturn } from '@/lib/order-cost-history';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { requirePermission } from '@/lib/server-auth';
 
 interface RecordReceiptMatch {
   id: string;
   match_status?: string;
 }
 
+interface ReceiptRow {
+  id: string;
+  record_id: string;
+  supplier_id?: string | null;
+  express_company?: string | null;
+  tracking_no?: string | null;
+  match_status?: string | null;
+}
+
 // 获取回单导入记录详情
 export async function GET(request: NextRequest) {
+  const authError = requirePermission(request, 'orders:view');
+  if (authError) return authError;
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
   const recordId = searchParams.get('recordId');
@@ -52,16 +65,31 @@ export async function GET(request: NextRequest) {
 }
 
 // 手动匹配回单与订单
-export async function PATCH(request: NextRequest) {
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const authError = requirePermission(request, 'orders:edit');
+  if (authError) return authError;
   const client = getSupabaseClient();
 
   try {
     const body = await request.json();
-    const { receiptId, orderId } = body;
+    const routeParams = await params;
+    const receiptId = body.receiptId || routeParams.id;
+    const { orderId } = body;
 
     if (!receiptId || !orderId) {
       return NextResponse.json({ success: false, error: '参数错误' }, { status: 400 });
     }
+
+    const { data: receipt, error: receiptError } = await client
+      .from('return_receipts')
+      .select('id, record_id, supplier_id, express_company, tracking_no, match_status')
+      .eq('id', receiptId)
+      .single<ReceiptRow>();
+
+    if (receiptError) throw new Error(`查询回单失败: ${receiptError.message}`);
 
     // 获取订单信息
     const { data: order, error: orderError } = await client
@@ -71,6 +99,9 @@ export async function PATCH(request: NextRequest) {
       .single();
 
     if (orderError) throw new Error(`查询订单失败: ${orderError.message}`);
+    if (receipt.supplier_id && order.supplier_id && receipt.supplier_id !== order.supplier_id) {
+      return NextResponse.json({ success: false, error: '回单与订单供应商不一致，无法关联' }, { status: 400 });
+    }
 
     // 更新回单
     const { error: updateError } = await client
@@ -84,13 +115,36 @@ export async function PATCH(request: NextRequest) {
 
     if (updateError) throw new Error(`更新回单失败: ${updateError.message}`);
 
-    // 更新导入记录的匹配数量
-    const { data: receipt } = await client
-      .from('return_receipts')
-      .select('record_id')
-      .eq('id', receiptId)
-      .single();
+    const now = new Date().toISOString();
+    const orderUpdatePayload: Record<string, string> = {
+      status: 'returned',
+      returned_at: now,
+      updated_at: now,
+    };
 
+    if (receipt.express_company) {
+      orderUpdatePayload.express_company = receipt.express_company;
+    }
+
+    if (receipt.tracking_no) {
+      orderUpdatePayload.tracking_no = receipt.tracking_no;
+    }
+
+    const { error: orderUpdateError } = await client
+      .from('orders')
+      .update(orderUpdatePayload)
+      .eq('id', orderId);
+
+    if (orderUpdateError) throw new Error(`更新订单物流信息失败: ${orderUpdateError.message}`);
+
+    await syncOrderCostHistoryAfterReturn(client, {
+      orderId,
+      expressCompany: receipt.express_company,
+      trackingNo: receipt.tracking_no,
+      returnedAt: now,
+    });
+
+    // 更新导入记录的匹配数量
     if (receipt) {
       const { data: allReceipts } = await client
         .from('return_receipts')
@@ -113,11 +167,12 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: '手动匹配成功',
+      message: receipt.match_status === 'conflict' ? '冲突已处理，回单关联成功' : '手动匹配成功',
       data: {
         receiptId,
         orderId,
         orderNo: order.order_no,
+        resolvedConflict: receipt.match_status === 'conflict',
       },
     });
   } catch (error) {

@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { requirePermission } from '@/lib/server-auth';
 
 // 获取预警规则列表
 export async function GET(request: NextRequest) {
+  const authError = requirePermission(request, 'settings:view');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
   
   try {
@@ -57,6 +61,9 @@ export async function GET(request: NextRequest) {
 
 // 创建预警规则
 export async function POST(request: NextRequest) {
+  const authError = requirePermission(request, 'settings:view');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
   
   try {
@@ -116,6 +123,9 @@ export async function POST(request: NextRequest) {
 
 // 批量更新预警规则状态
 export async function PATCH(request: NextRequest) {
+  const authError = requirePermission(request, 'settings:view');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
   
   try {

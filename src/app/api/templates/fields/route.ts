@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 interface TemplateFieldInput {
@@ -14,6 +15,9 @@ interface TemplateFieldInput {
 
 // 获取模板字段列表
 export async function GET(request: NextRequest) {
+  const authError = requirePermission(request, 'settings:view');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
   const templateId = searchParams.get('templateId');
@@ -47,6 +51,9 @@ export async function GET(request: NextRequest) {
 
 // 保存模板字段配置
 export async function POST(request: NextRequest) {
+  const authError = requirePermission(request, 'settings:edit');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
 
   try {
@@ -89,6 +96,9 @@ export async function POST(request: NextRequest) {
 
 // 更新单个模板字段
 export async function PUT(request: NextRequest) {
+  const authError = requirePermission(request, 'settings:edit');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
 
   try {

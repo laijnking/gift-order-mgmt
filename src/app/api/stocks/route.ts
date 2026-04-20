@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { requirePermission } from '@/lib/server-auth';
 
 const LOW_STOCK_THRESHOLD = 2;
 
@@ -39,6 +40,8 @@ function enhanceStock(stock: Record<string, unknown>): EnhancedStock {
 }
 
 export async function GET(request: NextRequest) {
+  const authError = requirePermission(request, 'stocks:view');
+  if (authError) return authError;
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
   const search = searchParams.get('search');
@@ -84,6 +87,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const authError = requirePermission(request, 'stocks:edit');
+  if (authError) return authError;
   const client = getSupabaseClient();
 
   try {
@@ -188,6 +193,8 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const authError = requirePermission(request, 'stocks:edit');
+  if (authError) return authError;
   const client = getSupabaseClient();
 
   try {

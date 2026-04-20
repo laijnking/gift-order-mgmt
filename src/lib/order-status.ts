@@ -32,6 +32,31 @@ export const CUSTOMER_FEEDBACK_SOURCE_STATUSES: OrderStatus[] = [
   'completed',
 ];
 
+export const RETURN_PROGRESS_STATUSES: OrderStatus[] = [
+  'partial_returned',
+  'returned',
+  'feedbacked',
+];
+
+export const ACTIVE_FULFILLMENT_STATUSES: OrderStatus[] = [
+  'pending',
+  'assigned',
+  ...RETURN_PROGRESS_STATUSES,
+];
+
+export const ARCHIVED_ORDER_STATUSES: OrderStatus[] = [
+  'completed',
+  'cancelled',
+];
+
+export function isReturnProgressStatus(status?: string | null): status is OrderStatus {
+  return RETURN_PROGRESS_STATUSES.includes(status as OrderStatus);
+}
+
+export function isArchivedOrderStatus(status?: string | null): status is OrderStatus {
+  return ARCHIVED_ORDER_STATUSES.includes(status as OrderStatus);
+}
+
 export function isCustomerFeedbackSourceStatus(status?: string | null): status is OrderStatus {
   return CUSTOMER_FEEDBACK_SOURCE_STATUSES.includes(status as OrderStatus);
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { requirePermission } from '@/lib/server-auth';
 
 // 数据库字段转前端格式
 function transformUser(dbUser: Record<string, unknown>) {
@@ -23,6 +24,9 @@ function hashPassword(password: string) {
 
 // 获取用户列表
 export async function GET(request: NextRequest) {
+  const authError = requirePermission(request, 'users:view');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
   const search = searchParams.get('search');
@@ -71,6 +75,9 @@ export async function GET(request: NextRequest) {
 
 // 更新用户
 export async function PUT(request: NextRequest) {
+  const authError = requirePermission(request, 'users:edit');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
   
   try {
@@ -128,6 +135,9 @@ export async function PUT(request: NextRequest) {
 
 // 删除用户
 export async function DELETE(request: NextRequest) {
+  const authError = requirePermission(request, 'users:delete');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
   
   try {
@@ -163,6 +173,9 @@ export async function DELETE(request: NextRequest) {
 
 // 新增用户
 export async function POST(request: NextRequest) {
+  const authError = requirePermission(request, 'users:create');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
   
   try {

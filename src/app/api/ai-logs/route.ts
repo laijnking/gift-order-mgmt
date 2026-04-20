@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 // 获取AI执行日志
 export async function GET(request: NextRequest) {
+  const authError = requirePermission(request, 'ai_logs:view');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
   const agentCode = searchParams.get('agentCode');

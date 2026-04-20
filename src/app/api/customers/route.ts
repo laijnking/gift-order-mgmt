@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 // 数据库字段转前端格式
@@ -30,6 +31,9 @@ function transformCustomer(dbCustomer: Record<string, unknown>) {
 
 // 获取客户列表
 export async function GET(request: NextRequest) {
+  const authError = requirePermission(request, 'customers:view');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
   const search = searchParams.get('search');
@@ -79,6 +83,9 @@ export async function GET(request: NextRequest) {
 
 // 新增客户
 export async function POST(request: NextRequest) {
+  const authError = requirePermission(request, 'customers:create');
+  if (authError) return authError;
+
   const client = getSupabaseClient();
   
   try {

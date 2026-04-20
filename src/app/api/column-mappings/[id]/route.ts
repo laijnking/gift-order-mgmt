@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 // 获取指定版本的映射配置
@@ -6,6 +7,8 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authError = requirePermission(request, 'orders:create');
+  if (authError) return authError;
   const client = getSupabaseClient();
   const { id } = await params;
 
@@ -40,6 +43,8 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authError = requirePermission(request, 'orders:create');
+  if (authError) return authError;
   const client = getSupabaseClient();
   const { id } = await params;
 
@@ -92,6 +97,8 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authError = requirePermission(request, 'orders:create');
+  if (authError) return authError;
   const client = getSupabaseClient();
   const { id } = await params;
 
