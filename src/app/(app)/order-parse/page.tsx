@@ -80,6 +80,8 @@ import {
   Building2,
   BarChart3,
 } from 'lucide-react';
+import { ProductPickerDialog } from '@/components/product/product-picker-dialog';
+import type { ProductPickerItem } from '@/components/product/product-picker-dialog';
 
 // 字段选项定义
 const COLUMN_OPTIONS = [
@@ -395,6 +397,8 @@ export default function OrderParsePage() {
   }>>({});
   const [matchingSupplierOrderId, setMatchingSupplierOrderId] = useState<string | null>(null);
   const [isMatchingSupplier, setIsMatchingSupplier] = useState(false);
+  const [productPickerOpen, setProductPickerOpen] = useState(false);
+  const [productPickerOrderId, setProductPickerOrderId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 优化后的自动检测列映射逻辑
@@ -1055,6 +1059,34 @@ export default function OrderParsePage() {
     setParsedOrders(orders =>
       orders.map(o => (o.id === id ? { ...o, [field]: value } : o))
     );
+  };
+
+  // 打开商品选择器（用于手动选择系统商品）
+  const openProductPicker = (orderId: string) => {
+    setProductPickerOrderId(orderId);
+    setProductPickerOpen(true);
+  };
+
+  // 商品选择器选中商品后更新订单
+  const handleProductSelect = (product: ProductPickerItem | null) => {
+    if (!product || !productPickerOrderId) return;
+    setParsedOrders(orders =>
+      orders.map(o =>
+        o.id === productPickerOrderId
+          ? {
+              ...o,
+              mappedProductCode: product.code,
+              mappedProductName: product.name,
+              mappedProductSpec: product.spec || '',
+              mappedProductBrand: product.brand || '',
+              systemProductId: product.id,
+              // 同步到 product_code 字段（保持兼容）
+              product_code: product.code,
+            }
+          : o
+      )
+    );
+    setProductPickerOrderId(null);
   };
 
   const removeOrder = (id: string) => {
@@ -2540,7 +2572,18 @@ export default function OrderParsePage() {
                                   </div>
                                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
                                     <div>
-                                      <Label className="text-xs text-muted-foreground">系统商品编码</Label>
+                                      <div className="flex items-center justify-between">
+                                        <Label className="text-xs text-muted-foreground">系统商品编码</Label>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-5 px-1 text-[10px] text-green-600 hover:text-green-700 hover:bg-green-50"
+                                          onClick={() => openProductPicker(order.id)}
+                                        >
+                                          <Package className="h-3 w-3 mr-0.5" />
+                                          选择商品
+                                        </Button>
+                                      </div>
                                       <Input
                                         value={order.mappedProductCode || order.product_code || ''}
                                         onChange={(e) => updateOrder(order.id, 'product_code', e.target.value)}
@@ -3201,6 +3244,17 @@ export default function OrderParsePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 商品选择器 Dialog */}
+      <ProductPickerDialog
+        open={productPickerOpen}
+        onOpenChange={(open) => {
+          setProductPickerOpen(open);
+          if (!open) setProductPickerOrderId(null);
+        }}
+        onSelect={handleProductSelect}
+        title="选择系统商品（按编码或名称搜索）"
+      />
     </div>
     </PageGuard>
   );
