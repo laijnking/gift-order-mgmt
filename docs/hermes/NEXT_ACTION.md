@@ -1,6 +1,6 @@
 # Next Action
 
-当前状态：Phase A-2 权限矩阵已收口（`src/lib/permissions.ts` 23 个常量，70 个 API 文件统一引用），剩余前端路由守卫未完成（API 层已完整，仅 UI 隐藏）。
+当前状态：Phase A-2 权限矩阵已收口（`src/lib/permissions.ts` 25 个常量，70 个 API 文件统一引用）；报表 API 状态字符串全部清理完毕；schema 非标准列全部 DB 验证通过。剩余前端路由守卫为 [future] 迭代项，不阻塞无人值守。
 
 1. **Phase A-2 权限矩阵收口** ✅
    - `role !== 'admin'` 硬编码 → `!isManagementRole()` ✅

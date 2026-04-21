@@ -25,7 +25,8 @@
 - [x] 统一权限矩阵（菜单 / 页面 / 按钮 / API）
   - 审计结果（2026-04-21 Hermes 接力）：`requirePermission` 50处全覆盖，API 层完整；缺口在：前端路由守卫缺失、`role !== 'admin'` 硬编码、权限字符串无枚举
   - 文档已生成：`docs/hermes/PERMISSION_MATRIX.md`
-  - 2026-04-21 收尾：`role !== 'admin'` 已改为 `isManagementRole()`；23 个权限常量已定义于 `src/lib/permissions.ts`，70 个 API 文件统一引用，ts-check 0 errors ✅
+  - 2026-04-21 收尾：`role !== 'admin'` 已改为 `isManagementRole()`；25 个权限常量已定义于 `src/lib/permissions.ts`，70 个 API 文件统一引用，ts-check 0 errors ✅
+  - ⚡ `[future]` 前端路由守卫（HTTP-only cookie + middleware）— API 层已有 requirePermission 守卫数据不泄露，作为后续迭代项
 - [x] 统一订单状态机、回单状态机、反馈状态机
   - 审计结果（2026-04-21 Hermes + Codex 接力）：14 个文件共 ~76 处硬编码状态字符串
   - 主要违规文件：`orders/page.tsx` ~60处、`page.tsx`（首页）~20处、`src/app/api/` 多处
