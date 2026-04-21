@@ -1,25 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { requirePermission } from '@/lib/server-auth';
 import { PERMISSIONS } from '@/lib/permissions';
+import { getSupabaseClient } from '@/storage/database/supabase-client';
 
-// 简单的密码哈希函数
 function hashPassword(password: string): string {
   return crypto.createHash('sha256').update(password).digest('hex');
-}
-
-// 创建指向 public schema 的 client
-function getPublicSupabaseClient() {
-  const url = process.env.COZE_SUPABASE_URL;
-  const anonKey = process.env.COZE_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) {
-    throw new Error('Supabase credentials not configured');
-  }
-  return createClient(url, anonKey, {
-    db: { schema: 'public' },
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
 }
 
 export async function POST(request: NextRequest) {
@@ -33,7 +19,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: '无效的用户数据' }, { status: 400 });
     }
 
-    const supabase = getPublicSupabaseClient();
+    const supabase = getSupabaseClient();
     
     // 转换数据以匹配 public.users 表结构
     const usersData = users.map(row => ({

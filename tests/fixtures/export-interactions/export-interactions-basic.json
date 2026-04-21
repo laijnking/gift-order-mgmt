@@ -40,6 +40,67 @@
         "actionLabel": "重新生成下载",
         "hint": "当前会优先回退到整批ZIP"
       }
+    },
+    {
+      "name": "local-no-provider-default",
+      "provider": "local",
+      "hasArtifact": false,
+      "expected": {
+        "strategy": "按需重生成",
+        "actionLabel": "重新生成下载",
+        "hint": "当前会先重新生成再下载"
+      }
+    },
+    {
+      "name": "s3-no-artifact",
+      "provider": "s3",
+      "hasArtifact": false,
+      "customHint": "明细文件当前会按需重新生成",
+      "expected": {
+        "strategy": "按需重生成",
+        "actionLabel": "重新生成下载",
+        "hint": "明细文件当前会按需重新生成"
+      }
+    },
+    {
+      "name": "undefined-provider-persisted",
+      "hasArtifact": true,
+      "expected": {
+        "strategy": "本地下载",
+        "actionLabel": "下载",
+        "hint": "将直接下载已落盘文件"
+      }
+    },
+    {
+      "name": "undefined-provider-no-artifact",
+      "hasArtifact": false,
+      "expected": {
+        "strategy": "按需重生成",
+        "actionLabel": "重新生成下载",
+        "hint": "当前会先重新生成再下载"
+      }
+    },
+    {
+      "name": "shipping-export-scenario",
+      "provider": "local",
+      "hasArtifact": true,
+      "customHint": "将直接下载已落盘文件",
+      "expected": {
+        "strategy": "本地下载",
+        "actionLabel": "下载",
+        "hint": "将直接下载已落盘文件"
+      }
+    },
+    {
+      "name": "customer-feedback-detail-regenerate",
+      "provider": "s3",
+      "hasArtifact": false,
+      "customHint": "当前会优先回退到整批ZIP",
+      "expected": {
+        "strategy": "按需重生成",
+        "actionLabel": "重新生成下载",
+        "hint": "当前会优先回退到整批ZIP"
+      }
     }
   ]
 }

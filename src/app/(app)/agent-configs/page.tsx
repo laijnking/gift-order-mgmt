@@ -2,22 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { PageGuard } from '@/components/auth/page-guard';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   Dialog,
   DialogContent,
@@ -48,10 +38,6 @@ import {
   XCircle,
   Loader2,
   Copy,
-  Code,
-  Settings,
-  History,
-  FileText,
   Terminal,
 } from 'lucide-react';
 
@@ -78,6 +64,8 @@ interface AgentConfig {
   created_at: string;
   updated_at: string;
 }
+
+type AgentTestMode = 'real' | 'mock';
 
 const AGENT_TYPES = [
   { value: 'order_parser', label: '订单解析' },
@@ -109,6 +97,7 @@ export default function AgentConfigsPage() {
   const [testOutput, setTestOutput] = useState('');
   const [isTesting, setIsTesting] = useState(false);
   const [testDuration, setTestDuration] = useState<number | null>(null);
+  const [testMode, setTestMode] = useState<AgentTestMode>('real');
   const canEditAgentConfigs = hasPermission('agent_configs:edit');
 
   // 表单状态
@@ -285,6 +274,7 @@ export default function AgentConfigsPage() {
     setIsTesting(true);
     setTestOutput('');
     setTestDuration(null);
+    setTestMode('real');
 
     try {
       const res = await fetch('/api/ai-test', {
@@ -300,12 +290,17 @@ export default function AgentConfigsPage() {
       });
 
       const data = await res.json();
-      const duration = Date.now();
 
       if (data.success) {
         setTestOutput(data.data.output);
         setTestDuration(data.data.duration);
-        toast.success('测试完成');
+        const mode: AgentTestMode = data.data.mode === 'mock' ? 'mock' : 'real';
+        setTestMode(mode);
+        if (mode === 'mock') {
+          toast.warning(data.message || '测试完成（模拟模式）');
+        } else {
+          toast.success('测试完成');
+        }
       } else {
         setTestOutput(`错误: ${data.error}`);
         toast.error(data.error || '测试失败');
@@ -341,31 +336,13 @@ export default function AgentConfigsPage() {
     setTestInput(agent.test_input || '');
     setTestOutput(agent.test_output || '');
     setTestDuration(null);
+    setTestMode(agent.test_status === 'mock' ? 'mock' : 'real');
     setIsTestDialogOpen(true);
   };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast.success('已复制到剪贴板');
-  };
-
-  const getStatusBadge = (agent: AgentConfig) => {
-    const successRate = agent.run_count > 0 
-      ? (agent.success_count / agent.run_count * 100).toFixed(1)
-      : '0';
-
-    return (
-      <div className="flex flex-col gap-1">
-        <Badge variant={agent.is_active ? 'default' : 'secondary'}>
-          {agent.is_active ? '启用' : '禁用'}
-        </Badge>
-        {agent.run_count > 0 && (
-          <span className="text-xs text-muted-foreground">
-            成功率 {successRate}%
-          </span>
-        )}
-      </div>
-    );
   };
 
   const getTypeLabel = (type: string) => {
@@ -759,6 +736,12 @@ export default function AgentConfigsPage() {
               <div className="text-sm text-muted-foreground flex items-center gap-1">
                 <Clock className="h-4 w-4" />
                 耗时 {testDuration}ms
+              </div>
+            )}
+
+            {testMode === 'mock' && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                当前为模拟测试模式，尚未接入真实大模型调用。
               </div>
             )}
 

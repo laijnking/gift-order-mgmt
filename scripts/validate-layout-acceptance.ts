@@ -1,14 +1,6 @@
-import { execFile } from 'child_process';
-import { readFile } from 'fs/promises';
 import path from 'path';
-import { promisify } from 'util';
-
-const execFileAsync = promisify(execFile);
-
-type Step = {
-  name: string;
-  cmd: string[];
-};
+import { runSteps, type Step } from './lib/step-runner';
+import { verifyRequiredDocMarkers } from './lib/doc-check';
 
 const ACCEPTANCE_DOC_PATH = path.join(
   process.cwd(),
@@ -61,32 +53,15 @@ const STEPS: Step[] = [
 ];
 
 async function verifyAcceptanceDoc() {
-  const content = await readFile(ACCEPTANCE_DOC_PATH, 'utf8');
-  const missing = REQUIRED_DOC_MARKERS.filter((marker) => !content.includes(marker));
-
-  if (missing.length > 0) {
-    throw new Error(`关键页面适配验收清单缺少必要章节: ${missing.join(', ')}`);
-  }
+  await verifyRequiredDocMarkers(ACCEPTANCE_DOC_PATH, REQUIRED_DOC_MARKERS, '关键页面适配验收清单');
 }
-
-async function runStep(step: Step) {
-  await execFileAsync(step.cmd[0], step.cmd.slice(1), {
-    cwd: process.cwd(),
-    maxBuffer: 1024 * 1024 * 10,
-  });
-}
-
 async function main() {
   console.log('Layout Acceptance');
   console.log('');
 
   await verifyAcceptanceDoc();
   console.log('PASS Acceptance Doc');
-
-  for (const step of STEPS) {
-    await runStep(step);
-    console.log(`PASS ${step.name}`);
-  }
+  await runSteps(STEPS);
 
   console.log('');
   console.log('All layout acceptance checks passed.');

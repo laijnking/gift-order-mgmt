@@ -5,6 +5,17 @@ import { promisify } from 'util';
 
 const execFileAsync = promisify(execFile);
 
+const REGRESSION_ENTRYPOINTS = [
+  'check:unattended-acceptance',
+  'check:api-contracts',
+  'check:local-acceptance',
+  'check:export-acceptance',
+  'check:export-api-acceptance',
+  'check:order-receipt-api-acceptance',
+  'check:backend-heavy-acceptance',
+  'check:permissions',
+] as const;
+
 type ChecklistItem = {
   status: 'pending' | 'in_progress' | 'done';
   text: string;
@@ -58,6 +69,31 @@ function getSectionSummary(section: ChecklistSection) {
   return { total, done, inProgress, pending };
 }
 
+function extractQueueBlockers(content: string) {
+  const lines = content.split('\n');
+  const blockers: string[] = [];
+  let inBlockers = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed === '当前阻塞事实：') {
+      inBlockers = true;
+      continue;
+    }
+
+    if (inBlockers) {
+      if (trimmed.startsWith('## ')) {
+        break;
+      }
+      if (trimmed.startsWith('- ')) {
+        blockers.push(trimmed.slice(2));
+      }
+    }
+  }
+
+  return blockers;
+}
+
 async function getGitStatus(projectRoot: string) {
   const { stdout } = await execFileAsync('git', ['status', '--short'], {
     cwd: projectRoot,
@@ -69,18 +105,29 @@ async function getGitStatus(projectRoot: string) {
     .filter(Boolean);
 }
 
+async function getPackageScripts(projectRoot: string) {
+  const packageJsonPath = path.join(projectRoot, 'package.json');
+  const packageContent = await readFile(packageJsonPath, 'utf8');
+  const packageJson = JSON.parse(packageContent) as { scripts?: Record<string, string> };
+  return packageJson.scripts || {};
+}
+
 async function main() {
   const projectRoot = process.cwd();
   const checklistPath = path.join(projectRoot, 'docs/codex/UNATTENDED_EXECUTION_CHECKLIST.md');
   const nextActionPath = path.join(projectRoot, 'docs/codex/NEXT_ACTION.md');
+  const queuePath = path.join(projectRoot, 'docs/codex/UNATTENDED_QUEUE.md');
 
-  const [checklistContent, nextActionContent, gitStatus] = await Promise.all([
+  const [checklistContent, nextActionContent, queueContent, gitStatus, scripts] = await Promise.all([
     readFile(checklistPath, 'utf8'),
     readFile(nextActionPath, 'utf8'),
+    readFile(queuePath, 'utf8'),
     getGitStatus(projectRoot),
+    getPackageScripts(projectRoot),
   ]);
 
   const sections = parseChecklist(checklistContent);
+  const blockers = extractQueueBlockers(queueContent);
   const nextActionLine = nextActionContent
     .split('\n')
     .map((line) => line.trim())
@@ -113,6 +160,23 @@ async function main() {
   } else {
     for (const item of inProgressItems) {
       console.log(item);
+    }
+  }
+
+  console.log('');
+  console.log('Regression entrypoints:');
+  for (const command of REGRESSION_ENTRYPOINTS) {
+    const script = scripts[command];
+    console.log(`- ${command}: ${script ? 'ready' : 'missing'}`);
+  }
+
+  console.log('');
+  console.log('Current blockers:');
+  if (blockers.length === 0) {
+    console.log('- 无');
+  } else {
+    for (const blocker of blockers) {
+      console.log(`- ${blocker}`);
     }
   }
 

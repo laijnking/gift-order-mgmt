@@ -197,7 +197,9 @@ async function main() {
     `).then(r => Object.fromEntries(r.rows.map(row => [row.status, row.count])));
 
     const baselineActiveSupplierCount = await pool.query(`
-      SELECT COUNT(*)::int as count FROM suppliers WHERE is_active = true
+      SELECT COUNT(*)::int as count
+      FROM suppliers
+      WHERE is_active IS DISTINCT FROM false
     `).then(r => r.rows[0].count);
 
     const baselineStockTotalValue = await pool.query(`

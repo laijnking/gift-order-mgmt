@@ -33,7 +33,13 @@ async function loadFixtures(fixturesDir: string) {
   for (const file of files) {
     const filePath = path.join(fixturesDir, file);
     const content = await readFile(filePath, 'utf8');
-    fixtures.push(JSON.parse(content) as OrderParseFixture);
+    const parsed = JSON.parse(content) as Partial<OrderParseFixture>;
+
+    if (!Array.isArray(parsed.headers) || !parsed.columnMapping || !parsed.expected) {
+      continue;
+    }
+
+    fixtures.push(parsed as OrderParseFixture);
   }
 
   return fixtures;

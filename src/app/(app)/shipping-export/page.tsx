@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageGuard } from '@/components/auth/page-guard';
 import { Button } from '@/components/ui/button';
@@ -31,9 +31,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
 import {
-  Package, FileDown, Search, RefreshCw, CheckCircle2, AlertTriangle, Loader2,
+  Package, FileDown, Search, RefreshCw, CheckCircle2, Loader2,
   FileSpreadsheet, Building2
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -54,21 +53,6 @@ interface Supplier {
   type: string;
   pendingOrderCount: number;
   lastExportTime: string | null;
-}
-
-interface PendingOrder {
-  id: string;
-  orderNo: string;
-  customerOrderNo: string;
-  supplierId: string;
-  supplierName: string;
-  itemCount: number;
-  totalPrice: number;
-  receiverName: string;
-  receiverPhone: string;
-  receiverAddress: string;
-  createdAt: string;
-  hasStockWarning: boolean;
 }
 
 interface ExportResult {
@@ -126,6 +110,7 @@ interface ExportSummary {
 export default function ShippingExportPage() {
   const router = useRouter();
   const { user } = useAuth();
+  const actorName = user?.realName || user?.username || 'system';
 
   const [loading, setLoading] = useState(true);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -164,15 +149,10 @@ export default function ShippingExportPage() {
     document.body.removeChild(downloadLink);
   };
 
-  const authHeaders = () => buildUserInfoHeaders(user);
+  const authHeaders = useCallback(() => buildUserInfoHeaders(user), [user]);
 
   // 加载供应商待发货统计
-  useEffect(() => {
-    loadSuppliers();
-    loadTemplates();
-  }, []);
-
-  const loadSuppliers = async () => {
+  const loadSuppliers = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch('/api/shipping-exports/pending', {
@@ -190,9 +170,9 @@ export default function ShippingExportPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [authHeaders]);
 
-  const loadTemplates = async () => {
+  const loadTemplates = useCallback(async () => {
     try {
       const [listResponse, defaultResponse] = await Promise.all([
         fetch('/api/templates?type=shipping', { headers: authHeaders() }),
@@ -211,7 +191,13 @@ export default function ShippingExportPage() {
     } catch (error) {
       console.error('加载模板失败:', error);
     }
-  };
+  }, [authHeaders]);
+
+  // 加载供应商待发货统计
+  useEffect(() => {
+    loadSuppliers();
+    loadTemplates();
+  }, [loadSuppliers, loadTemplates]);
 
   // 过滤供应商 - 按待发货+未导出排序
   const filteredSuppliers = suppliers
@@ -282,7 +268,7 @@ export default function ShippingExportPage() {
           templateId: effectiveTemplateId,
           dispatchMode: mode,
           persistenceMode: effectivePersistenceMode,
-          exportedBy: 'current_user', // TODO: 获取当前用户
+          exportedBy: actorName,
         }),
       });
 

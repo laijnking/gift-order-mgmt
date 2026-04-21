@@ -1,0 +1,126 @@
+{
+  "name": "customer-schema-basic",
+  "mutations": [
+    {
+      "mode": "modern",
+      "payload": {
+        "code": "KH-001",
+        "name": "现代客户",
+        "contactPerson": "张三",
+        "contactPhone": "13800138000",
+        "contactEmail": "modern@example.com",
+        "address": "厦门市思明区软件园",
+        "province": "福建",
+        "city": "厦门",
+        "district": "思明区",
+        "salesUserId": "sales-1",
+        "salesUserName": "销售甲",
+        "operatorUserId": "operator-1",
+        "operatorUserName": "跟单甲",
+        "creditLimit": 5000,
+        "paymentDays": 30,
+        "paymentStatus": "monthly",
+        "isActive": true,
+        "remark": "modern"
+      },
+      "expected": {
+        "code": "KH-001",
+        "sales_user_id": "sales-1",
+        "operator_user_id": "operator-1",
+        "contact_phone": "13800138000",
+        "contact_email": "modern@example.com",
+        "payment_days": 30,
+        "is_active": true
+      }
+    },
+    {
+      "mode": "legacy",
+      "payload": {
+        "code": "KH-002",
+        "name": "旧版客户",
+        "contactPerson": "李四",
+        "contactPhone": "13900139000",
+        "address": "泉州市丰泽区",
+        "province": "福建",
+        "salesUserId": "sales-2",
+        "salesUserName": "销售乙",
+        "operatorUserId": "operator-2",
+        "operatorUserName": "跟单乙",
+        "creditLimit": 3000,
+        "paymentStatus": "warning",
+        "isActive": false,
+        "remark": "legacy"
+      },
+      "expected": {
+        "code": "KH-002",
+        "salesperson_id": "sales-2",
+        "order_taker_id": "operator-2",
+        "phone": "13900139000",
+        "region": "福建",
+        "status": "inactive"
+      }
+    }
+  ],
+  "transforms": [
+    {
+      "input": {
+        "id": "customer-modern",
+        "code": "KH-001",
+        "name": "现代客户",
+        "contact_person": "张三",
+        "contact_phone": "13800138000",
+        "contact_email": "modern@example.com",
+        "address": "厦门市思明区软件园",
+        "province": "福建",
+        "city": "厦门",
+        "district": "思明区",
+        "sales_user_id": "sales-1",
+        "sales_user_name": "销售甲",
+        "operator_user_id": "operator-1",
+        "operator_user_name": "跟单甲",
+        "credit_limit": 5000,
+        "payment_days": 30,
+        "payment_status": "monthly",
+        "is_active": true,
+        "remark": "modern"
+      },
+      "expected": {
+        "id": "customer-modern",
+        "salesUserId": "sales-1",
+        "operatorUserId": "operator-1",
+        "contactPhone": "13800138000",
+        "paymentDays": 30,
+        "isActive": true
+      }
+    },
+    {
+      "input": {
+        "id": "customer-legacy",
+        "code": "KH-002",
+        "name": "旧版客户",
+        "contact": "李四",
+        "phone": "13900139000",
+        "address": "泉州市丰泽区",
+        "region": "福建",
+        "salesperson_id": "sales-2",
+        "salesperson_name": "销售乙",
+        "order_taker_id": "operator-2",
+        "order_taker_name": "跟单乙",
+        "credit_limit": 3000,
+        "settlement_cycle": "warning",
+        "status": "inactive",
+        "remark": "legacy"
+      },
+      "expected": {
+        "id": "customer-legacy",
+        "salesUserId": "sales-2",
+        "operatorUserId": "operator-2",
+        "contactPerson": "李四",
+        "contactPhone": "13900139000",
+        "province": "福建",
+        "paymentStatus": "warning",
+        "isActive": false
+      }
+    }
+  ]
+}

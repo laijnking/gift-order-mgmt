@@ -1,48 +1,17 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
 import { chromium, type Page } from 'playwright';
 import * as XLSX from 'xlsx';
+import {
+  ADMIN_USER,
+  DEFAULT_HOST,
+  startServer,
+  stopServer,
+  waitForServer,
+} from './lib/api-test-harness';
 
 const PORT = 5101;
-const BASE_URL = `http://127.0.0.1:${PORT}`;
+const BASE_URL = `http://${DEFAULT_HOST}:${PORT}`;
 const STORAGE_KEY = 'gift_order_user';
 const IMPORT_BATCH = 'BATCH-20260419-0001';
-
-type MockUser = {
-  id: string;
-  username: string;
-  realName: string;
-  role: string;
-  roleName: string;
-  dataScope: string;
-  permissions: string[];
-};
-
-const ADMIN_USER: MockUser = {
-  id: 'user-admin',
-  username: 'admin',
-  realName: '管理员',
-  role: 'admin',
-  roleName: '管理员',
-  dataScope: 'all',
-  permissions: [
-    'dashboard:view',
-    'orders:view',
-    'orders:create',
-    'orders:edit',
-    'orders:delete',
-    'orders:export',
-    'customers:view',
-    'suppliers:view',
-    'products:view',
-    'stocks:view',
-    'users:view',
-    'settings:view',
-  ],
-};
-
-async function wait(ms: number) {
-  await new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 function createReturnReceiptWorkbookBuffer() {
   const workbook = XLSX.utils.book_new();
@@ -62,52 +31,6 @@ function createReturnReceiptWorkbookBuffer() {
   ]);
   XLSX.utils.book_append_sheet(workbook, worksheet, '回单');
   return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
-}
-
-async function waitForServer() {
-  for (let i = 0; i < 60; i += 1) {
-    try {
-      const response = await fetch(`${BASE_URL}/login`);
-      if (response.ok) {
-        return;
-      }
-    } catch {}
-    await wait(1000);
-  }
-
-  throw new Error('本地服务启动超时');
-}
-
-function startServer() {
-  const child = spawn('corepack', ['pnpm', 'tsx', 'src/server.ts'], {
-    cwd: process.cwd(),
-    env: {
-      ...process.env,
-      PORT: String(PORT),
-      HOSTNAME: '127.0.0.1',
-      COZE_PROJECT_ENV: 'DEV',
-    },
-    stdio: 'pipe',
-  });
-
-  child.stdout.on('data', () => {});
-  child.stderr.on('data', () => {});
-
-  return child;
-}
-
-async function stopServer(child: ChildProcessWithoutNullStreams) {
-  if (child.exitCode !== null) return;
-
-  child.kill('SIGTERM');
-  for (let i = 0; i < 10; i += 1) {
-    if (child.exitCode !== null) return;
-    await wait(300);
-  }
-
-  if (child.exitCode === null) {
-    child.kill('SIGKILL');
-  }
 }
 
 async function preparePage(page: Page) {
@@ -597,7 +520,7 @@ async function runOrderIntakeToOrdersCheck(page: Page) {
     });
   });
 
-  await page.route('**/api/orders', async (route) => {
+  await page.route('**/api/orders**', async (route) => {
     if (route.request().method() === 'POST') {
       createOrderRequest = route.request().postDataJSON() as Record<string, unknown>;
       await route.fulfill({
@@ -699,7 +622,10 @@ async function runOrderIntakeToOrdersCheck(page: Page) {
   await page.getByRole('dialog').waitFor();
   await page.getByText('订单导入成功').waitFor();
   await page.getByText(IMPORT_BATCH).waitFor();
-  await page.getByRole('button', { name: '查看本批待派发' }).click();
+  await Promise.all([
+    page.waitForURL(`**/orders?importBatch=${IMPORT_BATCH}*`),
+    page.getByRole('button', { name: '查看本批待派发' }).click(),
+  ]);
 
   await page.getByRole('heading', { name: '订单管理' }).waitFor();
   await page.getByText('当前正在回看导入批次').waitFor();
@@ -1143,11 +1069,11 @@ async function runShippingPersistenceBranchSmoke(page: Page) {
 }
 
 async function main() {
-  const server = startServer();
+  const server = startServer(PORT);
   const browser = await chromium.launch({ headless: true });
 
   try {
-    await waitForServer();
+    await waitForServer(BASE_URL, server);
 
     const context = await browser.newContext();
     const intakePage = await context.newPage();

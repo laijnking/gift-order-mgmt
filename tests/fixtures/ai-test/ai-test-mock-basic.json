@@ -1,0 +1,20 @@
+{
+  "cases": [
+    {
+      "name": "mock-result-contract",
+      "input": "测试订单解析",
+      "duration": 123,
+      "expected": {
+        "mode": "mock",
+        "message": "测试执行完成（模拟模式）",
+        "agentTestStatus": "mock",
+        "logStatus": "mock",
+        "outputIncludes": [
+          "当前处于模拟测试模式",
+          "测试订单解析",
+          "尚未接入真实大模型调用"
+        ]
+      }
+    }
+  ]
+}

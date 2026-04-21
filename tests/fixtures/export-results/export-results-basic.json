@@ -90,6 +90,168 @@
           "/api/export-records/record-feedback/download?detailIndex=1"
         ]
       }
+    },
+    {
+      "name": "shipping-export-preview-mode",
+      "recordId": "record-preview",
+      "response": {
+        "templateSource": "explicit",
+        "details": [
+          {
+            "supplierId": "supplier-1",
+            "supplierName": "供应商A",
+            "fileName": "供应商A+发货通知单+20260419.xlsx",
+            "fileUrl": "/api/export-records/record-preview/download?detailIndex=0",
+            "templateSource": "explicit"
+          }
+        ]
+      },
+      "expected": {
+        "hasZip": false,
+        "hasPersistedArtifact": false,
+        "detailCount": 1,
+        "persistedDetailCount": 0,
+        "templateSource": "explicit",
+        "zipDownloadPath": null,
+        "detailDownloadPaths": [
+          "/api/export-records/record-preview/download?detailIndex=0"
+        ]
+      }
+    },
+    {
+      "name": "customer-feedback-preview-mode",
+      "recordId": "record-cf-preview",
+      "response": {
+        "templateSource": "column_mapping",
+        "details": [
+          {
+            "customerId": "customer-1",
+            "customerName": "客户A",
+            "fileName": "客户A+订单反馈+20260419.xlsx",
+            "fileUrl": "/api/export-records/record-cf-preview/download?detailIndex=0",
+            "templateSource": "column_mapping"
+          }
+        ]
+      },
+      "expected": {
+        "hasZip": false,
+        "hasPersistedArtifact": false,
+        "detailCount": 1,
+        "persistedDetailCount": 0,
+        "templateSource": "column_mapping",
+        "zipDownloadPath": null,
+        "detailDownloadPaths": [
+          "/api/export-records/record-cf-preview/download?detailIndex=0"
+        ]
+      }
+    },
+    {
+      "name": "shipping-export-dispatch-only",
+      "recordId": "record-dispatch",
+      "response": {
+        "templateSource": "default",
+        "details": []
+      },
+      "expected": {
+        "hasZip": false,
+        "hasPersistedArtifact": false,
+        "detailCount": 0,
+        "persistedDetailCount": 0,
+        "templateSource": "default",
+        "zipDownloadPath": null,
+        "detailDownloadPaths": []
+      }
+    },
+    {
+      "name": "shipping-export-explicit-template",
+      "recordId": "record-explicit",
+      "response": {
+        "zipFileName": "发货通知单批量导出+20260419.zip",
+        "zipFileUrl": "/api/export-records/record-explicit/download",
+        "templateSource": "explicit",
+        "artifact": {
+          "provider": "local",
+          "relative_path": "data/exports/record-explicit/batch.zip",
+          "file_name": "发货通知单批量导出+20260419.zip"
+        },
+        "details": [
+          {
+            "supplierId": "supplier-1",
+            "supplierName": "供应商A",
+            "fileName": "供应商A+发货通知单+20260419.xlsx",
+            "fileUrl": "/api/export-records/record-explicit/download?detailIndex=0",
+            "templateSource": "explicit",
+            "artifact": {
+              "provider": "local",
+              "relative_path": "data/exports/record-explicit/supplier-a.xlsx",
+              "file_name": "供应商A+发货通知单+20260419.xlsx"
+            }
+          },
+          {
+            "supplierId": "supplier-2",
+            "supplierName": "供应商B",
+            "fileName": "供应商B+发货通知单+20260419.xlsx",
+            "fileUrl": "/api/export-records/record-explicit/download?detailIndex=1",
+            "templateSource": "explicit",
+            "artifact": {
+              "provider": "local",
+              "relative_path": "data/exports/record-explicit/supplier-b.xlsx",
+              "file_name": "供应商B+发货通知单+20260419.xlsx"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "hasZip": true,
+        "hasPersistedArtifact": true,
+        "detailCount": 2,
+        "persistedDetailCount": 2,
+        "templateSource": "explicit",
+        "zipDownloadPath": "/api/export-records/record-explicit/download",
+        "detailDownloadPaths": [
+          "/api/export-records/record-explicit/download?detailIndex=0",
+          "/api/export-records/record-explicit/download?detailIndex=1"
+        ]
+      }
+    },
+    {
+      "name": "customer-feedback-s3-provider",
+      "recordId": "record-s3",
+      "response": {
+        "zipFileName": "客户反馈批量导出+20260420.zip",
+        "zipFileUrl": "/api/export-records/record-s3/download",
+        "templateSource": "default",
+        "artifact": {
+          "provider": "s3",
+          "relative_path": "exports/record-s3/batch.zip",
+          "file_name": "客户反馈批量导出+20260420.zip"
+        },
+        "details": [
+          {
+            "customerId": "customer-3",
+            "customerName": "客户C",
+            "fileName": "客户C+订单反馈+20260420.xlsx",
+            "fileUrl": "/api/export-records/record-s3/download?detailIndex=0",
+            "templateSource": "default",
+            "artifact": {
+              "provider": "s3",
+              "relative_path": "exports/record-s3/customer-c.xlsx",
+              "file_name": "客户C+订单反馈+20260420.xlsx"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "hasZip": true,
+        "hasPersistedArtifact": true,
+        "detailCount": 1,
+        "persistedDetailCount": 1,
+        "templateSource": "default",
+        "zipDownloadPath": "/api/export-records/record-s3/download",
+        "detailDownloadPaths": [
+          "/api/export-records/record-s3/download?detailIndex=0"
+        ]
+      }
     }
   ]
 }

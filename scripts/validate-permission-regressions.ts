@@ -213,6 +213,26 @@ async function run() {
     });
     logPass('ai-test POST blocks agent_configs:view-only user');
 
+    await expectNotDenied('/api/product-mappings', PRODUCTS_VIEWER);
+    logPass('product-mappings GET allows products:view without auth denial');
+
+    await expectForbidden('/api/product-mappings', PRODUCTS_VIEWER, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customerCode: 'PERM-TEST', productCode: 'PERM-PROD-1', mappingCode: 'PERM-MAP-1' }),
+    });
+    logPass('product-mappings POST blocks products:view-only user');
+
+    await expectForbidden('/api/product-mappings/batch', PRODUCTS_VIEWER, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mappings: [] }),
+    });
+    logPass('product-mappings batch blocks products:view-only user');
+
+    await expectNotDenied('/api/product-mappings', SUPPLIERS_VIEWER);
+    logPass('product-mappings GET allows suppliers:view without auth denial');
+
     console.log('All permission regression checks passed.');
   } finally {
     await stopServer(child);

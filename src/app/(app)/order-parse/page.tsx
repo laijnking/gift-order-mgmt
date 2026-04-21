@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,11 +32,11 @@ import { PageGuard } from '@/components/auth/page-guard';
 import { buildUserInfoHeaders } from '@/lib/auth';
 import { getColumnMappingDiagnostics } from '@/lib/column-mapping-diagnostics';
 import { flattenBundleDraftsToFlatOrders } from '@/lib/order-parse-bundles';
+import { buildExcelPreviewRows, normalizeExcelSheetRows, resolveExcelParsePayload } from '@/lib/order-parse-excel';
 import { findUserByIdOrName, getUserDisplayName, isOperatorAssignableRole, isSalesAssignableRole } from '@/lib/roles';
 import type { ParsedOrderBundleDraft, ParsedOrderDraft } from '@/types/order-parse';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Separator } from '@/components/ui/separator';
 import {
   Table,
   TableBody,
@@ -325,6 +325,7 @@ export default function OrderParsePage() {
   const [inputMode, setInputMode] = useState<'text' | 'excel'>('excel');
   const [inputText, setInputText] = useState('');
   const [excelFile, setExcelFile] = useState<File | null>(null);
+  const [excelRows, setExcelRows] = useState<string[][]>([]);
   const [excelPreview, setExcelPreview] = useState<string[][]>([]);
   const [excelSheetNames, setExcelSheetNames] = useState<string[]>([]);
   const [selectedSheet, setSelectedSheet] = useState<string>('');
@@ -603,6 +604,11 @@ export default function OrderParsePage() {
     return mapping;
   }, []);
 
+  const normalizeHeadersForCompare = useCallback(
+    (headers: string[]) => headers.map((header) => String(header || '').trim()).filter(Boolean),
+    []
+  );
+
   // 加载客户列表
   useEffect(() => {
     loadCustomers();
@@ -621,17 +627,6 @@ export default function OrderParsePage() {
     };
     loadUsers();
   }, []);
-
-  // 选择客户时加载映射配置
-  useEffect(() => {
-    if (selectedCustomer) {
-      loadMappingHistory(selectedCustomer);
-      loadSavedMapping(selectedCustomer);
-    } else {
-      setMappingHistory([]);
-      setColumnMapping({});
-    }
-  }, [selectedCustomer]);
 
   // 表头行变化时重新检测映射
   useEffect(() => {
@@ -666,7 +661,7 @@ export default function OrderParsePage() {
   };
 
   // 加载保存的映射配置
-  const loadSavedMapping = async (customerCode: string) => {
+  const loadSavedMapping = useCallback(async (customerCode: string) => {
     try {
       const res = await fetch(`/api/column-mappings?customerCode=${encodeURIComponent(customerCode)}`, {
         headers: buildUserInfoHeaders(),
@@ -693,7 +688,7 @@ export default function OrderParsePage() {
     } catch (error) {
       console.error('加载映射配置失败:', error);
     }
-  };
+  }, [excelPreview, normalizeHeadersForCompare]);
 
   // 加载映射历史版本
   const loadMappingHistory = async (customerCode: string) => {
@@ -709,6 +704,17 @@ export default function OrderParsePage() {
       console.error('加载映射历史失败:', error);
     }
   };
+
+  // 选择客户时加载映射配置
+  useEffect(() => {
+    if (selectedCustomer) {
+      loadMappingHistory(selectedCustomer);
+      loadSavedMapping(selectedCustomer);
+    } else {
+      setMappingHistory([]);
+      setColumnMapping({});
+    }
+  }, [selectedCustomer, loadSavedMapping]);
 
   // 保存当前映射配置
   const saveMapping = async () => {
@@ -779,10 +785,10 @@ export default function OrderParsePage() {
 
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
         setSelectedSheet(workbook.SheetNames[0]);
-        const jsonData = XLSX.utils.sheet_to_json<string[]>(firstSheet, { header: 1 });
-        const preview = jsonData.slice(0, 20).map(row =>
-          row.map(cell => String(cell ?? ''))
-        );
+        const jsonData = XLSX.utils.sheet_to_json<Array<string | number | boolean | null | undefined>>(firstSheet, { header: 1 });
+        const normalizedRows = normalizeExcelSheetRows(jsonData);
+        const preview = buildExcelPreviewRows(normalizedRows);
+        setExcelRows(normalizedRows);
         setExcelPreview(preview);
 
         // 自动检测列映射
@@ -806,10 +812,10 @@ export default function OrderParsePage() {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: 'array' });
         const sheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1 });
-        const preview = jsonData.slice(0, 20).map(row =>
-          row.map(cell => String(cell ?? ''))
-        );
+        const jsonData = XLSX.utils.sheet_to_json<Array<string | number | boolean | null | undefined>>(sheet, { header: 1 });
+        const normalizedRows = normalizeExcelSheetRows(jsonData);
+        const preview = buildExcelPreviewRows(normalizedRows);
+        setExcelRows(normalizedRows);
         setExcelPreview(preview);
         if (preview.length > 0) {
           const detected = autoDetectMapping(preview[0]);
@@ -888,13 +894,17 @@ export default function OrderParsePage() {
       return;
     }
 
+    if (!selectedCustomer) {
+      toast.error('请先选择关联客户');
+      return;
+    }
+
     setIsLoading(true);
     setParseResult(null);
 
     try {
       const startTime = Date.now();
-      const headers = excelPreview[headerRow] || [];
-      const dataRows = excelPreview.slice(headerRow + 1);
+      const { headers, dataRows } = resolveExcelParsePayload(excelRows, excelPreview, headerRow);
       const mappingDiagnostics = getColumnMappingDiagnostics(headers, columnMapping);
 
       // 调试日志
@@ -1001,6 +1011,7 @@ export default function OrderParsePage() {
   const handleClear = () => {
     setInputText('');
     setExcelFile(null);
+    setExcelRows([]);
     setExcelPreview([]);
     setExcelSheetNames([]);
     setSelectedSheet('');
@@ -1369,15 +1380,6 @@ export default function OrderParsePage() {
     h.remark?.includes(mappingSearchTerm) ||
     h.created_by?.includes(mappingSearchTerm)
   );
-
-  // 获取字段标签
-  const getFieldLabel = (fieldValue: string) => {
-    const option = COLUMN_OPTIONS.find(opt => opt.value === fieldValue);
-    return option?.label || fieldValue;
-  };
-
-  const normalizeHeadersForCompare = (headers: string[]) =>
-    headers.map((header) => String(header || '').trim()).filter(Boolean);
 
   const currentPreviewHeaders = normalizeHeadersForCompare(excelPreview[headerRow] || []);
   const activeMappingHeaders = normalizeHeadersForCompare(activeMappingMeta?.source_headers || []);
@@ -1895,6 +1897,7 @@ export default function OrderParsePage() {
                             className="h-7"
                             onClick={() => {
                               setExcelFile(null);
+                              setExcelRows([]);
                               setExcelPreview([]);
                               if (fileInputRef.current) fileInputRef.current.value = '';
                             }}

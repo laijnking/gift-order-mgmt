@@ -1,21 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { createClient } from '@supabase/supabase-js';
 import { requirePermission } from '@/lib/server-auth';
 import { PERMISSIONS } from '@/lib/permissions';
-
-// 创建指向 public schema 的 client
-function getPublicSupabaseClient() {
-  const url = process.env.COZE_SUPABASE_URL;
-  const anonKey = process.env.COZE_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) {
-    throw new Error('Supabase credentials not configured');
-  }
-  return createClient(url, anonKey, {
-    db: { schema: 'public' },
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-}
+import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 // 数据库字段转前端格式
 function transformUser(dbUser: Record<string, unknown>) {
@@ -41,7 +28,7 @@ export async function GET(
   if (authError) return authError;
 
   const { id } = await params;
-  const supabase = getPublicSupabaseClient();
+  const supabase = getSupabaseClient();
 
   try {
     const { data, error } = await supabase
@@ -57,8 +44,7 @@ export async function GET(
       throw new Error(`查询用户失败: ${error.message}`);
     }
 
-    const { password_hash, ...safeData } = data;
-    return NextResponse.json({ success: true, data: transformUser(safeData) });
+    return NextResponse.json({ success: true, data: transformUser(data as Record<string, unknown>) });
   } catch (error) {
     console.error('获取用户失败:', error);
     return NextResponse.json({
@@ -77,7 +63,7 @@ export async function PUT(
   if (authError) return authError;
 
   const { id } = await params;
-  const supabase = getPublicSupabaseClient();
+  const supabase = getSupabaseClient();
 
   try {
     const body = await request.json();
@@ -107,8 +93,7 @@ export async function PUT(
       throw new Error(`更新用户失败: ${error.message}`);
     }
 
-    const { password_hash, ...safeData } = data;
-    return NextResponse.json({ success: true, data: transformUser(safeData) });
+    return NextResponse.json({ success: true, data: transformUser(data as Record<string, unknown>) });
   } catch (error) {
     console.error('更新用户失败:', error);
     return NextResponse.json({
@@ -127,7 +112,7 @@ export async function DELETE(
   if (authError) return authError;
 
   const { id } = await params;
-  const supabase = getPublicSupabaseClient();
+  const supabase = getSupabaseClient();
 
   try {
     const { error } = await supabase

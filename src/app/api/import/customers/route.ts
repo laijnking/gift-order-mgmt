@@ -1,20 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { requirePermission } from '@/lib/server-auth';
 import { PERMISSIONS } from '@/lib/permissions';
-
-// 创建指向 public schema 的 client
-function getPublicSupabaseClient() {
-  const url = process.env.COZE_SUPABASE_URL;
-  const anonKey = process.env.COZE_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) {
-    throw new Error('Supabase credentials not configured');
-  }
-  return createClient(url, anonKey, {
-    db: { schema: 'public' },
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-}
+import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { buildCustomerMutationData, getCustomerSchemaMode } from '@/lib/customer-schema';
 
 // 中文列名映射到字段名
 const CHINESE_MAPPING: Record<string, string> = {
@@ -49,26 +37,6 @@ const CHINESE_MAPPING: Record<string, string> = {
   '备注': 'remark',
 };
 
-// 英文字段名到数据库字段的映射
-const FIELD_MAPPING: Record<string, string> = {
-  code: 'code',
-  name: 'name',
-  contactPerson: 'contact_person',
-  contactPhone: 'contact_phone',
-  contactEmail: 'contact_email',
-  province: 'province',
-  city: 'city',
-  district: 'district',
-  address: 'address',
-  salespersonName: 'sales_user_name',
-  orderTakerName: 'operator_user_name',
-  paymentStatus: 'payment_status',
-  creditLimit: 'credit_limit',
-  paymentDays: 'payment_days',
-  status: 'status',
-  remark: 'remark',
-};
-
 // 获取标准化字段值
 function getFieldValue(item: Record<string, unknown>, fieldName: string): unknown {
   // 先检查英文字段名
@@ -97,7 +65,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: '数据格式无效' }, { status: 400 });
     }
 
-    const supabase = getPublicSupabaseClient();
+    const supabase = getSupabaseClient();
+    const schemaMode = await getCustomerSchemaMode(supabase);
     let imported = 0;
     let skipped = 0;
     const errors: string[] = [];
@@ -115,51 +84,24 @@ export async function POST(request: NextRequest) {
         }
 
         // 构建客户数据
-        const customerData: Record<string, unknown> = {
-          code: getFieldValue(item, 'code') || `C${Date.now()}${imported + skipped}`,
-          name: name,
-        };
-        
-        const contactPerson = getFieldValue(item, 'contactPerson');
-        if (contactPerson) customerData.contact_person = contactPerson;
-        
-        const contactPhone = getFieldValue(item, 'contactPhone');
-        if (contactPhone) customerData.contact_phone = contactPhone;
-        
-        const contactEmail = getFieldValue(item, 'contactEmail');
-        if (contactEmail) customerData.contact_email = contactEmail;
-        
-        const province = getFieldValue(item, 'province');
-        if (province) customerData.province = province;
-        
-        const city = getFieldValue(item, 'city');
-        if (city) customerData.city = city;
-        
-        const district = getFieldValue(item, 'district');
-        if (district) customerData.district = district;
-        
-        const address = getFieldValue(item, 'address');
-        if (address) customerData.address = address;
-        
-        const salespersonName = getFieldValue(item, 'salespersonName');
-        if (salespersonName) customerData.sales_user_name = salespersonName;
-        
-        const orderTakerName = getFieldValue(item, 'orderTakerName');
-        if (orderTakerName) customerData.operator_user_name = orderTakerName;
-        
-        const paymentStatus = getFieldValue(item, 'paymentStatus');
-        if (paymentStatus) customerData.payment_status = paymentStatus;
-        
-        const creditLimit = getFieldValue(item, 'creditLimit');
-        if (creditLimit) customerData.credit_limit = parseFloat(String(creditLimit)) || 0;
-        
-        const paymentDays = getFieldValue(item, 'paymentDays');
-        if (paymentDays) customerData.payment_days = parseInt(String(paymentDays)) || 0;
-        
-        const remark = getFieldValue(item, 'remark');
-        if (remark) customerData.remark = remark;
-        
-        customerData.is_active = true;
+        const customerData = buildCustomerMutationData({
+          code: String(getFieldValue(item, 'code') || `C${Date.now()}${imported + skipped}`),
+          name,
+          contactPerson: String(getFieldValue(item, 'contactPerson') || ''),
+          contactPhone: String(getFieldValue(item, 'contactPhone') || ''),
+          contactEmail: String(getFieldValue(item, 'contactEmail') || ''),
+          province: String(getFieldValue(item, 'province') || ''),
+          city: String(getFieldValue(item, 'city') || ''),
+          district: String(getFieldValue(item, 'district') || ''),
+          address: String(getFieldValue(item, 'address') || ''),
+          salesUserName: String(getFieldValue(item, 'salespersonName') || ''),
+          operatorUserName: String(getFieldValue(item, 'orderTakerName') || ''),
+          paymentStatus: String(getFieldValue(item, 'paymentStatus') || 'normal'),
+          creditLimit: parseFloat(String(getFieldValue(item, 'creditLimit') || 0)) || 0,
+          paymentDays: parseInt(String(getFieldValue(item, 'paymentDays') || 0), 10) || 0,
+          isActive: true,
+          remark: String(getFieldValue(item, 'remark') || ''),
+        }, schemaMode);
 
         const { error } = await supabase
           .from('customers')
@@ -171,7 +113,7 @@ export async function POST(request: NextRequest) {
         } else {
           imported++;
         }
-      } catch (err) {
+      } catch {
         errors.push(`第 ${imported + skipped + 1} 行：处理失败`);
         skipped++;
       }

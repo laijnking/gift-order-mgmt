@@ -22,15 +22,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Progress } from '@/components/ui/progress';
 import {
-  FileSpreadsheet, Upload, Search, Loader2, CheckCircle2, 
-  XCircle, AlertTriangle, FileText, RefreshCw, Package, Link2
+  Upload, Loader2, CheckCircle2,
+  AlertTriangle, FileText, RefreshCw, Package, Link2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { PageGuard } from '@/components/auth/page-guard';
-import { buildUserInfoHeaders, usePermission } from '@/lib/auth';
+import { buildUserInfoHeaders, useAuth, usePermission } from '@/lib/auth';
 
 interface ReceiptRecord {
   id: string;
@@ -116,6 +115,7 @@ interface ImportedReceiptRow {
 }
 
 export default function ReturnReceiptPage() {
+  const { user } = useAuth();
   const { hasPermission } = usePermission();
   const canEditOrders = hasPermission('orders:edit');
 
@@ -130,31 +130,25 @@ export default function ReturnReceiptPage() {
   const [showMatchDialog, setShowMatchDialog] = useState(false);
   const [matching, setMatching] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const [showDetailDialog, setShowDetailDialog] = useState(false);
   const [showOrderPicker, setShowOrderPicker] = useState(false);
   const [currentReceipt, setCurrentReceipt] = useState<Receipt | null>(null);
   const [unmatchedOrders, setUnmatchedOrders] = useState<Order[]>([]);
   const [receiptFilter, setReceiptFilter] = useState<'all' | 'needs_review' | 'conflict' | 'matched'>('all');
   const [manualMatching, setManualMatching] = useState(false);
 
-  // 加载供应商列表
-  useEffect(() => {
-    loadSuppliers();
-    loadRecords();
-  }, []);
-
-  const authHeaders = useCallback(() => buildUserInfoHeaders(), []);
+  const actorName = user?.realName || user?.username || 'system';
+  const authHeaders = useCallback(() => buildUserInfoHeaders(user), [user]);
   const jsonHeaders = useCallback(
     () => ({
       'Content-Type': 'application/json',
-      ...buildUserInfoHeaders(),
+      ...buildUserInfoHeaders(user),
     }),
-    []
+    [user]
   );
 
-  const loadSuppliers = async () => {
+  const loadSuppliers = useCallback(async () => {
     try {
-      const response = await fetch('/api/suppliers?status=active');
+      const response = await fetch('/api/suppliers?status=active', { headers: authHeaders() });
       const data = await response.json();
       if (data.success) {
         setSuppliers(data.data || []);
@@ -162,9 +156,9 @@ export default function ReturnReceiptPage() {
     } catch (error) {
       console.error('加载供应商失败:', error);
     }
-  };
+  }, [authHeaders]);
 
-  const loadRecords = async () => {
+  const loadRecords = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch('/api/return-receipts/history', { headers: authHeaders() });
@@ -177,7 +171,13 @@ export default function ReturnReceiptPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [authHeaders]);
+
+  // 加载供应商列表
+  useEffect(() => {
+    loadSuppliers();
+    loadRecords();
+  }, [loadRecords, loadSuppliers]);
 
   // 文件上传处理
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
@@ -229,7 +229,7 @@ export default function ReturnReceiptPage() {
           supplierName: supplier?.name || '',
           receipts,
           fileName: file.name,
-          importedBy: 'current_user', // TODO: 获取当前用户
+          importedBy: actorName,
         }),
       });
 
@@ -252,7 +252,7 @@ export default function ReturnReceiptPage() {
             matchedCount: 0,
             unmatchedCount: result.data.totalCount || receipts.length,
             importedAt: new Date().toISOString(),
-            importedBy: 'current_user',
+            importedBy: actorName,
           });
           setShowMatchDialog(true);
         }
@@ -262,7 +262,7 @@ export default function ReturnReceiptPage() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '未知错误');
     }
-  }, [authHeaders, jsonHeaders, selectedSupplier, suppliers, toast]);
+  }, [actorName, jsonHeaders, loadRecords, selectedSupplier, suppliers]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -349,7 +349,7 @@ export default function ReturnReceiptPage() {
         headers: jsonHeaders(),
         body: JSON.stringify({
           receiptIds: selectedReceipts,
-          importedBy: 'current_user',
+          importedBy: actorName,
         }),
       });
 
@@ -626,7 +626,6 @@ export default function ReturnReceiptPage() {
                       onClick={() => {
                         setCurrentRecord(record);
                         loadRecordDetail(record.id);
-                        setShowDetailDialog(true);
                       }}
                     >
                       <div className="flex items-center justify-between mb-2">

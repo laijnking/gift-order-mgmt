@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { PERMISSIONS } from '@/lib/permissions';
+import { buildAiTestMockResult } from '@/lib/ai-test-mock';
 
 // 执行AI测试
 export async function POST(request: NextRequest) {
@@ -22,7 +23,6 @@ export async function POST(request: NextRequest) {
     }
 
     let agent = null;
-    let promptTemplate = prompt;
 
     // 如果提供了agentId，获取Agent配置
     if (agentId) {
@@ -36,12 +36,9 @@ export async function POST(request: NextRequest) {
       if (!data) throw new Error('Agent配置不存在');
       
       agent = data;
-      promptTemplate = promptTemplate || data.prompt_template;
     }
 
     // 替换模板变量
-    const finalPrompt = promptTemplate.replace('{input}', input || '');
-
     // 调用LLM API
     // 注意：这里需要使用LLM技能，实际实现时调用LLM API
     const startTime = Date.now();
@@ -54,11 +51,7 @@ export async function POST(request: NextRequest) {
     // });
     
     // 模拟响应
-    const mockResponse = {
-      success: true,
-      output: `已处理输入内容，正在返回结果...\n\n输入: ${input || prompt}\n\n(这是模拟响应，实际使用时需要配置LLM API)`,
-      duration: Date.now() - startTime,
-    };
+    const mockResponse = buildAiTestMockResult(input || prompt || '', Date.now() - startTime);
 
     // 更新Agent统计
     if (agent) {
@@ -71,7 +64,7 @@ export async function POST(request: NextRequest) {
         .update({
           test_input: input,
           test_output: mockResponse.output,
-          test_status: 'success',
+          test_status: mockResponse.agentTestStatus,
           last_run_at: new Date().toISOString(),
           run_count: newRunCount,
           success_count: newSuccessCount,
@@ -88,7 +81,7 @@ export async function POST(request: NextRequest) {
           agent_name: agent.name,
           input: input,
           output: mockResponse.output,
-          status: 'success',
+          status: mockResponse.logStatus,
           duration_ms: mockResponse.duration,
           model: agent.model,
           config: agent.config,
@@ -100,8 +93,9 @@ export async function POST(request: NextRequest) {
       data: {
         output: mockResponse.output,
         duration: mockResponse.duration,
+        mode: mockResponse.mode,
       },
-      message: '测试执行成功'
+      message: '测试执行完成（模拟模式）'
     });
   } catch (error) {
     console.error('AI测试失败:', error);

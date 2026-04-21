@@ -641,9 +641,11 @@ async function main() {
     await assertDatabaseReady(pool);
     server = startServer(PORT);
     await waitForServer(BASE_URL, server);
+    console.log(`PASS server startup - ${BASE_URL}`);
 
     for (const test of tests) {
       try {
+        console.log(`RUN ${test.name}`);
         await test.run({ pool });
         console.log(`PASS ${test.name}`);
       } catch (error) {
