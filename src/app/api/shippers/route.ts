@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { PERMISSIONS } from '@/lib/permissions';
 
 // 数据库字段转前端格式
 function transformShipper(dbShipper: Record<string, unknown>) {
@@ -34,7 +35,7 @@ function transformShipper(dbShipper: Record<string, unknown>) {
 
 // 获取发货方列表
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, 'suppliers:view');
+  const authError = requirePermission(request, PERMISSIONS.SUPPLIERS_VIEW);
   if (authError) return authError;
 
   const client = getSupabaseClient();
@@ -86,7 +87,7 @@ export async function GET(request: NextRequest) {
 
 // 创建发货方
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, 'suppliers:create');
+  const authError = requirePermission(request, PERMISSIONS.SUPPLIERS_CREATE);
   if (authError) return authError;
 
   const client = getSupabaseClient();

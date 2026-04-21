@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { normalizeTemplateType, syncTemplateTargetLink, transformTemplateRecord, type TemplateRecord } from '@/lib/template-utils';
 import { requirePermission } from '@/lib/server-auth';
+import { PERMISSIONS } from '@/lib/permissions';
 
 // 获取模板列表
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, 'settings:view');
+  const authError = requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
   if (authError) return authError;
 
   const client = getSupabaseClient();
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
 
 // 创建模板
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, 'settings:view');
+  const authError = requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
   if (authError) return authError;
 
   const client = getSupabaseClient();

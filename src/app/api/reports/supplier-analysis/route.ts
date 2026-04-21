@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isReturnProgressStatus } from '@/lib/order-status';
+import { isReturnProgressStatus, ORDER_STATUS_PENDING, ORDER_STATUS_ASSIGNED, ORDER_STATUS_COMPLETED, ORDER_STATUS_CANCELLED } from '@/lib/order-status';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission } from '@/lib/server-auth';
+import { PERMISSIONS } from '@/lib/permissions';
 
 // 获取供应商分析数据
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, 'dashboard:view');
+  const authError = requirePermission(request, PERMISSIONS.DASHBOARD_VIEW);
   if (authError) return authError;
   try {
     const supabase = await getSupabaseClient();
@@ -138,15 +139,15 @@ export async function GET(request: NextRequest) {
         });
 
         // 状态统计
-        if (order.status === 'pending') {
+        if (order.status === ORDER_STATUS_PENDING) {
           bySupplier[matchedSupplierId].statusBreakdown.pending++;
-        } else if (order.status === 'assigned') {
+        } else if (order.status === ORDER_STATUS_ASSIGNED) {
           bySupplier[matchedSupplierId].statusBreakdown.assigned++;
         } else if (isReturnProgressStatus(order.status)) {
           bySupplier[matchedSupplierId].statusBreakdown.returned++;
-        } else if (order.status === 'completed') {
+        } else if (order.status === ORDER_STATUS_COMPLETED) {
           bySupplier[matchedSupplierId].statusBreakdown.completed++;
-        } else if (order.status === 'cancelled') {
+        } else if (order.status === ORDER_STATUS_CANCELLED) {
           bySupplier[matchedSupplierId].statusBreakdown.cancelled++;
         }
 

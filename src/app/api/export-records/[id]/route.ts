@@ -3,6 +3,7 @@ import { saveExportArtifact } from '@/lib/export-artifacts';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import JSZip from 'jszip';
 import { requirePermission } from '@/lib/server-auth';
+import { PERMISSIONS } from '@/lib/permissions';
 
 type ExportRecordMetadata = {
   details?: Array<Record<string, unknown>>;
@@ -112,7 +113,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = requirePermission(request, 'orders:export');
+  const authError = requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
   if (authError) return authError;
 
   const client = getSupabaseClient();
@@ -167,7 +168,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = requirePermission(request, 'orders:export');
+  const authError = requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
   if (authError) return authError;
 
   const client = getSupabaseClient();
@@ -212,7 +213,10 @@ export async function POST(
 
       const response = await fetch(`${origin}/api/shipping-exports/batch`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-info': request.headers.get('x-user-info') || '',
+        },
         body: JSON.stringify({
           supplierIds,
           templateId: payload.templateId ?? record.template_id ?? null,
@@ -308,7 +312,10 @@ export async function POST(
 
       const response = await fetch(`${origin}/api/export-feedback/batch`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-info': request.headers.get('x-user-info') || '',
+        },
         body: JSON.stringify({
           customerIds,
           templateId: payload.templateId ?? record.template_id ?? null,

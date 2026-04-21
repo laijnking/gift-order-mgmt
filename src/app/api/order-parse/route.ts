@@ -4,10 +4,11 @@ import { buildBundleDraftsFromFlatOrders } from '@/lib/order-parse-bundles';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { requirePermission } from '@/lib/server-auth';
 import type { ParsedOrderDraft } from '@/types/order-parse';
+import { PERMISSIONS } from '@/lib/permissions';
 
 // 解析订单文本
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, 'orders:create');
+  const authError = requirePermission(request, PERMISSIONS.ORDERS_CREATE);
   if (authError) return authError;
   const client = getSupabaseClient();
   

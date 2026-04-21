@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { PERMISSIONS } from '@/lib/permissions';
 
 // 获取历史成本库列表
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, 'orders:view');
+  const authError = requirePermission(request, PERMISSIONS.ORDERS_VIEW);
   if (authError) return authError;
   const client = getSupabaseClient();
   
@@ -198,7 +199,7 @@ export async function GET(request: NextRequest) {
 
 // 批量导入历史成本（从订单数据）
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, 'orders:edit');
+  const authError = requirePermission(request, PERMISSIONS.ORDERS_EDIT);
   if (authError) return authError;
   const client = getSupabaseClient();
   

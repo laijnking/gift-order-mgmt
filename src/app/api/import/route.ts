@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/server-auth';
+import { PERMISSIONS } from '@/lib/permissions';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 export async function POST(request: NextRequest) {
@@ -7,12 +8,12 @@ export async function POST(request: NextRequest) {
   const { type, data } = body;
 
   const permissionMap: Record<string, string> = {
-    customers: 'customers:create',
-    products: 'products:create',
-    suppliers: 'suppliers:create',
-    warehouses: 'suppliers:create',
-    orders: 'orders:create',
-    stocks: 'stocks:edit',
+    customers: PERMISSIONS.CUSTOMERS_CREATE,
+    products: PERMISSIONS.PRODUCTS_CREATE,
+    suppliers: PERMISSIONS.SUPPLIERS_CREATE,
+    warehouses: PERMISSIONS.SUPPLIERS_CREATE,
+    orders: PERMISSIONS.ORDERS_CREATE,
+    stocks: PERMISSIONS.STOCKS_EDIT,
   };
 
   const requiredPermission = type ? permissionMap[type] : null;

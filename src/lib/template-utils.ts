@@ -3,22 +3,25 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 export type TemplateBusinessType = 'shipping' | 'customer_feedback' | 'common';
 export type TemplateTargetType = 'customer' | 'supplier';
 
-export interface TemplateRecord {
+/** DB row shape — mirrors templates table (snake_case, nullable columns) */
+export type TemplateRecord = {
   id: string;
-  code?: string | null;
-  name?: string | null;
-  description?: string | null;
-  type?: string | null;
-  target_type?: string | null;
-  target_id?: string | null;
-  target_name?: string | null;
-  field_mappings?: Record<string, string> | string | null;
-  config?: Record<string, unknown> | null;
-  is_default?: boolean | null;
-  is_active?: boolean | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-}
+  code: string | null;
+  name: string | null;
+  description: string | null;
+  type: string | null;
+  config: Record<string, unknown> | null;
+  is_default: boolean | null;
+  is_active: boolean | null;
+  created_by: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  // non-standard columns (exist in DB)
+  target_type: string | null;
+  target_id: string | null;
+  target_name: string | null;
+  field_mappings: Record<string, string> | string | null;
+};
 
 export function normalizeTemplateType(type?: string | null): TemplateBusinessType {
   switch ((type || '').trim().toLowerCase()) {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { syncOrderCostHistoryAfterReturn } from '@/lib/order-cost-history';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission } from '@/lib/server-auth';
+import { PERMISSIONS } from '@/lib/permissions';
 
 type ReceiptRow = {
   id: string;
@@ -69,7 +70,7 @@ async function collectOrderCandidates(
 
 // 自动匹配回单与订单
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, 'orders:edit');
+  const authError = requirePermission(request, PERMISSIONS.ORDERS_EDIT);
   if (authError) return authError;
   const client = getSupabaseClient();
 

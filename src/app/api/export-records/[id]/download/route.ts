@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getExportArtifactDownloadTarget, readExportArtifact } from '@/lib/export-artifacts';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission } from '@/lib/server-auth';
+import { PERMISSIONS } from '@/lib/permissions';
 
 type ExportDetailRecord = {
   artifact?: {
@@ -16,7 +17,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = requirePermission(request, 'orders:export');
+  const authError = requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
   if (authError) return authError;
 
   const client = getSupabaseClient();

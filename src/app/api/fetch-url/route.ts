@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { FetchClient, Config, HeaderUtils } from 'coze-coding-dev-sdk';
 import { requirePermission } from '@/lib/server-auth';
+import { PERMISSIONS } from '@/lib/permissions';
 
 const config = new Config();
 
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, 'settings:edit');
+  const authError = requirePermission(request, PERMISSIONS.SETTINGS_EDIT);
   if (authError) return authError;
 
   try {

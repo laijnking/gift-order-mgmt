@@ -89,8 +89,8 @@ async function seedProduct(pool: Pool, sku: string, name: string) {
   await pool.query(
     `
       INSERT INTO products (
-        id, sku, name, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at
-      ) VALUES ($1, $2, $3, 10, 20, '在售', true, now(), now())
+        id, code, sku, name, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at
+      ) VALUES ($1, $2, $2, $3, 10, 20, '在售', true, now(), now())
     `,
     [productId, sku, name]
   );

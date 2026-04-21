@@ -5,6 +5,8 @@ import { recordOrderCostFromDispatch } from '@/lib/order-cost-history';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { parseTemplateFieldMappings, resolvePreferredTemplate, type TemplateRecord } from '@/lib/template-utils';
 import { requirePermission } from '@/lib/server-auth';
+import { ORDER_STATUS_PENDING } from '@/lib/order-status';
+import { PERMISSIONS } from '@/lib/permissions';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 
@@ -88,14 +90,18 @@ async function getExistingDispatchContext(
   client: ReturnType<typeof getSupabaseClient>,
   orderId: string
 ) {
+  // D-3 派发去重：以 dispatch_records 的 dispatched 记录为准，
+  // 只要存在已派发记录，就复用而不重复扣库存/记成本
   const { data: latestDispatch } = await client
     .from('dispatch_records')
     .select('batch_no, items, dispatch_at')
     .eq('order_id', orderId)
+    .eq('status', 'dispatched')
     .order('dispatch_at', { ascending: false })
     .limit(1)
     .maybeSingle();
 
+  // 成本记录和库存版本仅作历史参考，不作为去重依据
   const { count: costCount } = await client
     .from('order_cost_history')
     .select('*', { count: 'exact', head: true })
@@ -107,6 +113,7 @@ async function getExistingDispatchContext(
     .eq('reference_id', orderId)
     .eq('change_type', 'order');
 
+  // 有 dispatched 记录 → 复用；仅有成本/库存记录但无派发记录 → 视为新派发
   const hasExistingSideEffects = Boolean(latestDispatch) || (costCount || 0) > 0 || (stockVersionCount || 0) > 0;
 
   return {
@@ -292,7 +299,7 @@ function rowsForOrder(
 }
 
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, 'orders:export');
+  const authError = requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
   if (authError) return authError;
 
   const client = getSupabaseClient();

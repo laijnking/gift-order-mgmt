@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission } from '@/lib/server-auth';
+import { PERMISSIONS } from '@/lib/permissions';
+import { ORDER_STATUS_ASSIGNED, ORDER_STATUS_PARTIAL_RETURNED, ORDER_STATUS_RETURNED, ORDER_STATUS_FEEDBACKED, ORDER_STATUS_COMPLETED } from '@/lib/order-status';
 
 // 获取回单时效分析数据
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, 'dashboard:view');
+  const authError = requirePermission(request, PERMISSIONS.DASHBOARD_VIEW);
   if (authError) return authError;
   try {
     const supabase = await getSupabaseClient();
@@ -16,7 +18,7 @@ export async function GET(request: NextRequest) {
     let orderQuery = supabase
       .from('orders')
       .select('*')
-      .in('status', ['completed', 'feedbacked', 'returned', 'partial_returned', 'assigned']);
+      .in('status', [ORDER_STATUS_ASSIGNED, ORDER_STATUS_PARTIAL_RETURNED, ORDER_STATUS_RETURNED, ORDER_STATUS_FEEDBACKED, ORDER_STATUS_COMPLETED]);
 
     if (startDate) {
       orderQuery = orderQuery

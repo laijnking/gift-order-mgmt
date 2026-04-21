@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isReturnProgressStatus } from '@/lib/order-status';
+import { isReturnProgressStatus, ORDER_STATUS_PENDING, ORDER_STATUS_ASSIGNED, ORDER_STATUS_COMPLETED, ORDER_STATUS_CANCELLED } from '@/lib/order-status';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission } from '@/lib/server-auth';
+import { PERMISSIONS } from '@/lib/permissions';
 
 // 获取销售业绩数据
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, 'dashboard:view');
+  const authError = requirePermission(request, PERMISSIONS.DASHBOARD_VIEW);
   if (authError) return authError;
   try {
     const supabase = await getSupabaseClient();
@@ -70,8 +71,8 @@ export async function GET(request: NextRequest) {
     }> = {};
 
     allOrders.forEach(order => {
-      const salesperson = order.salesperson_name || order.salespersonName || '未分配';
-      const operator = order.operator_name || order.operatorName || '未分配';
+      const salesperson = order.salesperson || '未分配';
+      const operator = order.operator_name || '未分配';
       const customer = order.customer_name || order.customerName || '未知客户';
 
       // 初始化
@@ -115,19 +116,19 @@ export async function GET(request: NextRequest) {
       byCustomer[customer].orderCount++;
 
       // 状态统计
-      if (order.status === 'pending') {
+      if (order.status === ORDER_STATUS_PENDING) {
         bySalesperson[salesperson].pendingCount++;
         byOperator[operator].pendingCount++;
-      } else if (order.status === 'assigned') {
+      } else if (order.status === ORDER_STATUS_ASSIGNED) {
         bySalesperson[salesperson].assignedCount++;
         byOperator[operator].assignedCount++;
       } else if (isReturnProgressStatus(order.status)) {
         bySalesperson[salesperson].returnedCount++;
         byOperator[operator].returnedCount++;
-      } else if (order.status === 'completed') {
+      } else if (order.status === ORDER_STATUS_COMPLETED) {
         bySalesperson[salesperson].completedCount++;
         byOperator[operator].completedCount++;
-      } else if (order.status === 'cancelled') {
+      } else if (order.status === ORDER_STATUS_CANCELLED) {
         bySalesperson[salesperson].cancelledCount++;
         byOperator[operator].cancelledCount++;
       }

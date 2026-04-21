@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/server-auth';
 import { CUSTOMER_FEEDBACK_SOURCE_STATUSES } from '@/lib/order-status';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { PERMISSIONS } from '@/lib/permissions';
 
 // 导出前校验订单回单状态
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, 'orders:export');
+  const authError = requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
   if (authError) return authError;
 
   const client = getSupabaseClient();

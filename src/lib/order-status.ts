@@ -1,5 +1,20 @@
 import type { OrderStatus } from '@/types/order';
 
+// Status value constants (single source of truth for status string values)
+export const ORDER_STATUS_PENDING: OrderStatus = 'pending';
+export const ORDER_STATUS_ASSIGNED: OrderStatus = 'assigned';
+export const ORDER_STATUS_PARTIAL_RETURNED: OrderStatus = 'partial_returned';
+export const ORDER_STATUS_RETURNED: OrderStatus = 'returned';
+export const ORDER_STATUS_FEEDBACKED: OrderStatus = 'feedbacked';
+export const ORDER_STATUS_COMPLETED: OrderStatus = 'completed';
+export const ORDER_STATUS_CANCELLED: OrderStatus = 'cancelled';
+
+// Dispatch record status constants (different from order status)
+export const DISPATCH_STATUS_PENDING = 'pending';
+export const DISPATCH_STATUS_DISPATCHED = 'dispatched';
+export const DISPATCH_STATUS_SHIPPED = 'shipped';
+export const DISPATCH_STATUS_DELIVERED = 'delivered';
+
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   pending: '待派发',
   assigned: '已派发',

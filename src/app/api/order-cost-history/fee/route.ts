@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { updateOrderCostHistoryFees } from '@/lib/order-cost-history';
 import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { PERMISSIONS } from '@/lib/permissions';
 
 // 更新历史成本库的快递费用
 export async function PATCH(request: NextRequest) {
-  const authError = requirePermission(request, 'orders:edit');
+  const authError = requirePermission(request, PERMISSIONS.ORDERS_EDIT);
   if (authError) return authError;
   const client = getSupabaseClient();
   

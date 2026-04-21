@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { PERMISSIONS } from '@/lib/permissions';
 
 // 数据库字段转前端格式
 function transformWarehouse(dbWarehouse: Record<string, unknown>) {
@@ -27,7 +28,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = requirePermission(request, 'suppliers:view');
+  const authError = requirePermission(request, PERMISSIONS.SUPPLIERS_VIEW);
   if (authError) return authError;
 
   const client = getSupabaseClient();
@@ -66,7 +67,7 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = requirePermission(request, 'suppliers:edit');
+  const authError = requirePermission(request, PERMISSIONS.SUPPLIERS_EDIT);
   if (authError) return authError;
 
   const client = getSupabaseClient();
@@ -118,7 +119,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = requirePermission(request, 'suppliers:delete');
+  const authError = requirePermission(request, PERMISSIONS.SUPPLIERS_DELETE);
   if (authError) return authError;
 
   const client = getSupabaseClient();

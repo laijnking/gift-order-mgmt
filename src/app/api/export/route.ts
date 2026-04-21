@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { recordOrderCostFromDispatch } from '@/lib/order-cost-history';
 import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { PERMISSIONS } from '@/lib/permissions';
 import * as XLSX from 'xlsx';
 
 interface OrderItem {
@@ -226,7 +227,7 @@ async function dispatchOneOrder(
 }
 
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, 'orders:export');
+  const authError = requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
   if (authError) return authError;
   const client = getSupabaseClient();
 

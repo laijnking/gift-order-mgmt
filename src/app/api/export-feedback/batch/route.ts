@@ -5,6 +5,7 @@ import { saveExportArtifact } from '@/lib/export-artifacts';
 import { buildExportRecordDownloadPath } from '@/lib/export-download';
 import { parseTemplateFieldMappings, resolvePreferredTemplate, type TemplateRecord } from '@/lib/template-utils';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { PERMISSIONS } from '@/lib/permissions';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 
@@ -122,7 +123,7 @@ function summarizeTemplateSource(
 
 // 批量导出客户反馈单
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, 'orders:export');
+  const authError = requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
   if (authError) return authError;
 
   const client = getSupabaseClient();

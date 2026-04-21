@@ -79,8 +79,8 @@ async function seedProduct(pool: Pool, sku: string, name: string) {
   await pool.query(
     `
       INSERT INTO products (
-        id, sku, name, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at
-      ) VALUES ($1, $2, $3, 10, 20, '在售', true, now(), now())
+        id, code, sku, name, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at
+      ) VALUES ($1, $2, $2, $3, 10, 20, '在售', true, now(), now())
     `,
     [id, sku, name]
   );
@@ -128,12 +128,12 @@ async function seedOrder(pool: Pool, input: {
     `
       INSERT INTO orders (
         id, order_no, status, items, receiver_name, receiver_phone, receiver_address,
-        customer_code, customer_name, salesperson, supplier_id, supplier_name,
-        source, sys_order_no, operator_name, created_at, updated_at, assigned_at, returned_at, completed_at
+        customer_code, customer_name, salesperson, operator_name, supplier_id, supplier_name,
+        source, sys_order_no, created_at, updated_at, assigned_at, returned_at, completed_at
       )
       VALUES (
         $1, $2, $3, $4::jsonb, '测试收货人', '13900000000', '上海市测试路 1 号',
-        'C-REPORT', '报表客户', '张三', $5, $6, 'api-test', $7, '李四',
+        'C-REPORT', '报表客户', '张三', '李四', $5, $6, 'api-test', $7,
         $8, $8, $9, $10, $11
       )
     `,
@@ -187,6 +187,23 @@ async function main() {
 
   try {
     await assertDatabaseReady(pool);
+
+    // 查询基线统计（在 seed 之前），避免真实业务数据干扰断言
+    const baselineOrderCounts = await pool.query(`
+      SELECT status, COUNT(*)::int as count
+      FROM orders
+      WHERE created_at >= '2026-04-17' AND created_at < '2026-04-21'
+      GROUP BY status
+    `).then(r => Object.fromEntries(r.rows.map(row => [row.status, row.count])));
+
+    const baselineActiveSupplierCount = await pool.query(`
+      SELECT COUNT(*)::int as count FROM suppliers WHERE is_active = true
+    `).then(r => r.rows[0].count);
+
+    const baselineStockTotalValue = await pool.query(`
+      SELECT COALESCE(SUM(quantity * unit_price), 0)::numeric as count FROM stocks
+    `).then(r => Number(r.rows[0].count));
+
     await cleanup(pool).catch(() => {});
 
     const supplierId = await seedSupplier(pool, { name: `供应商-${RUN_ID}`, isActive: true });
@@ -282,15 +299,24 @@ async function main() {
     const supplierStats = ensureObject(statsData.supplier, 'stats.data.supplier');
     const stockStats = ensureObject(statsData.stock, 'stats.data.stock');
 
-    assert(orderStatus.pending === 1, `pending 应为 1，实际 ${String(orderStatus.pending)}`);
-    assert(orderStatus.assigned === 1, `assigned 应为 1，实际 ${String(orderStatus.assigned)}`);
-    assert(orderStatus.partial_returned === 1, `partial_returned 应为 1，实际 ${String(orderStatus.partial_returned)}`);
-    assert(orderStatus.returned === 1, `returned 应为 1，实际 ${String(orderStatus.returned)}`);
-    assert(orderStatus.feedbacked === 1, `feedbacked 应为 1，实际 ${String(orderStatus.feedbacked)}`);
-    assert(orderStatus.completed === 1, `completed 应为 1，实际 ${String(orderStatus.completed)}`);
-    assert(orderStatus.cancelled === 1, `cancelled 应为 1，实际 ${String(orderStatus.cancelled)}`);
-    assert(supplierStats.active === 1, `活跃供应商应为 1，实际 ${String(supplierStats.active)}`);
-    assert(stockStats.totalValue === 100, `库存总值应按 unit_price 计算为 100，实际 ${String(stockStats.totalValue)}`);
+    assert(orderStatus.pending === (baselineOrderCounts['pending'] ?? 0) + 1,
+      `pending 应为 ${(baselineOrderCounts['pending'] ?? 0) + 1}，实际 ${String(orderStatus.pending)}`);
+    assert(orderStatus.assigned === (baselineOrderCounts['assigned'] ?? 0) + 1,
+      `assigned 应为 ${(baselineOrderCounts['assigned'] ?? 0) + 1}，实际 ${String(orderStatus.assigned)}`);
+    assert(orderStatus.partial_returned === (baselineOrderCounts['partial_returned'] ?? 0) + 1,
+      `partial_returned 应为 ${(baselineOrderCounts['partial_returned'] ?? 0) + 1}，实际 ${String(orderStatus.partial_returned)}`);
+    assert(orderStatus.returned === (baselineOrderCounts['returned'] ?? 0) + 1,
+      `returned 应为 ${(baselineOrderCounts['returned'] ?? 0) + 1}，实际 ${String(orderStatus.returned)}`);
+    assert(orderStatus.feedbacked === (baselineOrderCounts['feedbacked'] ?? 0) + 1,
+      `feedbacked 应为 ${(baselineOrderCounts['feedbacked'] ?? 0) + 1}，实际 ${String(orderStatus.feedbacked)}`);
+    assert(orderStatus.completed === (baselineOrderCounts['completed'] ?? 0) + 1,
+      `completed 应为 ${(baselineOrderCounts['completed'] ?? 0) + 1}，实际 ${String(orderStatus.completed)}`);
+    assert(orderStatus.cancelled === (baselineOrderCounts['cancelled'] ?? 0) + 1,
+      `cancelled 应为 ${(baselineOrderCounts['cancelled'] ?? 0) + 1}，实际 ${String(orderStatus.cancelled)}`);
+    assert(supplierStats.active === baselineActiveSupplierCount + 1,
+      `活跃供应商应为 ${baselineActiveSupplierCount + 1}，实际 ${String(supplierStats.active)}`);
+    assert(Number(stockStats.totalValue) === baselineStockTotalValue + 100,
+      `库存总值应为 ${baselineStockTotalValue + 100}，实际 ${stockStats.totalValue}`);
 
     const salesResponse = await fetchJson<{ success?: boolean; data?: unknown; error?: string }>(
       `${BASE_URL}/api/reports/sales-performance?startDate=2026-04-17&endDate=2026-04-21`,

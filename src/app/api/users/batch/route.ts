@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { requirePermission } from '@/lib/server-auth';
+import { PERMISSIONS } from '@/lib/permissions';
 
 // 简单的密码哈希函数
 function hashPassword(password: string): string {
@@ -22,7 +23,7 @@ function getPublicSupabaseClient() {
 }
 
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, 'users:create');
+  const authError = requirePermission(request, PERMISSIONS.USERS_CREATE);
   if (authError) return authError;
 
   try {

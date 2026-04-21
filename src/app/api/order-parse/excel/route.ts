@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { getColumnMappingDiagnostics } from '@/lib/column-mapping-diagnostics';
 import { requirePermission } from '@/lib/server-auth';
+import { PERMISSIONS } from '@/lib/permissions';
 import type {
   ParsedOrderBundleDraft,
   ParsedOrderDraftItem,
@@ -459,7 +460,7 @@ async function parseExcelData(
 }
 
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, 'orders:create');
+  const authError = requirePermission(request, PERMISSIONS.ORDERS_CREATE);
   if (authError) return authError;
   const client = getSupabaseClient();
   

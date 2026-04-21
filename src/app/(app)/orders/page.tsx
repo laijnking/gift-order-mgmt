@@ -33,7 +33,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
-import { getOrderStatusBadgeClass, getOrderStatusLabel, isReturnProgressStatus, ORDER_STATUS_OPTIONS } from '@/lib/order-status';
+import { getOrderStatusBadgeClass, getOrderStatusLabel, isReturnProgressStatus, ORDER_STATUS_OPTIONS, ORDER_STATUS_PENDING, ORDER_STATUS_ASSIGNED, ORDER_STATUS_PARTIAL_RETURNED, ORDER_STATUS_RETURNED, ORDER_STATUS_FEEDBACKED, ORDER_STATUS_COMPLETED, ORDER_STATUS_CANCELLED } from '@/lib/order-status';
 import { toast } from 'sonner';
 import {
   Package,
@@ -519,7 +519,7 @@ const calculateOrderAlerts = useMemo(() => {
   
   // a. 待发货 -> 通知发货：当天16:00未派发
   const pendingToAssign = orders.filter(o => {
-    if (o.status !== 'pending') return false;
+    if (o.status !== ORDER_STATUS_PENDING) return false;
     const createdAt = new Date(o.createdAt);
     return createdAt < today16 && now >= today16;
   });
@@ -533,7 +533,7 @@ const calculateOrderAlerts = useMemo(() => {
   
   // b. 通知发货 -> 导入回单：次日10点未回单
   const assignedToReturned = orders.filter(o => {
-    if (o.status !== 'assigned') return false;
+    if (o.status !== ORDER_STATUS_ASSIGNED) return false;
     const createdAt = new Date(o.createdAt);
     return createdAt < tomorrow10 && now >= tomorrow10;
   });
@@ -550,7 +550,7 @@ const calculateOrderAlerts = useMemo(() => {
     const createdAt = new Date(o.createdAt);
     const hoursDiff = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60);
     const isOver24h = hoursDiff > 24;
-    const isNotCompleted = o.status !== 'completed' && o.status !== 'cancelled';
+    const isNotCompleted = o.status !== ORDER_STATUS_COMPLETED && o.status !== ORDER_STATUS_CANCELLED;
     return isOver24h && isNotCompleted;
   });
   alerts.push({
@@ -816,30 +816,30 @@ useEffect(() => {
 
   // 获取订单不可删除的原因
   const getDeleteDisabledReason = (order: Order): string | null => {
-    if (order.status === 'assigned') return '订单已派发供应商，无法删除';
-    if (order.status === 'partial_returned') return '订单正在回单处理中，无法删除';
-    if (order.status === 'returned') return '订单已回单，需先完成客户反馈/财务处理，无法删除';
-    if (order.status === 'feedbacked') return '订单已反馈客户，等待导出金蝶，无法删除';
-    if (order.status === 'completed') return '订单已导出金蝶归档，无法删除';
+    if (order.status === ORDER_STATUS_ASSIGNED) return '订单已派发供应商，无法删除';
+    if (order.status === ORDER_STATUS_PARTIAL_RETURNED) return '订单正在回单处理中，无法删除';
+    if (order.status === ORDER_STATUS_RETURNED) return '订单已回单，需先完成客户反馈/财务处理，无法删除';
+    if (order.status === ORDER_STATUS_FEEDBACKED) return '订单已反馈客户，等待导出金蝶，无法删除';
+    if (order.status === ORDER_STATUS_COMPLETED) return '订单已导出金蝶归档，无法删除';
     return null;
   };
 
   // 获取订单不可编辑的原因
   const getEditDisabledReason = (order: Order): string | null => {
-    if (order.status === 'completed') return '订单已导出金蝶归档，无法编辑';
-    if (order.status === 'feedbacked') return '订单已反馈客户，建议仅做财务归档处理';
-    if (order.status === 'partial_returned') return '订单正在回单处理中，编辑功能受限';
+    if (order.status === ORDER_STATUS_COMPLETED) return '订单已导出金蝶归档，无法编辑';
+    if (order.status === ORDER_STATUS_FEEDBACKED) return '订单已反馈客户，建议仅做财务归档处理';
+    if (order.status === ORDER_STATUS_PARTIAL_RETURNED) return '订单正在回单处理中，编辑功能受限';
     return null;
   };
 
   // 获取当前订单可编辑的字段提示
   const getEditableFieldsHint = (order: Order): string => {
-    if (order.status === 'pending') return '可编辑所有信息';
-    if (order.status === 'assigned') return '仅可编辑收货人、电话、地址、备注';
-    if (order.status === 'returned') return '可修正快递信息、收货信息、备注';
-    if (order.status === 'feedbacked') return '已反馈客户，建议不再修改业务信息';
-    if (order.status === 'partial_returned') return '仅可编辑收货人、电话、地址、备注';
-    if (order.status === 'cancelled') return '可编辑所有信息';
+    if (order.status === ORDER_STATUS_PENDING) return '可编辑所有信息';
+    if (order.status === ORDER_STATUS_ASSIGNED) return '仅可编辑收货人、电话、地址、备注';
+    if (order.status === ORDER_STATUS_RETURNED) return '可修正快递信息、收货信息、备注';
+    if (order.status === ORDER_STATUS_FEEDBACKED) return '已反馈客户，建议不再修改业务信息';
+    if (order.status === ORDER_STATUS_PARTIAL_RETURNED) return '仅可编辑收货人、电话、地址、备注';
+    if (order.status === ORDER_STATUS_CANCELLED) return '可编辑所有信息';
     return '';
   };
 
@@ -850,7 +850,7 @@ useEffect(() => {
 
   // 检查订单是否可以编辑（已导出金蝶归档后不能编辑）
   const canEditOrder = (order: Order): boolean => {
-    return order.status !== 'completed';
+    return order.status !== ORDER_STATUS_COMPLETED;
   };
 
   const fetchSuppliers = useCallback(async () => {
@@ -1283,13 +1283,13 @@ useEffect(() => {
         const targetOrders = selectedOrders.size > 0
           ? selectedOrders
           : orders
-              .filter((o) => o.status === 'assigned' || o.status === 'partial_returned')
+              .filter((o) => o.status === ORDER_STATUS_ASSIGNED || o.status === ORDER_STATUS_PARTIAL_RETURNED)
               .map((o) => o.id);
 
         // Apply to each selected order if tracking provided
         for (const orderId of targetOrders) {
           const order = orders.find((o) => o.id === orderId);
-          if (order && (order.status === 'assigned' || order.status === 'partial_returned')) {
+          if (order && (order.status === ORDER_STATUS_ASSIGNED || order.status === ORDER_STATUS_PARTIAL_RETURNED)) {
             try {
               const res = await fetch('/api/orders', {
                 method: 'PATCH',
@@ -1324,7 +1324,7 @@ useEffect(() => {
   const handleBatchShip = async () => {
     const targetIds: string[] = selectedOrders.size > 0
       ? Array.from(selectedOrders).map(o => o.id)
-      : filteredOrders.filter((o) => o.status === 'assigned').map((o) => o.id);
+      : filteredOrders.filter((o) => o.status === ORDER_STATUS_ASSIGNED).map((o) => o.id);
 
     if (targetIds.length === 0) {
       toast.error('没有可发货的订单');
@@ -1338,7 +1338,7 @@ useEffect(() => {
   const handleExportKingdee = async () => {
     const targetIds: string[] = selectedOrders.size > 0
       ? Array.from(selectedOrders).map(o => o.id)
-      : filteredOrders.filter((o) => o.status === 'feedbacked').map((o) => o.id);
+      : filteredOrders.filter((o) => o.status === ORDER_STATUS_FEEDBACKED).map((o) => o.id);
 
     if (targetIds.length === 0) {
       toast.error('没有可导出金蝶的订单（需已反馈状态）');
@@ -1346,7 +1346,7 @@ useEffect(() => {
     }
 
     try {
-      const targetOrders = orders.filter((o) => targetIds.includes(o.id) && o.status === 'feedbacked');
+      const targetOrders = orders.filter((o) => targetIds.includes(o.id) && o.status === ORDER_STATUS_FEEDBACKED);
       const header = '系统单号\t客户单号\t客户\t收货人\t电话\t地址\t商品\t数量\t供应商\t快递公司\t快递单号\t业务员\t跟单员\t派发批次';
       const rows = targetOrders.map((o) => [
         o.sysOrderNo || '',
@@ -1394,8 +1394,8 @@ useEffect(() => {
   // --- Ship notice (发货通知) ---
   const handleShipNotice = async () => {
     const hasAssignedOrders = selectedOrders.size > 0
-      ? Array.from(selectedOrders).some((o) => o.status === 'assigned')
-      : filteredOrders.some((o) => o.status === 'assigned');
+      ? Array.from(selectedOrders).some((o) => o.status === ORDER_STATUS_ASSIGNED)
+      : filteredOrders.some((o) => o.status === ORDER_STATUS_ASSIGNED);
 
     if (!hasAssignedOrders) {
       toast.error('请先选择已派发给供应商的订单');
@@ -1410,14 +1410,14 @@ useEffect(() => {
   const handleFeedback = async () => {
     const targetIds: string[] = selectedOrders.size > 0
       ? Array.from(selectedOrders).map(o => o.id)
-      : filteredOrders.filter((o) => o.status === 'returned').map((o) => o.id);
+      : filteredOrders.filter((o) => o.status === ORDER_STATUS_RETURNED).map((o) => o.id);
 
     if (targetIds.length === 0) {
       toast.error('没有可反馈的订单（需已回单状态）');
       return;
     }
 
-    const targetOrders = orders.filter((o) => targetIds.includes(o.id) && o.status === 'returned');
+    const targetOrders = orders.filter((o) => targetIds.includes(o.id) && o.status === ORDER_STATUS_RETURNED);
     const lines = targetOrders.map(
       (o) =>
         `${o.sysOrderNo || o.orderNo}\t${o.receiver.name}\t${o.receiver.phone}\t${o.receiver.address}\t${o.supplierName || '-'}\t${o.trackingNo || '-'}\t${o.expressCompany || '-'}`
@@ -1532,20 +1532,20 @@ useEffect(() => {
 
   // Count orders for action bar hints
   const selectedPendingCount = Array.from(selectedOrders).filter(
-    (o) => o.status === 'pending'
+    (o) => o.status === ORDER_STATUS_PENDING
   ).length;
   const selectedAssignedCount = Array.from(selectedOrders).filter(
-    (o) => o.status === 'assigned'
+    (o) => o.status === ORDER_STATUS_ASSIGNED
   ).length;
   const selectedReturnableCount = Array.from(selectedOrders).filter(
-    (o) => o.status === 'returned'
+    (o) => o.status === ORDER_STATUS_RETURNED
   ).length;
   const selectedFeedbackedCount = Array.from(selectedOrders).filter(
-    (o) => o.status === 'feedbacked'
+    (o) => o.status === ORDER_STATUS_FEEDBACKED
   ).length;
 
   // 统计未归档订单数
-  const unarchivedCount = orders.filter(o => !['completed', 'cancelled'].includes(o.status)).length;
+  const unarchivedCount = orders.filter(o => o.status !== ORDER_STATUS_COMPLETED && o.status !== ORDER_STATUS_CANCELLED).length;
   const activeImportBatch = advancedFields.importBatch?.trim() || '';
   const activeImportBatchSummary = useMemo(() => {
     if (!activeImportBatch) {
@@ -1561,11 +1561,11 @@ useEffect(() => {
 
     return {
       total: batchOrders.length,
-      pending: batchOrders.filter((order) => order.status === 'pending').length,
-      assigned: batchOrders.filter((order) => order.status === 'assigned').length,
+      pending: batchOrders.filter((order) => order.status === ORDER_STATUS_PENDING).length,
+      assigned: batchOrders.filter((order) => order.status === ORDER_STATUS_ASSIGNED).length,
       returned: batchOrders.filter((order) => isReturnProgressStatus(order.status)).length,
       completed: batchOrders.filter((order) =>
-        order.status === 'completed' || order.status === 'cancelled'
+        order.status === ORDER_STATUS_COMPLETED || order.status === ORDER_STATUS_CANCELLED
       ).length,
       statusCounts,
     };
@@ -1607,7 +1607,7 @@ useEffect(() => {
             订单管理
           </h1>
           <p className="text-sm text-muted-foreground">
-            共 {orders.length} 条订单，其中 {unarchivedCount} 条未归档，{orders.filter((o) => o.status === 'pending').length} 条待派发
+            共 {orders.length} 条订单，其中 {unarchivedCount} 条未归档，{orders.filter((o) => o.status === ORDER_STATUS_PENDING).length} 条待派发
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
@@ -2437,7 +2437,7 @@ useEffect(() => {
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         )}
-                        {order.status === 'pending' && (
+                        {order.status === ORDER_STATUS_PENDING && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -3252,7 +3252,7 @@ useEffect(() => {
                   <Badge className={getOrderStatusBadgeClass(editForm.status)}>
                     {getOrderStatusLabel(editForm.status)}
                   </Badge>
-                  {editForm.status === 'assigned' || editForm.status === 'partial_returned' ? (
+                  {editForm.status === ORDER_STATUS_ASSIGNED || editForm.status === ORDER_STATUS_PARTIAL_RETURNED ? (
                     <span className="text-xs text-muted-foreground">
                       已派发订单仅可编辑收货信息
                     </span>
@@ -3276,27 +3276,27 @@ useEffect(() => {
                 <Input
                   value={editForm.customerCode}
                   onChange={(e) => setEditForm({ ...editForm, customerCode: e.target.value })}
-                  disabled={editForm.status === 'assigned' || editForm.status === 'partial_returned'}
-                  className={editForm.status === 'assigned' || editForm.status === 'partial_returned' ? 'bg-muted' : ''}
+                  disabled={editForm.status === ORDER_STATUS_ASSIGNED || editForm.status === ORDER_STATUS_PARTIAL_RETURNED}
+                  className={editForm.status === ORDER_STATUS_ASSIGNED || editForm.status === ORDER_STATUS_PARTIAL_RETURNED ? 'bg-muted' : ''}
                 />
               </div>
             </div>
             <div className="space-y-2">
-              <Label className={((editForm.status === 'assigned' || editForm.status === 'partial_returned') ? 'text-muted-foreground' : '')}>
-                商品名称 {editForm.status === 'assigned' || editForm.status === 'partial_returned' && <span className="text-xs">(已派发订单不可修改)</span>}
+              <Label className={((editForm.status === ORDER_STATUS_ASSIGNED || editForm.status === ORDER_STATUS_PARTIAL_RETURNED) ? 'text-muted-foreground' : '')}>
+                商品名称 {editForm.status === ORDER_STATUS_ASSIGNED || editForm.status === ORDER_STATUS_PARTIAL_RETURNED && <span className="text-xs">(已派发订单不可修改)</span>}
               </Label>
               <div className="flex gap-2">
                 <Input
                   value={editForm.productName}
                   onChange={(e) => setEditForm({ ...editForm, productName: e.target.value })}
-                  disabled={editForm.status === 'assigned' || editForm.status === 'partial_returned'}
-                  className={editForm.status === 'assigned' || editForm.status === 'partial_returned' ? 'bg-muted flex-1' : 'flex-1'}
+                  disabled={editForm.status === ORDER_STATUS_ASSIGNED || editForm.status === ORDER_STATUS_PARTIAL_RETURNED}
+                  className={editForm.status === ORDER_STATUS_ASSIGNED || editForm.status === ORDER_STATUS_PARTIAL_RETURNED ? 'bg-muted flex-1' : 'flex-1'}
                 />
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setEditProductPickerOpen(true)}
-                  disabled={editForm.status === 'assigned' || editForm.status === 'partial_returned'}
+                  disabled={editForm.status === ORDER_STATUS_ASSIGNED || editForm.status === ORDER_STATUS_PARTIAL_RETURNED}
                   title="从商品目录选择"
                 >
                   选择商品
@@ -3312,16 +3312,16 @@ useEffect(() => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className={((editForm.status === 'assigned' || editForm.status === 'partial_returned') ? 'text-muted-foreground' : '')}>
-                  数量 {editForm.status === 'assigned' || editForm.status === 'partial_returned' && <span className="text-xs">(已派发订单不可修改)</span>}
+                <Label className={((editForm.status === ORDER_STATUS_ASSIGNED || editForm.status === ORDER_STATUS_PARTIAL_RETURNED) ? 'text-muted-foreground' : '')}>
+                  数量 {editForm.status === ORDER_STATUS_ASSIGNED || editForm.status === ORDER_STATUS_PARTIAL_RETURNED && <span className="text-xs">(已派发订单不可修改)</span>}
                 </Label>
                 <Input
                   type="number"
                   min="1"
                   value={editForm.quantity}
                   onChange={(e) => setEditForm({ ...editForm, quantity: parseInt(e.target.value) || 1 })}
-                  disabled={editForm.status === 'assigned' || editForm.status === 'partial_returned'}
-                  className={editForm.status === 'assigned' || editForm.status === 'partial_returned' ? 'bg-muted' : ''}
+                  disabled={editForm.status === ORDER_STATUS_ASSIGNED || editForm.status === ORDER_STATUS_PARTIAL_RETURNED}
+                  className={editForm.status === ORDER_STATUS_ASSIGNED || editForm.status === ORDER_STATUS_PARTIAL_RETURNED ? 'bg-muted' : ''}
                 />
               </div>
               <div className="space-y-2">

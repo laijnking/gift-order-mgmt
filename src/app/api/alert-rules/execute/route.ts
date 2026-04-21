@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/server-auth';
 import { executeAlertRules } from '@/lib/alert-executor';
+import { PERMISSIONS } from '@/lib/permissions';
 
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, 'settings:view');
+  const authError = requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
   if (authError) return authError;
 
   try {

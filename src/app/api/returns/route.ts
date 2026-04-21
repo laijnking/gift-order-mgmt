@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { syncOrderCostHistoryAfterReturn } from '@/lib/order-cost-history';
 import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { PERMISSIONS } from '@/lib/permissions';
 import * as XLSX from 'xlsx';
 
 interface ReturnRow {
@@ -157,7 +158,7 @@ async function findOrder(client: ReturnType<typeof getSupabaseClient>, row: Retu
 }
 
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, 'orders:edit');
+  const authError = requirePermission(request, PERMISSIONS.ORDERS_EDIT);
   if (authError) return authError;
   const client = getSupabaseClient();
 
@@ -174,6 +175,23 @@ export async function POST(request: NextRequest) {
     for (const row of rows) {
       const matched = await findOrder(client, row);
       const now = new Date().toISOString();
+
+      // D-1 重复检测：同订单 + 同物流单号 + 同快递公司 已存在则跳过（不阻塞，由人工复核）
+      if (matched) {
+        const existingReceipt = await client
+          .from('return_receipts')
+          .select('id')
+          .eq('order_id', matched.order.id)
+          .eq('tracking_no', row.trackingNo)
+          .eq('express_company', row.expressCompany)
+          .maybeSingle();
+        if (existingReceipt?.data) {
+          unmatched.push(
+            `${row.orderNo || row.matchCode || row.receiverPhone || '未知'} - ${row.trackingNo} [重复，已存在回单 ${existingReceipt.data.id}]`
+          );
+          continue;
+        }
+      }
 
       if (!matched) {
         unmatchedCount += 1;

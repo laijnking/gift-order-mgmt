@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission } from '@/lib/server-auth';
+import { ORDER_STATUS_PENDING, ORDER_STATUS_ASSIGNED, ORDER_STATUS_PARTIAL_RETURNED, ORDER_STATUS_RETURNED, ORDER_STATUS_FEEDBACKED, ORDER_STATUS_COMPLETED, ORDER_STATUS_CANCELLED } from '@/lib/order-status';
+import { PERMISSIONS } from '@/lib/permissions';
 
 // 获取报表统计数据
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, 'dashboard:view');
+  const authError = requirePermission(request, PERMISSIONS.DASHBOARD_VIEW);
   if (authError) return authError;
   try {
     const supabase = await getSupabaseClient();
@@ -46,13 +48,13 @@ export async function GET(request: NextRequest) {
     // 订单状态统计
     const orderStatusStats = {
       total: allOrders.length,
-      pending: allOrders.filter(o => o.status === 'pending').length,
-      assigned: allOrders.filter(o => o.status === 'assigned').length,
-      partial_returned: allOrders.filter(o => o.status === 'partial_returned').length,
-      returned: allOrders.filter(o => o.status === 'returned').length,
-      feedbacked: allOrders.filter(o => o.status === 'feedbacked').length,
-      completed: allOrders.filter(o => o.status === 'completed').length,
-      cancelled: allOrders.filter(o => o.status === 'cancelled').length,
+      pending: allOrders.filter(o => o.status === ORDER_STATUS_PENDING).length,
+      assigned: allOrders.filter(o => o.status === ORDER_STATUS_ASSIGNED).length,
+      partial_returned: allOrders.filter(o => o.status === ORDER_STATUS_PARTIAL_RETURNED).length,
+      returned: allOrders.filter(o => o.status === ORDER_STATUS_RETURNED).length,
+      feedbacked: allOrders.filter(o => o.status === ORDER_STATUS_FEEDBACKED).length,
+      completed: allOrders.filter(o => o.status === ORDER_STATUS_COMPLETED).length,
+      cancelled: allOrders.filter(o => o.status === ORDER_STATUS_CANCELLED).length,
     };
 
     // 2. 按时间维度统计订单

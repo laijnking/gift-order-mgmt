@@ -3,6 +3,9 @@ import { getSupabaseClient } from '@/storage/database/supabase-client';
 import * as XLSX from 'xlsx';
 import crypto from 'crypto';
 import { requirePermission } from '@/lib/server-auth';
+import { isManagementRole } from '@/lib/roles';
+import { ORDER_STATUS_ASSIGNED, ORDER_STATUS_COMPLETED } from '@/lib/order-status';
+import { PERMISSIONS } from '@/lib/permissions';
 
 interface DuplicateOrderDetail {
   orderNo: string;
@@ -419,7 +422,7 @@ async function matchProduct(
 
 // 获取所有订单
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, 'orders:view');
+  const authError = requirePermission(request, PERMISSIONS.ORDERS_VIEW);
   if (authError) return authError;
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
@@ -438,7 +441,7 @@ export async function GET(request: NextRequest) {
     // ==================== 数据权限过滤 ====================
     // 仅本人(self)：只看业务员或跟单员是自己的订单
     // admin 角色不看 dataScope 限制，可查看全部数据
-    if (currentUser && currentUser.dataScope === 'self' && currentUser.role !== 'admin') {
+    if (currentUser && currentUser.dataScope === 'self' && !isManagementRole(currentUser.role)) {
       // 根据 username 获取用户的真实姓名
       const realName = await getUserRealNameByUsername(client, currentUser.username);
       
@@ -530,7 +533,7 @@ export async function GET(request: NextRequest) {
 
 // 导入订单（支持JSON格式创建和Excel文件上传）
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, 'orders:create');
+  const authError = requirePermission(request, PERMISSIONS.ORDERS_CREATE);
   if (authError) return authError;
   const client = getSupabaseClient();
   
@@ -1093,7 +1096,7 @@ export async function POST(request: NextRequest) {
 
 // 更新订单状态
 export async function PATCH(request: NextRequest) {
-  const authError = requirePermission(request, 'orders:edit');
+  const authError = requirePermission(request, PERMISSIONS.ORDERS_EDIT);
   if (authError) return authError;
   const client = getSupabaseClient();
   
@@ -1133,10 +1136,10 @@ export async function PATCH(request: NextRequest) {
 
     if (status) {
       updateData.status = status;
-      if (status === 'assigned') {
+      if (status === ORDER_STATUS_ASSIGNED) {
         updateData.assigned_at = new Date().toISOString();
       }
-      if (status === 'completed') {
+      if (status === ORDER_STATUS_COMPLETED) {
         updateData.completed_at = new Date().toISOString();
       }
     }
@@ -1220,7 +1223,7 @@ export async function PATCH(request: NextRequest) {
 
 // 删除订单
 export async function DELETE(request: NextRequest) {
-  const authError = requirePermission(request, 'orders:delete');
+  const authError = requirePermission(request, PERMISSIONS.ORDERS_DELETE);
   if (authError) return authError;
   const client = getSupabaseClient();
   

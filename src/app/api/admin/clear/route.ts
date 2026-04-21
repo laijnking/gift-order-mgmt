@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { PERMISSIONS } from '@/lib/permissions';
 
 export async function DELETE(request: NextRequest) {
-  const authError = requirePermission(request, 'settings:edit');
+  const authError = requirePermission(request, PERMISSIONS.SETTINGS_EDIT);
   if (authError) return authError;
 
   try {
@@ -58,7 +59,7 @@ export async function DELETE(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, 'settings:edit');
+  const authError = requirePermission(request, PERMISSIONS.SETTINGS_EDIT);
   if (authError) return authError;
 
   try {

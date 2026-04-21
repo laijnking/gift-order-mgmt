@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { buildUserInfoHeaders } from '@/lib/auth';
-import { getOrderStatusBadgeClass, getOrderStatusLabel, isReturnProgressStatus } from '@/lib/order-status';
+import { getOrderStatusBadgeClass, getOrderStatusLabel, isReturnProgressStatus, ORDER_STATUS_PENDING, ORDER_STATUS_ASSIGNED, ORDER_STATUS_PARTIAL_RETURNED, ORDER_STATUS_RETURNED, ORDER_STATUS_FEEDBACKED, ORDER_STATUS_COMPLETED, ORDER_STATUS_CANCELLED } from '@/lib/order-status';
 import {
   Select,
   SelectContent,
@@ -129,14 +129,14 @@ export default function HomePage() {
       const orders = ordersData.data || [];
       const orderStats: OrderStats = {
         total: orders.length,
-        pending: orders.filter((o: Record<string, unknown>) => o.status === 'pending').length,
-        assigned: orders.filter((o: Record<string, unknown>) => o.status === 'assigned').length,
-        partialReturned: orders.filter((o: Record<string, unknown>) => o.status === 'partial_returned').length,
-        returned: orders.filter((o: Record<string, unknown>) => o.status === 'returned').length,
-        feedbacked: orders.filter((o: Record<string, unknown>) => o.status === 'feedbacked').length,
+        pending: orders.filter((o: Record<string, unknown>) => o.status === ORDER_STATUS_PENDING).length,
+        assigned: orders.filter((o: Record<string, unknown>) => o.status === ORDER_STATUS_ASSIGNED).length,
+        partialReturned: orders.filter((o: Record<string, unknown>) => o.status === ORDER_STATUS_PARTIAL_RETURNED).length,
+        returned: orders.filter((o: Record<string, unknown>) => o.status === ORDER_STATUS_RETURNED).length,
+        feedbacked: orders.filter((o: Record<string, unknown>) => o.status === ORDER_STATUS_FEEDBACKED).length,
         returnProgress: orders.filter((o: Record<string, unknown>) => isReturnProgressStatus(String(o.status || ''))).length,
-        completed: orders.filter((o: Record<string, unknown>) => o.status === 'completed').length,
-        cancelled: orders.filter((o: Record<string, unknown>) => o.status === 'cancelled').length,
+        completed: orders.filter((o: Record<string, unknown>) => o.status === ORDER_STATUS_COMPLETED).length,
+        cancelled: orders.filter((o: Record<string, unknown>) => o.status === ORDER_STATUS_CANCELLED).length,
       };
 
       const customers = customersData.data || [];
@@ -212,19 +212,19 @@ export default function HomePage() {
 
   const getStatusConfig = (status: string) => {
     switch (status) {
-      case 'pending':
+      case ORDER_STATUS_PENDING:
         return { label: getOrderStatusLabel(status), color: getOrderStatusBadgeClass(status), icon: Clock };
-      case 'assigned':
+      case ORDER_STATUS_ASSIGNED:
         return { label: getOrderStatusLabel(status), color: getOrderStatusBadgeClass(status), icon: Truck };
-      case 'partial_returned':
+      case ORDER_STATUS_PARTIAL_RETURNED:
         return { label: getOrderStatusLabel(status), color: getOrderStatusBadgeClass(status), icon: Truck };
-      case 'returned':
+      case ORDER_STATUS_RETURNED:
         return { label: getOrderStatusLabel(status), color: getOrderStatusBadgeClass(status), icon: CheckCircle };
-      case 'feedbacked':
+      case ORDER_STATUS_FEEDBACKED:
         return { label: getOrderStatusLabel(status), color: getOrderStatusBadgeClass(status), icon: CheckCircle };
-      case 'completed':
+      case ORDER_STATUS_COMPLETED:
         return { label: getOrderStatusLabel(status), color: getOrderStatusBadgeClass(status), icon: CheckCircle };
-      case 'cancelled':
+      case ORDER_STATUS_CANCELLED:
         return { label: getOrderStatusLabel(status), color: getOrderStatusBadgeClass(status), icon: AlertTriangle };
       default:
         return { label: status, color: 'bg-gray-100', icon: Package };

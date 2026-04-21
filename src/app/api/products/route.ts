@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { PERMISSIONS } from '@/lib/permissions';
 
 // 数据库字段转前端格式
 function transformProduct(dbProduct: Record<string, unknown>) {
@@ -35,7 +36,7 @@ function transformProduct(dbProduct: Record<string, unknown>) {
 
 // 获取商品列表
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, 'products:view');
+  const authError = requirePermission(request, PERMISSIONS.PRODUCTS_VIEW);
   if (authError) return authError;
 
   const client = getSupabaseClient();
@@ -99,7 +100,7 @@ export async function GET(request: NextRequest) {
 
 // 新增商品
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, 'products:create');
+  const authError = requirePermission(request, PERMISSIONS.PRODUCTS_CREATE);
   if (authError) return authError;
 
   const client = getSupabaseClient();

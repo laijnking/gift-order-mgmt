@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { supportsColumnMappingMetadata } from '@/lib/column-mapping-metadata';
 import { requirePermission } from '@/lib/server-auth';
+import { PERMISSIONS } from '@/lib/permissions';
 
 // 获取客户字段映射历史版本
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, 'orders:create');
+  const authError = requirePermission(request, PERMISSIONS.ORDERS_CREATE);
   if (authError) return authError;
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);

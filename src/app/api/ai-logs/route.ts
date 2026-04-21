@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { PERMISSIONS } from '@/lib/permissions';
 
 // 获取AI执行日志
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, 'ai_logs:view');
+  const authError = requirePermission(request, PERMISSIONS.AI_LOGS_VIEW);
   if (authError) return authError;
 
   const client = getSupabaseClient();

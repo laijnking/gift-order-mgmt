@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission } from '@/lib/server-auth';
+import { PERMISSIONS } from '@/lib/permissions';
 
 // 数据库字段转前端格式
 function transformUser(dbUser: Record<string, unknown>) {
@@ -24,7 +25,7 @@ function hashPassword(password: string) {
 
 // 获取用户列表
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, 'users:view');
+  const authError = requirePermission(request, PERMISSIONS.USERS_VIEW);
   if (authError) return authError;
 
   const client = getSupabaseClient();
@@ -75,7 +76,7 @@ export async function GET(request: NextRequest) {
 
 // 更新用户
 export async function PUT(request: NextRequest) {
-  const authError = requirePermission(request, 'users:edit');
+  const authError = requirePermission(request, PERMISSIONS.USERS_EDIT);
   if (authError) return authError;
 
   const client = getSupabaseClient();
@@ -135,7 +136,7 @@ export async function PUT(request: NextRequest) {
 
 // 删除用户
 export async function DELETE(request: NextRequest) {
-  const authError = requirePermission(request, 'users:delete');
+  const authError = requirePermission(request, PERMISSIONS.USERS_DELETE);
   if (authError) return authError;
 
   const client = getSupabaseClient();
@@ -173,7 +174,7 @@ export async function DELETE(request: NextRequest) {
 
 // 新增用户
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, 'users:create');
+  const authError = requirePermission(request, PERMISSIONS.USERS_CREATE);
   if (authError) return authError;
 
   const client = getSupabaseClient();
