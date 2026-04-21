@@ -118,7 +118,7 @@ const ROLE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
 };
 
 export default function UsersPage() {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const { hasPermission } = usePermission();
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
@@ -144,7 +144,12 @@ export default function UsersPage() {
   const [excelImportDialogOpen, setExcelImportDialogOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const authHeaders = () => buildUserInfoHeaders(user);
+
+  // 构建认证头（user 加载完成前为空，避免 401）
+  const authHeaders = (): Record<string, string> => {
+    if (!user) return {};
+    return buildUserInfoHeaders(user);
+  };
 
   // 合并 roles 表的角色和用户表中已存在的角色
   const allRoles = React.useMemo(() => {
@@ -408,6 +413,21 @@ export default function UsersPage() {
         isActive: (row.isActive || row['状态']) === '启用' || (row.isActive || row['状态']) === '是',
         remark: row.remark || row['备注'] || '',
       })).filter((u: { username: string; realName: string }) => u.username && u.realName);
+
+      if (authLoading) {
+        toast.error('用户信息加载中，请稍候');
+        return;
+      }
+
+      if (!user) {
+        toast.error('用户未登录，请重新登录');
+        return;
+      }
+
+      if (!hasPermission('users:create')) {
+        toast.error('当前账号没有导入用户的权限');
+        return;
+      }
 
       if (usersData.length === 0) {
         toast.error('未解析到有效的用户数据');

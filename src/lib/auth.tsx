@@ -25,6 +25,33 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const STORAGE_KEY = 'gift_order_user';
 
+function normalizeStoredUser(value: unknown): AuthUser | null {
+  if (!value || typeof value !== 'object') return null;
+
+  const record = value as Record<string, unknown>;
+  const id = typeof record.id === 'string' ? record.id : '';
+  const username = typeof record.username === 'string' ? record.username : '';
+  const realName = typeof record.realName === 'string' ? record.realName : username;
+  const role = typeof record.role === 'string' ? record.role : '';
+
+  if (!id || !username || !role) {
+    return null;
+  }
+
+  return {
+    id,
+    username,
+    realName,
+    role,
+    roleName: typeof record.roleName === 'string' ? record.roleName : undefined,
+    department: typeof record.department === 'string' ? record.department : undefined,
+    dataScope: typeof record.dataScope === 'string' ? record.dataScope : 'self',
+    permissions: Array.isArray(record.permissions)
+      ? record.permissions.filter((permission): permission is string => typeof permission === 'string')
+      : [],
+  };
+}
+
 function readStoredUser(): AuthUser | null {
   if (typeof window === 'undefined') return null;
 
@@ -32,7 +59,12 @@ function readStoredUser(): AuthUser | null {
   if (!raw) return null;
 
   try {
-    return JSON.parse(raw) as AuthUser;
+    const parsed = normalizeStoredUser(JSON.parse(raw));
+    if (!parsed) {
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+    return parsed;
   } catch {
     localStorage.removeItem(STORAGE_KEY);
     return null;
