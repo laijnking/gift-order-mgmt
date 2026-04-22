@@ -96,6 +96,10 @@ function normalizeDbValue(value: unknown): unknown {
     );
   }
 
+  if (typeof value === 'string' && /^-?\d+(\.\d+)?$/.test(value)) {
+    return Number(value);
+  }
+
   return value;
 }
 

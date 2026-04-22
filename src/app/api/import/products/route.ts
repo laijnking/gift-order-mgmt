@@ -1,20 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { requirePermission } from '@/lib/server-auth';
+import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { PERMISSIONS } from '@/lib/permissions';
-
-// 创建指向 public schema 的 client
-function getPublicSupabaseClient() {
-  const url = process.env.COZE_SUPABASE_URL;
-  const anonKey = process.env.COZE_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) {
-    throw new Error('Supabase credentials not configured');
-  }
-  return createClient(url, anonKey, {
-    db: { schema: 'public' },
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-}
 
 // 字段映射：前端字段名 -> 数据库字段名
 const FIELD_MAPPING: Record<string, string> = {
@@ -98,7 +85,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: '数据格式无效' }, { status: 400 });
     }
 
-    const supabase = getPublicSupabaseClient();
+    const client = getSupabaseClient();
     let imported = 0;
     let skipped = 0;
     const errors: string[] = [];
@@ -165,7 +152,7 @@ export async function POST(request: NextRequest) {
         }
         productData.is_active = true;
 
-        const { error } = await supabase
+        const { error } = await client
           .from('products')
           .insert(productData);
 

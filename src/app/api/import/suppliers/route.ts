@@ -1,20 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { requirePermission } from '@/lib/server-auth';
+import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { PERMISSIONS } from '@/lib/permissions';
-
-// 创建指向 public schema 的 client
-function getPublicSupabaseClient() {
-  const url = process.env.COZE_SUPABASE_URL;
-  const anonKey = process.env.COZE_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) {
-    throw new Error('Supabase credentials not configured');
-  }
-  return createClient(url, anonKey, {
-    db: { schema: 'public' },
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-}
 
 export async function POST(request: NextRequest) {
   const authError = requirePermission(request, PERMISSIONS.SUPPLIERS_CREATE);
@@ -27,7 +14,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: '无效的数据格式' }, { status: 400 });
     }
 
-    const supabase = getPublicSupabaseClient();
+    const client = getSupabaseClient();
     let imported = 0;
     let skipped = 0;
     const errors: string[] = [];
@@ -93,7 +80,7 @@ export async function POST(request: NextRequest) {
         if (item.remark || item['备注']) shipperData.remark = item.remark || item['备注'];
         shipperData.is_active = true;
 
-        const { error } = await supabase
+        const { error } = await client
           .from('shippers')
           .insert(shipperData);
 

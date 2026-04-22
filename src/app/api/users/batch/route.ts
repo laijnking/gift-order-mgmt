@@ -24,12 +24,15 @@ export async function POST(request: NextRequest) {
     // 转换数据以匹配 public.users 表结构
     const usersData = users.map(row => ({
       username: row.username || row['用户名'] || '',
-      real_name: row.realName || row['姓名'] || '',
+      name: row.name || row['姓名'] || row.realName || row['真实姓名'] || '',
       role: row.role || row['角色'] || 'operator',
+      password: hashPassword(row.password || row['密码'] || '123456'),
+      phone: row.phone || row['手机'] || null,
+      email: row.email || row['邮箱'] || null,
+      status: (row.isActive || row['状态']) === '禁用' ? 'inactive' : 'active',
+      data_scope: row.dataScope || row['数据权限'] || 'self',
       department: row.department || row['部门'] || null,
-      is_active: (row.isActive || row['状态']) === '禁用' ? false : true,
-      password_hash: hashPassword(row.password || row['密码'] || '123456'),
-    })).filter((u: { username: string; real_name: string }) => u.username && u.real_name);
+    })).filter((u: { username: string; name: string }) => u.username && u.name);
 
     if (usersData.length === 0) {
       return NextResponse.json({ success: false, error: '未解析到有效的用户数据' }, { status: 400 });

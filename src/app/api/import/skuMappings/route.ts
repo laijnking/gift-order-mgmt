@@ -1,25 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { requirePermission } from '@/lib/server-auth';
+import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { PERMISSIONS } from '@/lib/permissions';
 
 interface ProductLookup {
   id: string;
   barcode: string | null;
   name: string | null;
-}
-
-// 创建指向 public schema 的 client
-function getPublicSupabaseClient() {
-  const url = process.env.COZE_SUPABASE_URL;
-  const anonKey = process.env.COZE_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) {
-    throw new Error('Supabase credentials not configured');
-  }
-  return createClient(url, anonKey, {
-    db: { schema: 'public' },
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
 }
 
 export async function POST(request: NextRequest) {
@@ -33,21 +20,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: '数据格式无效' }, { status: 400 });
     }
 
-    const supabase = getPublicSupabaseClient();
+    const client = getSupabaseClient();
     
     // 获取商品和客户列表用于映射
-    const { data: products } = await supabase
+    const { data: products } = await client
       .from('products')
       .select('id, barcode, name')
       .eq('is_active', true);
     
-    const { data: customers } = await supabase
+    const { data: customers } = await client
       .from('customers')
       .select('id, code')
       .eq('is_active', true);
 
-    const productMap = new Map((products || []).map(p => [p.barcode, p.id]));
-    const customerMap = new Map((customers || []).map(c => [c.code, c.id]));
+    const productMap = new Map((products || []).map((p: Record<string, unknown>) => [p.barcode, p.id]));
+    const customerMap = new Map((customers || []).map((c: Record<string, unknown>) => [c.code, c.id]));
 
     let imported = 0;
     let skipped = 0;
@@ -90,7 +77,7 @@ export async function POST(request: NextRequest) {
         if (item.remark || item['备注']) mappingData.remark = item.remark || item['备注'];
         mappingData.is_active = true;
 
-        const { error } = await supabase
+        const { error } = await client
           .from('product_mappings')
           .insert(mappingData);
 

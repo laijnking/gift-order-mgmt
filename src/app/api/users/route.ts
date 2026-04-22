@@ -9,7 +9,8 @@ function transformUser(dbUser: Record<string, unknown>) {
   return {
     id: dbUser.id,
     username: dbUser.username,
-    realName: dbUser.real_name,
+    name: dbUser.name || dbUser.real_name || '',
+    realName: dbUser.real_name || dbUser.name || '',
     role: dbUser.role,
     department: dbUser.department,
     isActive: dbUser.is_active,
@@ -38,7 +39,7 @@ export async function GET(request: NextRequest) {
     let query = client.from('users').select('*');
 
     if (search) {
-      query = query.or(`username.ilike.%${search}%,real_name.ilike.%${search}%`);
+      query = query.or(`username.ilike.%${search}%,name.ilike.%${search}%,real_name.ilike.%${search}%`);
     }
 
     if (role) {
@@ -184,8 +185,10 @@ export async function POST(request: NextRequest) {
     
     const userData = {
       username: body.username,
+      password: body.password || '123456',
       password_hash: hashPassword(body.password || '123456'),
-      real_name: body.realName,
+      name: body.name || body.realName || body.username || '',
+      real_name: body.realName || body.name || null,
       role: body.role || 'operator',
       department: body.department,
       is_active: body.isActive !== false,
