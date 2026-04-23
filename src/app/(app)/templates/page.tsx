@@ -14,6 +14,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import {
@@ -177,6 +179,7 @@ export default function TemplatesPage() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [previewTemplate, setPreviewTemplate] = useState<ExportTemplate | null>(null);
   const [importingTemplate, setImportingTemplate] = useState(false);
+  const [supplierComboboxOpen, setSupplierComboboxOpen] = useState(false);
   
   // 表单状态
   const [formData, setFormData] = useState({
@@ -893,21 +896,45 @@ export default function TemplatesPage() {
               {formData.targetType === 'supplier' && (
                 <div className="space-y-2">
                   <Label>选择供应商</Label>
-                  <Select value={formData.targetId} onValueChange={(v) => {
-                    const supplier = suppliers.find(s => s.id === v);
-                    setFormData({...formData, targetId: v, targetName: supplier?.name || ''});
-                  }}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="选择供应商" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {suppliers.map(supplier => (
-                        <SelectItem key={supplier.id} value={supplier.id}>
-                          {supplier.name} ({supplier.code})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={supplierComboboxOpen} onOpenChange={setSupplierComboboxOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={supplierComboboxOpen}
+                        className="w-full justify-start text-left font-normal"
+                      >
+                        {formData.targetId ? (
+                          <span>{suppliers.find(s => s.id === formData.targetId)?.name || formData.targetName || '未知供应商'}</span>
+                        ) : (
+                          <span className="text-muted-foreground">输入搜索供应商...</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[400px] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="搜索供应商名称或编码..." />
+                        <CommandList>
+                          <CommandEmpty>未找到供应商</CommandEmpty>
+                          <CommandGroup>
+                            {suppliers.map(supplier => (
+                              <CommandItem
+                                key={supplier.id}
+                                value={supplier.id}
+                                onSelect={() => {
+                                  setFormData({...formData, targetId: supplier.id, targetName: supplier.name});
+                                  setSupplierComboboxOpen(false);
+                                }}
+                              >
+                                <span>{supplier.name}</span>
+                                <span className="ml-2 text-xs text-muted-foreground">({supplier.code})</span>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               )}
               

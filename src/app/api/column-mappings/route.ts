@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { customerCode, mappingConfig, headerRow, remark, createdBy, sourceHeaders } = body;
+    const { customerCode, mappingConfig, headerRow, remark, createdBy, sourceHeaders, feedbackExportHeaderOverrides } = body;
 
     if (!customerCode || !mappingConfig) {
       return NextResponse.json({ success: false, error: '缺少必要参数' }, { status: 400 });
@@ -114,6 +114,26 @@ export async function POST(request: NextRequest) {
     const normalizedHeaders = Array.isArray(sourceHeaders)
       ? normalizeHeaders(sourceHeaders.map((header) => String(header ?? '')))
       : [];
+
+    // 构建反馈导出列名映射：{ "客户列名": "系统字段名" }
+    // 基础映射：从 columnMapping 的列索引反推出客户原始列名
+    const feedbackExportHeaders: Record<string, string> = {};
+    Object.entries(mappingConfig as Record<string, string>).forEach(([colIndex, fieldName]) => {
+      const colIdx = parseInt(colIndex);
+      const header = normalizedHeaders[colIdx];
+      if (header && fieldName && fieldName !== 'ignore' && fieldName !== 'ext_keep') {
+        feedbackExportHeaders[header] = fieldName;
+      }
+    });
+
+    // 用户可额外指定导出列名覆盖（如"货号"映射到 productCode，导出时希望列名叫"商品编码"）
+    if (feedbackExportHeaderOverrides && typeof feedbackExportHeaderOverrides === 'object') {
+      for (const [key, value] of Object.entries(feedbackExportHeaderOverrides)) {
+        if (typeof value === 'string') {
+          feedbackExportHeaders[key] = value;
+        }
+      }
+    }
 
     // 获取当前最新版本号
     const { data: existing } = await client
@@ -150,6 +170,7 @@ export async function POST(request: NextRequest) {
         headerRow ?? 0,
         normalizedHeaders
       );
+      insertPayload.feedback_export_headers = feedbackExportHeaders;
     }
 
     // 插入新配置

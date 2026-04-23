@@ -214,8 +214,14 @@ async function dispatchPendingOrder(
     });
 
     dispatchItems.push({
-      productCode: stock.product_code || itemText(item, 'product_code', 'productCode'),
-      productName: stock.product_name || itemText(item, 'product_name', 'productName'),
+      // 供应商商品编码（来自订单/SKU映射，供应商发货时使用）
+      supplierProductCode: itemText(item, 'cu_product_code', 'cuProductCode') || stock.product_code,
+      supplierProductName: itemText(item, 'cu_product_name', 'cuProductName') || stock.product_name,
+      supplierProductSpec: itemText(item, 'cu_product_spec', 'cuProductSpec') || String(stock.supplier_product_spec || ''),
+      // 系统商品编码（用于内部成本核算）
+      productCode: stock.product_code,
+      productName: stock.product_name,
+      productSpec: stock.supplier_product_spec || '',
       quantity,
       unitCost,
       warehouseName: stock.warehouse_name || '',
@@ -254,31 +260,51 @@ function rowsForOrder(
   order: Record<string, unknown>,
   fieldMappings: Record<string, string>,
   batchNo: string,
-  dispatchItems?: Array<Record<string, unknown>>
+  dispatchItems?: Array<Record<string, unknown>>,
+  isSupplierTemplate?: boolean
 ) {
   const items = dispatchItems && dispatchItems.length > 0
     ? dispatchItems
     : parseItems(order.items).map((item) => ({
-      productCode: itemText(item, 'product_code', 'productCode'),
-      productName: itemText(item, 'product_name', 'productName', 'cu_product_name', 'cuProductName'),
-      productSpec: itemText(item, 'product_spec', 'productSpec', 'cu_product_spec', 'cuProductSpec'),
+      // 供应商专属模板优先取供应商商品信息；通用模板优先取系统商品信息
+      productCode: isSupplierTemplate
+        ? itemText(item, 'cu_product_code', 'cuProductCode') || itemText(item, 'product_code', 'productCode')
+        : itemText(item, 'product_code', 'productCode') || itemText(item, 'cu_product_code', 'cuProductCode'),
+      productName: isSupplierTemplate
+        ? itemText(item, 'cu_product_name', 'cuProductName') || itemText(item, 'product_name', 'productName')
+        : itemText(item, 'product_name', 'productName') || itemText(item, 'cu_product_name', 'cuProductName'),
+      productSpec: isSupplierTemplate
+        ? itemText(item, 'cu_product_spec', 'cuProductSpec') || itemText(item, 'product_spec', 'productSpec')
+        : itemText(item, 'product_spec', 'productSpec') || itemText(item, 'cu_product_spec', 'cuProductSpec'),
       quantity: toNumber(item.quantity, 1),
       unitCost: toNumber(item.price || item.unit_price),
       warehouseName: itemText(item, 'warehouse'),
     }));
 
   return items.map((item) => {
+    // dispatchItems 已有供应商商品字段（派发时已优先保留 cu_product_*），直接用
+    const supplierProductCode = (item as Record<string, unknown>).supplierProductCode as string || '';
+    const supplierProductName = (item as Record<string, unknown>).supplierProductName as string || '';
+    const supplierProductSpec = (item as Record<string, unknown>).supplierProductSpec as string || '';
+
     const context: Record<string, unknown> = {
       sysOrderNo: order.sys_order_no || '',
       orderNo: order.order_no || '',
       matchCode: order.match_code || '',
       dispatchBatch: batchNo || order.assigned_batch || '',
-      productCode: item.productCode || '',
-      productName: item.productName || '',
-      productSpec: item.productSpec || '',
+      // 供应商模板优先用供应商编码，系统模板用系统编码，都没有则互相兜底
+      productCode: isSupplierTemplate
+        ? (supplierProductCode || (item.productCode as string) || '')
+        : ((item.productCode as string) || supplierProductCode || ''),
+      productName: isSupplierTemplate
+        ? (supplierProductName || (item.productName as string) || '')
+        : ((item.productName as string) || supplierProductName || ''),
+      productSpec: isSupplierTemplate
+        ? (supplierProductSpec || (item.productSpec as string) || '')
+        : ((item.productSpec as string) || supplierProductSpec || ''),
       quantity: item.quantity || 1,
       unitCost: item.unitCost || '',
-      warehouseName: item.warehouseName || '',
+      warehouseName: (item.warehouseName as string) || '',
       receiverName: order.receiver_name || '',
       receiverPhone: order.receiver_phone || '',
       receiverAddress: order.receiver_address || '',
@@ -324,21 +350,13 @@ export async function POST(request: NextRequest) {
     let resolvedTemplateId = templateId || null;
     let resolvedTemplate: TemplateRecord | null = null;
     let templateName = '默认发货通知模板';
-    let templateSource: 'explicit' | 'default' | 'first' = 'default';
+    let templateSource: 'explicit' | 'target' | 'linked' | 'default' | 'first' = 'default';
     if (resolvedTemplateId) {
       const { data: template } = await client.from('templates').select('*').eq('id', resolvedTemplateId).maybeSingle();
       if (template) {
         resolvedTemplate = template as TemplateRecord;
         if (template.name) templateName = String(template.name);
         templateSource = 'explicit';
-      }
-    } else {
-      const { template, source } = await resolvePreferredTemplate(client, { type: 'shipping' });
-      if (template) {
-        resolvedTemplate = template;
-        if (template.id) resolvedTemplateId = template.id;
-        if (template.name) templateName = String(template.name);
-        templateSource = source === 'first' ? 'first' : 'default';
       }
     }
     const fieldMappings = resolvedTemplate ? parseTemplateFieldMappings(resolvedTemplate) : DEFAULT_SHIPPING_FIELD_MAPPINGS;
@@ -365,6 +383,23 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
+      let supplierTemplate = resolvedTemplate;
+      let supplierTemplateId = resolvedTemplateId;
+      let supplierTemplateName = templateName;
+      let supplierTemplateSource: 'explicit' | 'target' | 'linked' | 'default' | 'first' = templateSource;
+      if (!supplierTemplate) {
+        const { template, source } = await resolvePreferredTemplate(client, { type: 'shipping', targetType: 'supplier', targetId: supplierId });
+        if (template) {
+          supplierTemplate = template;
+          supplierTemplateId = template.id;
+          supplierTemplateName = String(template.name || '供应商发货模板');
+          supplierTemplateSource = source as 'target' | 'linked' | 'default' | 'first';
+        }
+      }
+      const supplierFieldMappings = supplierTemplate ? parseTemplateFieldMappings(supplierTemplate) : DEFAULT_SHIPPING_FIELD_MAPPINGS;
+      const supplierExportFieldMappings = Object.keys(supplierFieldMappings).length > 0 ? supplierFieldMappings : DEFAULT_SHIPPING_FIELD_MAPPINGS;
+      const isSupplierTemplate = Boolean(supplierTemplate?.target_type === 'supplier' && supplierTemplate?.target_id === supplierId);
+
       const { data: orders, error: ordersError } = await client
         .from('orders')
         .select('*')
@@ -390,7 +425,7 @@ export async function POST(request: NextRequest) {
             assignedOnlyCount += 1;
           }
           const exportBatchNo = dispatchResult?.dispatchBatch || batchNo;
-          exportRows.push(...rowsForOrder(order, exportFieldMappings, exportBatchNo, dispatchResult?.dispatchItems));
+          exportRows.push(...rowsForOrder(order, supplierExportFieldMappings, exportBatchNo, dispatchResult?.dispatchItems, isSupplierTemplate));
           allOrderIds.push(String(order.id));
           supplierSuccessCount += 1;
         } catch (error) {
@@ -404,7 +439,7 @@ export async function POST(request: NextRequest) {
       const safeSupplierName = supplierName.replace(/[\\/:*?"<>|]/g, '_');
       const fileName = `${safeSupplierName}+发货通知单+${today}.xlsx`;
       const worksheet = XLSX.utils.json_to_sheet(exportRows);
-      const headers = Object.keys(exportFieldMappings);
+      const headers = Object.keys(supplierExportFieldMappings);
       worksheet['!cols'] = headers.map((header) => ({ wch: Math.max(12, Math.min(48, header.length * 2 + 4)) }));
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, '发货通知单');
@@ -422,9 +457,9 @@ export async function POST(request: NextRequest) {
         supplierId,
         supplierName,
         orderCount: supplierSuccessCount,
-        templateId: resolvedTemplateId,
-        templateName,
-        templateSource,
+        templateId: supplierTemplateId,
+        templateName: supplierTemplateName,
+        templateSource: supplierTemplateSource as string,
         fileName,
         fileUrl: detailArtifact ? buildExportRecordDownloadPath(recordId, detailIndex) : null,
         artifact: detailArtifact

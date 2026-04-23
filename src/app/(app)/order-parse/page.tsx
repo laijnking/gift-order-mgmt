@@ -27,6 +27,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { PageGuard } from '@/components/auth/page-guard';
 import { buildUserInfoHeaders } from '@/lib/auth';
@@ -53,6 +58,7 @@ import {
   FileText,
   RefreshCw,
   Check,
+  CheckCircle,
   X,
   Trash2,
   Copy,
@@ -204,6 +210,8 @@ interface MappingHistory {
   header_fingerprint?: string;
   template_signature?: string;
   source_headers?: string[];
+  mapping_config?: Record<string, string>;
+  feedback_export_headers?: Record<string, string>;
 }
 
 interface SubmitValidationSummary {
@@ -371,6 +379,9 @@ export default function OrderParsePage() {
   const [activeMappingMeta, setActiveMappingMeta] = useState<MappingHistory | null>(null);
   const [showMappingDialog, setShowMappingDialog] = useState(false);
   const [mappingSearchTerm, setMappingSearchTerm] = useState('');
+  const [mappingAutoLoaded, setMappingAutoLoaded] = useState(false);
+  const [mappingCollapsed, setMappingCollapsed] = useState(false);
+  const [mappingAutoLoadedId, setMappingAutoLoadedId] = useState<string | null>(null);
   const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
   const [customerSearch, setCustomerSearch] = useState('');
   const [textInputCollapsed, setTextInputCollapsed] = useState(true);
@@ -660,7 +671,20 @@ export default function OrderParsePage() {
     }
   };
 
-  // 加载保存的映射配置
+  // 计算当前 Excel header 的指纹
+  const computeCurrentFingerprint = useCallback(() => {
+    const headers = excelPreview[headerRow] || [];
+    const normalized = headers.map((h: string) => String(h || '').trim()).filter(Boolean);
+    // 使用与后端一致的 SHA-256 前16位
+    if (typeof window !== 'undefined' && window.crypto?.subtle) {
+      // 浏览器环境：使用 Web Crypto API
+      return normalizeHeadersForCompare(headers).join('|');
+    }
+    // 简单字符串作为备用
+    return normalized.join('|');
+  }, [excelPreview, headerRow, normalizeHeadersForCompare]);
+
+  // 加载保存的映射配置（用于手动加载）
   const loadSavedMapping = useCallback(async (customerCode: string) => {
     try {
       const res = await fetch(`/api/column-mappings?customerCode=${encodeURIComponent(customerCode)}`, {
@@ -690,6 +714,43 @@ export default function OrderParsePage() {
     }
   }, [excelPreview, normalizeHeadersForCompare]);
 
+  // 自动加载历史映射：按 fingerprint 精确匹配
+  const autoLoadMappingByFingerprint = useCallback(async (customerCode: string) => {
+    const currentHeaders = excelPreview[headerRow] || [];
+    if (currentHeaders.length === 0) return;
+
+    const normalizedHeaders = normalizeHeadersForCompare(currentHeaders);
+    const fingerprint = normalizedHeaders.join('|');
+
+    try {
+      const res = await fetch(
+        `/api/column-mappings/history?customerCode=${encodeURIComponent(customerCode)}&fingerprint=${encodeURIComponent(fingerprint)}`,
+        { headers: buildUserInfoHeaders() }
+      );
+      const data = await res.json();
+      if (data.success && data.data && data.data.length > 0) {
+        const savedMapping = data.data[0];
+        // 再次确认列名完全一致
+        const savedHeaders = normalizeHeadersForCompare(savedMapping.source_headers || []);
+        if (JSON.stringify(normalizedHeaders) === JSON.stringify(savedHeaders)) {
+          setColumnMapping(savedMapping.mapping_config || {});
+          setActiveMappingMeta(savedMapping);
+          setMappingAutoLoaded(true);
+          setMappingAutoLoadedId(savedMapping.id);
+          setMappingCollapsed(true); // 折叠列表
+          toast.success(`已自动加载历史映射 (v${savedMapping.version})，${Object.keys(savedMapping.mapping_config || {}).length} 列已配置`);
+        }
+      } else {
+        // 无匹配映射，重置状态
+        setMappingAutoLoaded(false);
+        setMappingAutoLoadedId(null);
+        setMappingCollapsed(false);
+      }
+    } catch (error) {
+      console.error('自动加载历史映射失败:', error);
+    }
+  }, [excelPreview, headerRow, normalizeHeadersForCompare]);
+
   // 加载映射历史版本
   const loadMappingHistory = async (customerCode: string) => {
     try {
@@ -705,16 +766,19 @@ export default function OrderParsePage() {
     }
   };
 
-  // 选择客户时加载映射配置
+  // 选择客户时：优先按 fingerprint 自动加载历史映射
   useEffect(() => {
     if (selectedCustomer) {
       loadMappingHistory(selectedCustomer);
-      loadSavedMapping(selectedCustomer);
+      autoLoadMappingByFingerprint(selectedCustomer);
     } else {
       setMappingHistory([]);
       setColumnMapping({});
+      setMappingAutoLoaded(false);
+      setMappingAutoLoadedId(null);
+      setMappingCollapsed(false);
     }
-  }, [selectedCustomer, loadSavedMapping]);
+  }, [selectedCustomer, autoLoadMappingByFingerprint, loadMappingHistory]);
 
   // 保存当前映射配置
   const saveMapping = async () => {
@@ -735,6 +799,7 @@ export default function OrderParsePage() {
           mappingConfig: columnMapping,
           headerRow,
           sourceHeaders: excelPreview[headerRow] || [],
+          feedbackExportHeaderOverrides: {},
         }),
       });
 
@@ -1973,11 +2038,44 @@ export default function OrderParsePage() {
                         </div>
 
                         {/* Column mapping - 优化UI，使用分组下拉框 */}
+                        {/* 自动加载历史映射 Banner */}
+                        {mappingAutoLoaded && (
+                          <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg mb-2 shrink-0">
+                            <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
+                            <span className="text-sm text-green-800 flex-1">
+                              已自动加载历史映射 (v{activeMappingMeta?.version})，
+                              {Object.keys(columnMapping).filter(k => columnMapping[k] && columnMapping[k] !== 'ignore').length} 列已配置
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-xs shrink-0"
+                              onClick={() => setMappingCollapsed(v => !v)}
+                            >
+                              {mappingCollapsed ? (
+                                <><ChevronDown className="h-3 w-3 mr-1" />展开</>
+                              ) : (
+                                <><ChevronUp className="h-3 w-3 mr-1" />收起</>
+                              )}
+                            </Button>
+                          </div>
+                        )}
+
                         {excelPreview.length > headerRow && (
-                          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-                            <Label className="text-xs font-medium shrink-0">
-                              列映射（自动识别）
-                            </Label>
+                          <Collapsible
+                            open={!mappingCollapsed}
+                            onOpenChange={(open) => setMappingCollapsed(!open)}
+                            className="flex-1 min-h-0 overflow-hidden flex flex-col"
+                          >
+                            <CollapsibleTrigger asChild>
+                              <div className="flex items-center gap-2 cursor-pointer select-none shrink-0">
+                                <Label className="text-xs font-medium">列映射（自动识别）</Label>
+                                {mappingCollapsed && (
+                                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                                )}
+                              </div>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent className="flex-1 min-h-0 overflow-hidden flex flex-col">
                             <ScrollArea className="flex-1 mt-2 pr-2">
                               <div className="space-y-2 pb-2">
                                 {(excelPreview[headerRow] || []).map((header, idx) => (
@@ -1989,6 +2087,7 @@ export default function OrderParsePage() {
                                     <Select
                                       value={columnMapping[String(idx)] || 'ignore'}
                                       onValueChange={(v) => {
+                                        setMappingAutoLoaded(false);
                                         setColumnMapping(prev => {
                                           const updated = { ...prev, [String(idx)]: v };
                                           if (v.startsWith('ext_field_')) {
@@ -2059,7 +2158,8 @@ export default function OrderParsePage() {
                                 </table>
                               </div>
                             </details>
-                          </div>
+                            </CollapsibleContent>
+                          </Collapsible>
                         )}
                       </div>
                     )}

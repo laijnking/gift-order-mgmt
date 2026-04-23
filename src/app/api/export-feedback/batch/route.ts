@@ -60,7 +60,8 @@ function itemText(item: OrderItem, ...keys: string[]) {
 
 function buildFeedbackRows(
   orders: Record<string, unknown>[],
-  fieldMappings: Record<string, string>
+  fieldMappings: Record<string, string>,
+  feedbackExportHeaders?: Record<string, string>
 ) {
   const normalizedMappings = Object.keys(fieldMappings).length > 0 ? fieldMappings : DEFAULT_CUSTOMER_FEEDBACK_MAPPINGS;
 
@@ -71,6 +72,7 @@ function buildFeedbackRows(
       : [{ product_name: '', product_code: '', product_spec: '', quantity: 1, price: null }];
 
     return rowItems.map((item) => {
+      // 基础 context：所有可能用到的字段都先计算出来
       const context: Record<string, unknown> = {
         bill_no: order.sys_order_no || '',
         bill_date: order.created_at || '',
@@ -82,10 +84,10 @@ function buildFeedbackRows(
         supplier_name: order.supplier_name || '',
         salesperson: order.salesperson || '',
         operator: order.operator_name || '',
-        product_name: itemText(item, 'product_name', 'productName', 'cu_product_name', 'cuProductName'),
-        customer_product_name: itemText(item, 'cu_product_name', 'cuProductName', 'product_name', 'productName'),
-        product_code: itemText(item, 'product_code', 'productCode', 'cu_product_code', 'cuProductCode'),
-        product_spec: itemText(item, 'product_spec', 'productSpec', 'cu_product_spec', 'cuProductSpec'),
+        // cu_product_* 优先（客户原始信息）
+        product_name: itemText(item, 'cu_product_name', 'cuProductName', 'product_name', 'productName'),
+        product_code: itemText(item, 'cu_product_code', 'cuProductCode', 'product_code', 'productCode'),
+        product_spec: itemText(item, 'cu_product_spec', 'cuProductSpec', 'product_spec', 'productSpec'),
         quantity: toNumber(item.quantity, 1),
         price: item.price ?? item.unit_price ?? '',
         amount: toNumber(item.quantity, 1) * toNumber(item.price ?? item.unit_price, 0),
@@ -98,6 +100,23 @@ function buildFeedbackRows(
         tracking_no: order.tracking_no || '',
       };
 
+      // 有客户列名映射：使用客户原始列名 + 追加物流列
+      if (feedbackExportHeaders && Object.keys(feedbackExportHeaders).length > 0) {
+        const logisticsHeaders = ['快递公司', '运单号'];
+        const allHeaders = [...Object.keys(feedbackExportHeaders), ...logisticsHeaders];
+
+        return Object.fromEntries(
+          allHeaders.map((header) => {
+            if (header === '快递公司') return [header, context.express_company ?? ''];
+            if (header === '运单号') return [header, context.tracking_no ?? ''];
+            // 从 feedbackExportHeaders 中找系统字段名，再从 context 取值
+            const systemField = feedbackExportHeaders[header];
+            return [header, systemField ? (context[systemField] ?? '') : ''];
+          })
+        );
+      }
+
+      // 无客户映射：使用 normalizedMappings 构建（兼容默认/模板场景）
       return Object.fromEntries(
         Object.entries(normalizedMappings).map(([header, fieldKey]) => [header, context[fieldKey] ?? ''])
       );
@@ -202,13 +221,14 @@ export async function POST(request: NextRequest) {
       const customerName = customer?.name || '未知客户';
       const { data: customerMapping } = await client
         .from('column_mappings')
-        .select('id, version, mapping_config')
+        .select('id, version, mapping_config, feedback_export_headers')
         .eq('customer_code', orders[0]?.customer_code || '')
         .eq('is_active', true)
         .limit(1)
         .maybeSingle();
 
       let exportFieldMappings = customerMapping?.mapping_config || {};
+      let feedbackExportHeaders = customerMapping?.feedback_export_headers || null;
       let exportTemplateName = customerMapping
         ? `客户导入映射(v${customerMapping.version})`
         : templateName;
@@ -235,6 +255,7 @@ export async function POST(request: NextRequest) {
           exportTemplateId = customerScopedTemplate.id || exportTemplateId;
           exportTemplateName = String(customerScopedTemplate.name || exportTemplateName);
           exportFieldMappings = parseTemplateFieldMappings(customerScopedTemplate);
+          feedbackExportHeaders = null; // 模板有自己的字段映射，不使用客户导入列名
           if (resolvedTemplate?.id === customerScopedTemplate.id && templateSource === 'explicit') {
             exportTemplateSource = 'explicit';
           }
@@ -244,7 +265,7 @@ export async function POST(request: NextRequest) {
       // 生成文件名: 客户名称+订单反馈+日期
       const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
       const fileName = `${customerName}+订单反馈+${today}.xlsx`;
-      const exportRows = buildFeedbackRows(orders as Record<string, unknown>[], exportFieldMappings);
+      const exportRows = buildFeedbackRows(orders as Record<string, unknown>[], exportFieldMappings, feedbackExportHeaders || undefined);
       const worksheet = XLSX.utils.json_to_sheet(exportRows);
       const headers = Object.keys(exportRows[0] || exportFieldMappings || DEFAULT_CUSTOMER_FEEDBACK_MAPPINGS);
       worksheet['!cols'] = headers.map((header) => ({ wch: Math.max(12, Math.min(40, header.length * 2 + 4)) }));

@@ -550,7 +550,11 @@ CREATE TABLE IF NOT EXISTS column_mappings (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     created_by VARCHAR(50),
-    remark TEXT
+    remark TEXT,
+    source_headers JSONB DEFAULT '[]'::JSONB,
+    header_fingerprint VARCHAR(32),
+    template_signature VARCHAR(48),
+    feedback_export_headers JSONB DEFAULT '{}'::JSONB
 );
 
 -- =====================================================
