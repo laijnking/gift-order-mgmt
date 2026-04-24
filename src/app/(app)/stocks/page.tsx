@@ -70,7 +70,7 @@ import {
 const IMPORT_TEMPLATE = {
   title: '库存管理',
   fields: ['supplierCode', 'supplierName', 'productName', 'productCode', 'spec', 'quantity', 'price', 'warehouse', 'remark'],
-  fieldLabels: ['供应商编码', '供应商名称', '商品名称', '商品编码', '规格型号', '库存数量', '单价', '仓库', '备注'],
+  fieldLabels: ['发货方编码', '发货方名称', '商品名称', '商品编码', '规格型号', '库存数量', '单价', '仓库', '备注'],
   template: [
     { supplierCode: 'GYS-001', supplierName: '首映礼省内仓', productName: '九阳电蒸锅', productCode: 'DZ100HG-GZ605', spec: 'DZ100HG-GZ605', quantity: '15', price: '145.00', warehouse: '默认仓', remark: '' },
     { supplierCode: 'GYS-001', supplierName: '首映礼省内仓', productName: '苏泊尔果蔬清洗机', productCode: 'GS10', spec: 'GS10', quantity: '3', price: '115.00', warehouse: '默认仓', remark: '尾货预警' },
@@ -95,6 +95,14 @@ interface Stock {
 }
 
 interface Supplier {
+  id: string;
+  code?: string;
+  name: string;
+  type?: string;
+  sendType?: string;
+}
+
+interface Warehouse {
   id: string;
   code: string;
   name: string;
@@ -146,6 +154,7 @@ export default function StocksPage() {
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [filteredStocks, setFilteredStocks] = useState<Stock[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [supplierFilter, setSupplierFilter] = useState<string>('all');
@@ -184,10 +193,10 @@ export default function StocksPage() {
   // 导入配置
   const IMPORT_CONFIG = {
     fields: ['supplierCode', 'supplierName', 'productName', 'productCode', 'spec', 'quantity', 'price', 'warehouse', 'remark'],
-    fieldLabels: ['供应商编码', '供应商名称', '商品名称', '商品编码', '规格型号', '库存数量', '单价', '仓库', '备注'],
+    fieldLabels: ['发货方编码', '发货方名称', '商品名称', '商品编码', '规格型号', '库存数量', '单价', '仓库', '备注'],
     columnMappings: {
-      supplierCode: ['供应商编码', '供应商代码', '编码'],
-      supplierName: ['供应商名称', '供应商', '供货商'],
+      supplierCode: ['发货方编码', '发货方代码', '编码'],
+      supplierName: ['发货方名称', '发货方', '供货商'],
       productName: ['商品名称', '品名', '商品'],
       productCode: ['商品编码', 'SKU', '货号'],
       spec: ['规格', '规格型号', '型号规格'],
@@ -202,6 +211,8 @@ export default function StocksPage() {
   const [formData, setFormData] = useState({
     supplier_id: '',
     supplier_name: '',
+    warehouse_id: '',
+    warehouse_name: '',
     product_code: '',
     product_name: '',
     quantity: 0,
@@ -251,13 +262,15 @@ export default function StocksPage() {
         params.set('lowStockOnly', 'true');
       }
 
-      const [stocksRes, suppliersRes] = await Promise.all([
+      const [stocksRes, shippersRes, warehousesRes] = await Promise.all([
         fetch(`/api/stocks?${params.toString()}`, { headers: authHeaders() }),
-        fetch('/api/suppliers?active=true', { headers: authHeaders() }),
+        fetch('/api/shippers?active=true', { headers: authHeaders() }),
+        fetch('/api/warehouses', { headers: authHeaders() }),
       ]);
 
       const stocksData = await stocksRes.json();
-      const suppliersData = await suppliersRes.json();
+      const shippersData = await shippersRes.json();
+      const warehousesData = await warehousesRes.json();
 
       if (stocksData.success) {
         setStocks(stocksData.data || []);
@@ -265,8 +278,11 @@ export default function StocksPage() {
           setStats(stocksData.stats);
         }
       }
-      if (suppliersData.success) {
-        setSuppliers(suppliersData.data || []);
+      if (shippersData.success) {
+        setSuppliers((shippersData.data || []).filter((s: Supplier) => s.name));
+      }
+      if (warehousesData.success) {
+        setWarehouses((warehousesData.data || []).filter((w: Warehouse) => w.name));
       }
     } catch (error) {
       console.error('加载数据失败:', error);
@@ -420,6 +436,8 @@ export default function StocksPage() {
           ...formData,
           supplierId: formData.supplier_id,
           supplierName: formData.supplier_name,
+          warehouseId: formData.warehouse_id || null,
+          warehouseName: formData.warehouse_name || '',
           productCode: formData.product_code,
           productName: formData.product_name,
         }),
@@ -448,6 +466,8 @@ export default function StocksPage() {
     setFormData({
       supplier_id: stock.supplier_id || '',
       supplier_name: stock.supplier_name || '',
+      warehouse_id: stock.warehouse_id || '',
+      warehouse_name: (stock as unknown as Record<string, unknown>).warehouse_name as string || '',
       product_code: stock.product_code || '',
       product_name: stock.product_name || '',
       quantity: stock.quantity || 0,
@@ -483,6 +503,8 @@ export default function StocksPage() {
     setFormData({
       supplier_id: '',
       supplier_name: '',
+      warehouse_id: '',
+      warehouse_name: '',
       product_code: '',
       product_name: '',
       quantity: 0,
@@ -811,9 +833,9 @@ export default function StocksPage() {
           <PopoverTrigger asChild>
             <Button variant="outline" className="w-full justify-start lg:w-[200px]">
               <span className={supplierFilter && supplierFilter !== 'all' ? '' : 'text-muted-foreground'}>
-                {supplierFilter && supplierFilter !== 'all' 
-                  ? suppliers.find(s => s.id === supplierFilter)?.name || '筛选供应商'
-                  : '筛选供应商'}
+                {supplierFilter && supplierFilter !== 'all'
+                  ? suppliers.find(s => s.id === supplierFilter)?.name || '筛选发货方'
+                  : '筛选发货方'}
               </span>
             </Button>
           </PopoverTrigger>
@@ -822,7 +844,7 @@ export default function StocksPage() {
               <div className="flex items-center border-b px-3">
                 <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                 <input
-                  placeholder="搜索供应商..."
+                  placeholder="搜索发货方..."
                   value={supplierSearch}
                   onChange={(e) => setSupplierSearch(e.target.value)}
                   className="flex h-9 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
@@ -838,7 +860,7 @@ export default function StocksPage() {
                     setSupplierSearch('');
                   }}
                 >
-                  全部供应商
+                  全部发货方
                 </div>
                 {suppliers
                   .filter(s => s.name.toLowerCase().includes(supplierSearch.toLowerCase()))
@@ -858,7 +880,7 @@ export default function StocksPage() {
                   ))}
                 {suppliers.filter(s => s.name.toLowerCase().includes(supplierSearch.toLowerCase())).length === 0 && (
                   <div className="px-2 py-4 text-sm text-center text-muted-foreground">
-                    没有找到匹配的供应商
+                    没有找到匹配的发货方
                   </div>
                 )}
               </div>
@@ -880,7 +902,7 @@ export default function StocksPage() {
               <TableRow>
                 <TableHead>商品名称</TableHead>
                 <TableHead>SKU编码</TableHead>
-                <TableHead>供应商</TableHead>
+                <TableHead>发货方</TableHead>
                 <TableHead className="text-right">库存</TableHead>
                 <TableHead className="text-right">在途</TableHead>
                 <TableHead className="text-right">可用</TableHead>
@@ -981,7 +1003,7 @@ export default function StocksPage() {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="supplier">供应商 *</Label>
+              <Label htmlFor="supplier">发货方 *</Label>
               <Select
                 value={formData.supplier_id || 'none'}
                 onValueChange={(value) => {
@@ -993,12 +1015,39 @@ export default function StocksPage() {
                 }}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="选择供应商" />
+                  <SelectValue placeholder="选择发货方" />
                 </SelectTrigger>
                 <SelectContent>
                   {suppliers.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
-                      {s.name}
+                      {s.name}{s.type ? ` (${s.type})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="warehouse">仓库</Label>
+              <Select
+                value={formData.warehouse_id || 'none'}
+                onValueChange={(value) => {
+                  if (value === 'none') {
+                    const w = warehouses.find(w => w.id === formData.warehouse_id);
+                    setFormData(prev => ({ ...prev, warehouse_id: '', warehouse_name: '' }));
+                  } else {
+                    const w = warehouses.find(w => w.id === value);
+                    setFormData(prev => ({ ...prev, warehouse_id: value, warehouse_name: w?.name || '' }));
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="选择仓库（可选）" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">不使用仓库</SelectItem>
+                  {warehouses.map((w) => (
+                    <SelectItem key={w.id} value={w.id}>
+                      {w.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1006,12 +1055,12 @@ export default function StocksPage() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
-                <Label htmlFor="product_code">SKU编码 *</Label>
+                <Label htmlFor="product_code">商品编码 *</Label>
                 <Input
                   id="product_code"
                   value={formData.product_code}
                   onChange={(e) => setFormData({ ...formData, product_code: e.target.value })}
-                  placeholder="商品SKU"
+                  placeholder="商品编码"
                 />
               </div>
               <div className="grid gap-2">
@@ -1132,7 +1181,7 @@ export default function StocksPage() {
                   <TableRow>
                     <TableHead>时间</TableHead>
                     <TableHead>商品</TableHead>
-                    <TableHead>供应商</TableHead>
+                    <TableHead>发货方</TableHead>
                     <TableHead className="text-right">变更前</TableHead>
                     <TableHead className="text-right">变更后</TableHead>
                     <TableHead className="text-right">变化</TableHead>
@@ -1348,13 +1397,13 @@ export default function StocksPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">供应商</Label>
+                  <Label className="text-xs text-muted-foreground">发货方</Label>
                   <Select value={priceHistorySupplier} onValueChange={setPriceHistorySupplier}>
                     <SelectTrigger className="h-8 w-full lg:w-[180px]">
-                      <SelectValue placeholder="全部供应商" />
+                      <SelectValue placeholder="全部发货方" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">全部供应商</SelectItem>
+                      <SelectItem value="all">全部发货方</SelectItem>
                       {suppliers.map((s) => (
                         <SelectItem key={s.id} value={s.id}>
                           {s.name}
@@ -1395,7 +1444,7 @@ export default function StocksPage() {
                   <TableRow>
                     <TableHead>时间</TableHead>
                     <TableHead>商品</TableHead>
-                    <TableHead>供应商</TableHead>
+                    <TableHead>发货方</TableHead>
                     <TableHead className="text-right">原价</TableHead>
                     <TableHead className="text-right">新价</TableHead>
                     <TableHead className="text-right">变化</TableHead>
