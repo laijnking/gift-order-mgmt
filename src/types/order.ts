@@ -1,209 +1,505 @@
 // 订单状态枚举
-export type OrderStatus = 
-  | 'pending'      // 待派发
-  | 'assigned'     // 已派发
+export type OrderStatus =
+  | 'pending'       // 待派发
+  | 'assigned'      // 已派发
   | 'partial_returned'  // 部分回单
-  | 'returned'     // 已回单
-  | 'feedbacked'   // 已反馈客户
-  | 'completed'    // 已导出金蝶/归档
-  | 'cancelled';  // 已取消
+  | 'returned'      // 已回单
+  | 'feedbacked'    // 已反馈客户
+  | 'completed'     // 已完成/已归档
+  | 'cancelled';   // 已取消
 
 // 订单来源
-export type OrderSource = 'wechat' | 'excel' | 'form' | 'jushuitan';
+export type OrderSource = 'wechat' | 'excel' | 'form' | 'jushuitan' | 'ai_parse';
 
 // 快递公司
-export type ExpressCompany = 
-  | '顺丰速运' | '中通快递' | '圆通速递' | '韵达快递' 
+export type ExpressCompany =
+  | '顺丰速运' | '中通快递' | '圆通速递' | '韵达快递'
   | '申通快递' | '极兔速递' | '京东物流' | '德邦快递'
   | 'EMS' | '邮政包裹' | '菜鸟裹裹' | '其他';
 
 // 匹配类型
-export type MatchType = 'spec' | 'name' | 'mapping' | 'none';
+export type MatchType = 'spec' | 'name' | 'mapping' | 'none' | 'product_id' | 'code';
 
 // 订单商品（包含客户原始信息和系统匹配信息）
 export interface OrderItem {
   // 系统商品档案信息（匹配成功后填充）
-  productId?: string | null;      // 系统商品ID
-  productName: string;             // 系统商品名称
-  productSpec?: string;            // 系统商品规格型号
-  productCode?: string;            // 系统商品编码
-  unitPrice?: number | null;       // 系统商品单价
-  
+  productId?: string | null;
+  productName: string;
+  productSpec?: string;
+  productCode?: string;
+  productBrand?: string;
+  unitPrice?: number | null;
+
   // 客户原始商品信息（始终保留）
-  cuProductName?: string;          // 客户原始商品名称
-  cuProductCode?: string;          // 客户原始商品编码
-  cuProductSpec?: string;          // 客户原始规格型号
-  
+  cuProductName?: string;
+  cuProductCode?: string;
+  cuProductSpec?: string;
+
   // 订单商品信息
-  quantity: number;                // 数量
-  price?: number;                  // 客户订单单价（可能与系统单价不同）
-  remark?: string;                 // 备注
-  
+  quantity: number;
+  price?: number;
+  amount?: number;
+  discount?: number;
+  taxRate?: number;
+  remark?: string;
+
   // 匹配信息
-  matchType?: MatchType;           // 匹配方式
-  matchHint?: string;              // 匹配说明
+  matchType?: string;
+  matchHint?: string;
 }
 
 // 订单收货信息
 export interface ReceiverInfo {
-  name: string;         // 收货人
-  phone: string;        // 收货电话
-  address: string;      // 收货地址
-  province?: string;    // 省份（用于运费计算）
-  city?: string;        // 城市
-  district?: string;    // 区/县
+  name: string;
+  phone: string;
+  address: string;
+  province?: string;
+  city?: string;
+  district?: string;
 }
 
-// 订单主体
+// 订单主体 — 与 API transformOrder 输出完全对齐
 export interface Order {
-  id: string;           // 内部唯一ID
-  sysOrderNo?: string;  // 系统订单号（自动生成，全局唯一）
-  orderNo: string;      // 客户订单号（客户侧，可能重复）
-  supplierOrderNo?: string; // 供应商侧单据号
-  status: OrderStatus;  // 订单状态
-  
-  // 商品信息
+  id: string;
+  sysOrderNo?: string;
+  orderNo: string;
+  supplierOrderNo?: string;
+  status: OrderStatus;
   items: OrderItem[];
-  
-  // 收货信息
   receiver: ReceiverInfo;
-  
-  // 客户信息
-  customerCode: string;  // 客户代码
-  customerName: string;  // 客户名称
-  salesperson: string;   // 业务员（旧字段，兼容）
-  salespersonName?: string; // 业务员名称（来自客户档案）
-  operatorName?: string;    // 跟单员名称（来自客户档案）
-  
-  // 快递信息
-  expressCompany?: ExpressCompany;
-  trackingNo?: string;
-  
-  // 供应商分配
+
+  // 关联档案ID
+  customerId?: string;
+  customerCode: string;
+  customerName: string;
+  salespersonId?: string;
+  salesperson?: string;
+  salespersonName?: string;
+  operatorId?: string;
+  operatorName?: string;
   supplierId?: string;
   supplierName?: string;
-  
+  warehouseId?: string;
+  warehouse?: string;
+
+  // 财务字段
+  amount?: number;
+  discount?: number;
+  taxRate?: number;
+  incomeName?: string;
+  incomeAmount?: number;
+  invoiceRequired?: boolean;
+
+  // 快递信息
+  expressCompany?: string;
+  trackingNo?: string;
+  expressRequirement?: string;
+
   // 元数据
   source: OrderSource;
-  importBatch?: string;  // 导入批次号
-  assignedBatch?: string; // 派发批次号
-  
-  // 唯一匹配码
-  matchCode?: string;    // MD5(客户代码 + 收件人 + 型号 + 数量) 前8位
-  
-  // 备用字段（客户订单的额外信息）
+  importBatch?: string;
+  assignedBatch?: string;
+  matchCode?: string;
+
+  // 单据信息
+  billNo?: string;
+  billDate?: string;
+
+  // 备用字段
   extFields?: Record<string, string | null>;
-  
+
   // 时间戳
   createdAt: string;
   updatedAt: string;
   assignedAt?: string;
   completedAt?: string;
-  
+  returnedAt?: string;
+
   // 其他
   remark?: string;
-  expressRequirement?: string; // 快递要求，如"不发极兔"
 }
 
-// 供应商
+// 供应商 — 对齐 suppliers 表 + API transformSupplier
 export interface Supplier {
   id: string;
+  code?: string;
   name: string;
-  shortName: string;    // 简称
-  type: 'warehouse' | 'supplier';  // 仓库或供应商
-  contact?: string;     // 联系方式
-  sendType: 'wechat' | 'system' | 'jushuitan' | 'download'; // 发货方式
-  province?: string;    // 所在省份
-  canJd: boolean;       // 能否发京东
-  expressRestrictions?: string[]; // 快递限制
-  costFactor?: number;  // 成本系数
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+  shortName?: string;
+  type: string;
+  contactPerson?: string;
+  contactPhone?: string;
+  sendType: string;
+  province?: string;
+  city?: string;
+  canJd?: boolean;
+  expressRestrictions?: string[];
+  costFactor?: number;
+  settlementType?: string;
+  isActive?: boolean;
+  remark?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-// 客户
-export interface Customer {
+// 发货方 — 对齐 shippers 表 + API transformShipper
+export interface Shipper {
   id: string;
   code: string;
   name: string;
   shortName?: string;
-  contact?: string;
-  phone?: string;
+  type: string;
+  contactPerson?: string;
+  contactPhone?: string;
+  province?: string;
+  city?: string;
   address?: string;
-  salesperson?: string;
-  salespersonName?: string;
-  operator?: string;
-  operatorName?: string;
-  status: 'active' | 'inactive';
-  createdAt: string;
-  updatedAt: string;
+  sendType: string;
+  jdChannelId?: string;
+  pddShopId?: string;
+  canJd?: boolean;
+  canPdd?: boolean;
+  expressRestrictions?: string[];
+  settlementType?: string;
+  costFactor?: number;
+  isActive?: boolean;
+  remark?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-// 商品
-export interface Product {
+// 客户 — 对齐 customers 表 + API transformCustomer
+export interface Customer {
   id: string;
   code: string;
   name: string;
-  spec?: string;
+  type?: string;
+  contactPerson?: string;
+  contactPhone?: string;
+  contactEmail?: string;
+  phone?: string;
+  mobile?: string;
+  address?: string;
+  province?: string;
+  city?: string;
+  district?: string;
+  region?: string;
+  salesUserId?: string;
+  salesUserName?: string;
+  operatorUserId?: string;
+  operatorUserName?: string;
+  creditLimit?: number;
+  paymentDays?: number;
+  paymentStatus?: string;
+  settlementCycle?: string;
+  isActive?: boolean;
+  remark?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// 商品 — 对齐 products 表 + API transformProduct
+export interface Product {
+  id: string;
+  sku?: string;
+  code?: string;
+  barcode?: string;
+  name: string;
   brand?: string;
   category?: string;
-  unitPrice?: number;
-  status: 'active' | 'inactive' | 'discontinued';
-  createdAt: string;
-  updatedAt: string;
+  spec?: string;
+  unit?: string;
+  size?: string;
+  weight?: number;
+  costPrice?: number;
+  retailPrice?: number;
+  lifecycleStatus?: string;
+  isActive?: boolean;
+  // 尺寸和重量字段（用于运费计算）
+  length?: number;
+  width?: number;
+  height?: number;
+  volume?: number;
+  lengthCm?: number;
+  widthCm?: number;
+  heightCm?: number;
+  weightKg?: number;
+  volumeFactor?: number;
+  volumeWeight?: number;
+  remark?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-// SKU映射
-export interface ProductMapping {
+// 仓库 — 对齐 warehouses 表 + API transformWarehouse
+export interface Warehouse {
   id: string;
-  customerCode?: string;
-  customerProductName: string;
-  systemProductId?: string;
-  systemProductCode?: string;
-  systemProductName?: string;  // 用于mock数据
-  createdAt: string;
-  updatedAt: string;
+  code: string;
+  name: string;
+  shortName?: string;
+  type: string;
+  contactPerson?: string;
+  contactPhone?: string;
+  address?: string;
+  province?: string;
+  city?: string;
+  isActive?: boolean;
+  remark?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-// 供应商库存
+// 供应商库存 — 对齐 stocks 表 + API enhanceStock
 export interface SupplierStock {
   id: string;
+  productId: string;
+  productCode?: string;
+  productName: string;
   supplierId: string;
   supplierName: string;
-  productId: string;
-  productName: string;
-  productCode: string;
-  productSpec?: string;
+  warehouseId?: string;
+  warehouseName?: string;
   quantity: number;
-  price: number;
-  version?: string;
-  createdAt: string;
-  updatedAt: string;
+  reservedQuantity: number;
+  availableQuantity: number;
+  unitPrice: number;
+  minStock?: number;
+  maxStock?: number;
+  status?: string;
+  isLowStock?: boolean;
+  stockLevel?: 'out' | 'low' | 'normal';
+  remark?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-// 发货记录
+// 发货记录 — 对齐 dispatch_records 表
 export interface DispatchRecord {
   id: string;
   orderId: string;
-  orderNo: string;
+  orderNo?: string;
   supplierId: string;
   supplierName: string;
+  warehouseId?: string;
+  batchNo: string;
+  dispatchAt?: string;
+  status: string;
   expressCompany?: string;
   trackingNo?: string;
-  status: 'pending' | 'shipped' | 'delivered';
-  createdAt: string;
-  updatedAt: string;
+  items: Array<{
+    productCode?: string;
+    productName?: string;
+    quantity: number;
+    unitCost?: number;
+    warehouseName?: string;
+  }>;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-// 回单记录
+// 回单记录 — 对齐 return_records 表
 export interface ReturnRecord {
   id: string;
-  orderId: string;
-  orderNo: string;
+  orderId?: string;
+  orderNo?: string;
   expressCompany: string;
   trackingNo: string;
-  receivedAt: string;
-  note?: string;
-  createdAt: string;
+  returnedAt?: string;
+  receivedAt?: string;
+  matchedBy?: string;
+  matchConfidence?: number;
+  supplierId?: string;
+  supplierName?: string;
+  operator?: string;
+  status: string;
+  remark?: string;
+  createdAt?: string;
+}
+
+// SKU映射 — 对齐 product_mappings 表（实际运行时的列）
+export interface ProductMapping {
+  id: string;
+  productId?: string;
+  productCode?: string;
+  productName?: string;
+  customerId?: string;
+  customerCode?: string;
+  customerName?: string;
+  supplierId?: string;
+  supplierName?: string;
+  customerSku?: string;
+  customerBarcode?: string;
+  customerProductName: string;
+  price?: number;
+  isActive?: boolean;
+  remark?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// 预警规则 — 对齐 alert_rules 表
+export interface AlertRule {
+  id: string;
+  name: string;
+  code: string;
+  type: string;
+  config?: Record<string, unknown>;
+  priority?: number;
+  isEnabled?: boolean;
+  notificationChannels?: string[];
+  description?: string;
+  remark?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// 预警记录 — 对齐 alert_records 表
+export interface AlertRecord {
+  id: string;
+  ruleId?: string;
+  ruleCode?: string;
+  ruleName?: string;
+  orderId?: string;
+  orderNo?: string;
+  stockId?: string;
+  alertType: string;
+  alertLevel: string;
+  title: string;
+  content: string;
+  data?: Record<string, unknown>;
+  isRead?: boolean;
+  isResolved?: boolean;
+  resolvedAt?: string;
+  resolvedBy?: string;
+  resolution?: string;
+  customerCode?: string;
+  productCode?: string;
+  supplierId?: string;
+  supplierName?: string;
+  createdAt?: string;
+}
+
+// 历史成本记录 — 对齐 order_cost_history 表
+export interface OrderCostRecord {
+  id: string;
+  orderId: string;
+  orderNo?: string;
+  matchCode?: string;
+  supplierId?: string;
+  supplierName?: string;
+  warehouseId?: string;
+  warehouseName?: string;
+  productCode?: string;
+  productName?: string;
+  quantity?: number;
+  unitCost?: number;
+  totalCost?: number;
+  expressFee?: number;
+  otherFee?: number;
+  totalAmount?: number;
+  expressCompany?: string;
+  trackingNo?: string;
+  receiverName?: string;
+  receiverPhone?: string;
+  receiverAddress?: string;
+  customerCode?: string;
+  customerName?: string;
+  salesperson?: string;
+  operatorName?: string;
+  orderDate?: string;
+  shippedDate?: string;
+  returnedDate?: string;
+  dispatchBatch?: string;
+  remark?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// 库存版本记录 — 对齐 stock_versions 表
+export interface StockVersion {
+  id: string;
+  stockId?: string;
+  productCode?: string;
+  productName?: string;
+  supplierId?: string;
+  supplierName?: string;
+  warehouseId?: string;
+  warehouseName?: string;
+  beforeQuantity?: number;
+  afterQuantity?: number;
+  changeQuantity?: number;
+  beforePrice?: number;
+  afterPrice?: number;
+  changePrice?: number;
+  changeType: string;
+  changeReason?: string;
+  operator?: string;
+  createdAt?: string;
+}
+
+// 价格历史记录 — 对齐 price_history 表
+export interface PriceHistoryRecord {
+  id: string;
+  productCode?: string;
+  productName?: string;
+  supplierId?: string;
+  supplierName?: string;
+  beforePrice?: number;
+  afterPrice?: number;
+  changePrice?: number;
+  changeType: string;
+  changeReason?: string;
+  effectiveFrom?: string;
+  effectiveTo?: string;
+  operator?: string;
+  createdAt?: string;
+}
+
+// 用户 — 对齐 users 表
+export interface User {
+  id: string;
+  username: string;
+  realName?: string;
+  role?: string;
+  department?: string;
+  phone?: string;
+  email?: string;
+  isActive?: boolean;
+  lastLoginAt?: string;
+  remark?: string;
+  dataScope?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// 角色 — 对齐 roles 表
+export interface Role {
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  dataScope?: string;
+  isSystem?: boolean;
+  isActive?: boolean;
+  sortOrder?: number;
+  permissions?: string[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// 模板 — 对齐 templates 表
+export interface Template {
+  id: string;
+  code?: string;
+  name: string;
+  description?: string;
+  type: string;
+  targetType?: string;
+  targetId?: string;
+  targetName?: string;
+  fieldMappings?: Record<string, string>;
+  config?: Record<string, unknown>;
+  isDefault?: boolean;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }

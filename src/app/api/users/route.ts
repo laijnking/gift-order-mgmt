@@ -15,6 +15,11 @@ function transformUser(dbUser: Record<string, unknown>) {
     lastLoginAt: dbUser.last_login_at,
     createdAt: dbUser.created_at,
     updatedAt: dbUser.updated_at,
+    // 新增字段
+    phone: dbUser.phone || null,
+    email: dbUser.email || null,
+    remark: dbUser.remark || null,
+    dataScope: dbUser.data_scope || 'self',
   };
 }
 
@@ -99,7 +104,7 @@ export async function PUT(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const { username, realName, role, department, isActive } = body;
+    const { username, realName, role, department, isActive, phone, email, remark, dataScope } = body;
 
     const updateData: Record<string, unknown> = {};
     if (username !== undefined) updateData.username = username;
@@ -107,6 +112,11 @@ export async function PUT(request: NextRequest) {
     if (role !== undefined) updateData.role = role;
     if (department !== undefined) updateData.department = department;
     if (isActive !== undefined) updateData.is_active = isActive;
+    // 新增字段
+    if (phone !== undefined) updateData.phone = phone;
+    if (email !== undefined) updateData.email = email;
+    if (remark !== undefined) updateData.remark = remark;
+    if (dataScope !== undefined) updateData.data_scope = dataScope;
 
     const { data, error } = await client
       .from('users')
@@ -188,6 +198,11 @@ export async function POST(request: NextRequest) {
       role: body.role || 'operator',
       department: body.department,
       is_active: body.isActive !== false,
+      // 新增字段
+      phone: body.phone || null,
+      email: body.email || null,
+      remark: body.remark || null,
+      data_scope: body.dataScope || 'self',
     };
 
     const { data, error } = await client

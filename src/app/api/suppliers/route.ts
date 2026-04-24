@@ -6,19 +6,23 @@ import { getSupabaseClient } from '@/storage/database/supabase-client';
 function transformSupplier(dbSupplier: Record<string, unknown>) {
   return {
     id: dbSupplier.id,
+    code: (dbSupplier as Record<string, unknown>).code as string || '',
     name: dbSupplier.name,
     shortName: dbSupplier.short_name || '',
     type: dbSupplier.type,
-    contact: dbSupplier.contact as string | undefined,
+    contactPerson: (dbSupplier as Record<string, unknown>).contact_person as string || '',
+    contactPhone: (dbSupplier as Record<string, unknown>).contact_phone as string || '',
+    province: (dbSupplier as Record<string, unknown>).province as string || '',
+    city: (dbSupplier as Record<string, unknown>).city as string || '',
     sendType: dbSupplier.send_type || 'download',
-    province: dbSupplier.province as string | undefined,
     canJd: dbSupplier.can_jd ?? true,
-    expressRestrictions: typeof dbSupplier.express_restrictions === 'string' 
-      ? JSON.parse(dbSupplier.express_restrictions) 
+    expressRestrictions: typeof dbSupplier.express_restrictions === 'string'
+      ? JSON.parse(dbSupplier.express_restrictions)
       : (dbSupplier.express_restrictions as string[] | undefined),
     costFactor: dbSupplier.cost_factor as number | undefined,
     settlementType: dbSupplier.settlement_type as string || 'monthly',
     isActive: dbSupplier.is_active ?? true,
+    remark: (dbSupplier as Record<string, unknown>).remark as string || '',
     createdAt: dbSupplier.created_at,
     updatedAt: dbSupplier.updated_at as string | undefined,
   };

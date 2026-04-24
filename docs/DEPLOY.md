@@ -6,16 +6,21 @@
 
 | 项目 | 值 |
 |------|-----|
-| 域名 | https://abc123.dev.coze.site |
-| 端口 | 5000 |
-| 协议 | HTTPS |
+| 服务器 | 1.95.139.195 |
+| 访问端口 | 80 (Nginx) |
+| 应用端口 | 3001 |
+| 数据库 | PostgreSQL (本机) |
+| 数据库端口 | 5432 |
+| 数据库名 | gift_order |
+| 数据库用户 | postgres |
+| 数据库密码 | Qazxsw@725 |
 
 ### 1.2 开发环境
 
 | 项目 | 值 |
 |------|-----|
 | 本地端口 | 5000 |
-| 数据库 | Supabase (开发) |
+| 数据库 | 连接远程服务器 PostgreSQL |
 
 ---
 
@@ -65,8 +70,9 @@ run = ["pnpm", "run", "start"]
 | 变量名 | 说明 | 示例 |
 |--------|------|------|
 | `COZE_WORKSPACE_PATH` | 项目根目录 | `/workspace/projects/` |
-| `COZE_PROJECT_DOMAIN_DEFAULT` | 访问域名 | `https://abc123.dev.coze.site` |
-| `DEPLOY_RUN_PORT` | 服务端口 | `5000` |
+| `COZE_PROJECT_DOMAIN_DEFAULT` | 访问域名 | `https://lp.lianxiaoyun.com` |
+| `DEPLOY_RUN_PORT` | 服务端口 | `3001` |
+|| `DATABASE_URL` | PostgreSQL 连接字符串 | `postgresql://postgres:Qazxsw%40725@127.0.0.1:5432/gift_order` |
 | `COZE_PROJECT_ENV` | 环境标识 | `PROD` |
 
 ### 3.2 Supabase 配置
@@ -105,7 +111,84 @@ export const supabase = createClient(supabaseUrl, supabaseKey);
 
 ## 5. 部署步骤
 
-### 5.0 Docker 外网访问
+### 5.0 直接部署（systemd）
+
+生产环境直接使用 Node.js + systemd 运行，配合 Nginx 反向代理。
+
+#### 环境文件
+
+创建 `/data/project/.env.service`：
+
+```bash
+PORT=3001
+DATABASE_URL=postgresql://postgres:Qazxsw%40725@127.0.0.1:5432/gift_order
+NODE_ENV=production
+```
+
+#### systemd 服务
+
+创建 `/etc/systemd/system/gift-order-mgmt.service`：
+
+```ini
+[Unit]
+Description=Gift Order Management System
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=LP
+WorkingDirectory=/data/project
+ExecStart=/usr/local/bin/node /data/project/dist/server.js
+EnvironmentFile=/data/project/.env.service
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+#### Nginx 反向代理
+
+配置 `/etc/nginx/conf.d/gift-order-mgmt.conf`：
+
+```nginx
+server {
+    listen 80;
+    server_name _;
+
+    client_max_body_size 100M;
+
+    location / {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+#### 启动命令
+
+```bash
+# 重新加载 systemd
+sudo systemctl daemon-reload
+
+# 启用开机自启
+sudo systemctl enable gift-order-mgmt
+
+# 启动服务
+sudo systemctl start gift-order-mgmt
+
+# 重启服务
+sudo systemctl restart gift-order-mgmt
+```
+
+### 5.1 Docker 外网访问
 
 如果使用仓库根目录的 `docker-compose.yml` 做部署，并且需要外网直接访问应用，请先在 `.env.docker` 里至少设置这几项：
 
@@ -173,7 +256,29 @@ pkill -f "next start" && pnpm start
 
 ## 6. 服务管理
 
-### 6.1 PM2 管理
+### 6.1 systemd 服务管理
+
+生产环境使用 systemd 管理服务。
+
+环境配置文件：`/data/project/.env.service`
+
+```bash
+# 查看状态
+sudo systemctl status gift-order-mgmt
+
+# 查看日志
+sudo journalctl -u gift-order-mgmt -f
+
+# 重启服务
+sudo systemctl restart gift-order-mgmt
+
+# 停止服务
+sudo systemctl stop gift-order-mgmt
+
+# 服务已启用开机自启
+```
+
+### 6.2 PM2 管理（备用）
 
 ```bash
 # 启动服务
@@ -192,7 +297,7 @@ pm2 restart gift-order
 pm2 stop gift-order
 ```
 
-### 6.2 日志查看
+### 6.3 日志查看
 
 ```bash
 # 应用日志

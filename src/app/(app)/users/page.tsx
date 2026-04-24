@@ -72,6 +72,11 @@ interface User {
   lastLoginAt?: string;
   createdAt: string;
   updatedAt?: string;
+  // 新增字段
+  phone?: string | null;
+  email?: string | null;
+  remark?: string | null;
+  dataScope?: string;
 }
 
 interface Role {

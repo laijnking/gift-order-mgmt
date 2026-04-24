@@ -185,7 +185,9 @@ export const mockStocks: SupplierStock[] = [
     productCode: 'DZ100HG-GZ605',
     productName: '九阳电蒸锅 DZ100HG-GZ605',
     quantity: 15,
-    price: 145,
+    unitPrice: 145,
+    reservedQuantity: 0,
+    availableQuantity: 15,
     createdAt: '2026-03-01T00:00:00Z',
     updatedAt: '2026-03-30T08:00:00Z'
   },
@@ -196,8 +198,10 @@ export const mockStocks: SupplierStock[] = [
     productId: 'PRD-002',
     productCode: 'GS10',
     productName: '苏泊尔果蔬清洗机 GS10',
-    quantity: 3, // 尾货，<=2台需要预警
-    price: 115,
+    quantity: 3,
+    unitPrice: 115,
+    reservedQuantity: 0,
+    availableQuantity: 3,
     createdAt: '2026-03-01T00:00:00Z',
     updatedAt: '2026-03-30T08:00:00Z'
   },
@@ -209,7 +213,9 @@ export const mockStocks: SupplierStock[] = [
     productCode: 'GS10',
     productName: '苏泊尔果蔬清洗机 GS10',
     quantity: 50,
-    price: 110,
+    unitPrice: 110,
+    reservedQuantity: 0,
+    availableQuantity: 50,
     createdAt: '2026-03-01T00:00:00Z',
     updatedAt: '2026-03-30T08:00:00Z'
   },
@@ -221,7 +227,9 @@ export const mockStocks: SupplierStock[] = [
     productCode: '40N5',
     productName: '九阳电饭煲 40N5',
     quantity: 20,
-    price: 360,
+    unitPrice: 360,
+    reservedQuantity: 0,
+    availableQuantity: 20,
     createdAt: '2026-03-01T00:00:00Z',
     updatedAt: '2026-03-30T08:00:00Z'
   },
@@ -233,7 +241,9 @@ export const mockStocks: SupplierStock[] = [
     productCode: 'KL60-V169',
     productName: '九阳空气炸锅 6L KL60-V169',
     quantity: 100,
-    price: 280,
+    unitPrice: 280,
+    reservedQuantity: 0,
+    availableQuantity: 100,
     createdAt: '2026-03-01T00:00:00Z',
     updatedAt: '2026-03-30T08:00:00Z'
   }
@@ -244,24 +254,24 @@ export const mockMappings: ProductMapping[] = [
   {
     id: 'MAP-001',
     customerProductName: '苏泊尔ZMD安心系列绞肉机',
-    systemProductName: '苏泊尔ZMD安心系列 升级搅菜杆双层四刃精钢刀锋绞肉机',
-    systemProductCode: 'JRD05-U',
+    productName: '苏泊尔ZMD安心系列 升级搅菜杆双层四刃精钢刀锋绞肉机',
+    productCode: 'JRD05-U',
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z'
   },
   {
     id: 'MAP-002',
     customerProductName: '九阳电蒸锅',
-    systemProductName: '九阳电蒸锅',
-    systemProductCode: 'DZ100HG-GZ605',
+    productName: '九阳电蒸锅',
+    productCode: 'DZ100HG-GZ605',
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z'
   },
   {
     id: 'MAP-003',
     customerProductName: '苏泊尔果蔬清洗机',
-    systemProductName: '苏泊尔果蔬清洗机',
-    systemProductCode: 'GS10',
+    productName: '苏泊尔果蔬清洗机',
+    productCode: 'GS10',
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z'
   }
@@ -275,9 +285,17 @@ export const mockDispatches: DispatchRecord[] = [
     orderNo: 'ORD-20260330-001',
     supplierId: 'SUP-001',
     supplierName: '首映礼省内仓',
+    batchNo: 'BATCH-001',
     expressCompany: '中通快递',
     trackingNo: 'ZT1234567890',
     status: 'shipped',
+    items: [
+      {
+        productCode: 'DZ100HG-GZ605',
+        productName: '九阳电蒸锅',
+        quantity: 1
+      }
+    ],
     createdAt: '2026-03-30T16:00:00Z',
     updatedAt: '2026-03-30T16:00:00Z'
   },
@@ -287,9 +305,17 @@ export const mockDispatches: DispatchRecord[] = [
     orderNo: 'ORD-20260330-002',
     supplierId: 'SUP-003',
     supplierName: '成都拓普壹',
+    batchNo: 'BATCH-002',
     expressCompany: '圆通速递',
     trackingNo: 'YT9876543210',
     status: 'shipped',
+    items: [
+      {
+        productCode: 'GS10',
+        productName: '苏泊尔果蔬清洗机',
+        quantity: 2
+      }
+    ],
     createdAt: '2026-03-30T17:00:00Z',
     updatedAt: '2026-03-30T17:00:00Z'
   }
@@ -303,6 +329,7 @@ export const mockReturns: ReturnRecord[] = [
     orderNo: 'ORD-20260330-002',
     expressCompany: '圆通速递',
     trackingNo: 'YT9876543210',
+    status: 'received',
     receivedAt: '2026-04-02T10:00:00Z',
     createdAt: '2026-04-02T10:00:00Z'
   }

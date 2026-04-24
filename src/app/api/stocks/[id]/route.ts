@@ -73,7 +73,7 @@ export async function PUT(
     if (currentError) throw new Error(`查询当前库存失败: ${currentError.message}`);
 
     const body = await request.json();
-    const { quantity, in_transit, price, supplier_id, supplier_name, product_code, product_name, changeReason, operator } = body;
+    const { quantity, in_transit, price, unit_price, unitPrice, supplier_id, supplier_name, product_code, product_name, changeReason, operator } = body;
 
     const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
@@ -81,7 +81,9 @@ export async function PUT(
 
     if (quantity !== undefined) updateData.quantity = quantity;
     if (in_transit !== undefined) updateData.in_transit = in_transit;
-    if (price !== undefined) updateData.price = price;
+    if (unit_price !== undefined) updateData.unit_price = unit_price;
+    else if (price !== undefined) updateData.unit_price = price;
+    else if (unitPrice !== undefined) updateData.unit_price = unitPrice;
     if (supplier_id !== undefined) updateData.supplier_id = supplier_id;
     if (supplier_name !== undefined) updateData.supplier_name = supplier_name;
     if (product_code !== undefined) updateData.product_code = product_code;
@@ -99,8 +101,8 @@ export async function PUT(
     // 创建版本历史记录（如果有变更）
     const beforeQuantity = currentStock.quantity;
     const afterQuantity = data.quantity;
-    const beforePrice = currentStock.price;
-    const afterPrice = data.price;
+    const beforePrice = currentStock.unit_price;
+    const afterPrice = data.unit_price;
 
     if (beforeQuantity !== afterQuantity || beforePrice !== afterPrice) {
       await client.from('stock_versions').insert({

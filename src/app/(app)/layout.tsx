@@ -7,9 +7,22 @@ import { useAuth } from '@/lib/auth';
 import {
   Package, BarChart3, Warehouse, Users, Bot, FileText,
   Link2, Settings, ChevronLeft, ChevronRight, LogOut, User,
-  Building2, Truck, Menu, X, ChevronDown, Bell, DollarSign
+  Building2, Truck, Menu, X, ChevronDown, Bell, DollarSign,
+  UserCircle, Lock, Mail, Phone
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
+import { buildUserInfoHeaders } from '@/lib/auth';
 
 interface MenuItem {
   label: string;
@@ -60,6 +73,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set(['档案管理', '系统设置']));
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changePasswordLoading, setChangePasswordLoading] = useState(false);
+  const [userProfile, setUserProfile] = useState({ phone: '', email: '' });
   const pathname = usePathname();
   const router = useRouter();
   const { user, isLoading, logout } = useAuth();
@@ -82,6 +103,101 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       newExpanded.add(label);
     }
     setExpandedMenus(newExpanded);
+  };
+
+  // 加载用户资料
+  const loadUserProfile = async () => {
+    if (!user) return;
+    try {
+      const res = await fetch('/api/users/me', {
+        headers: buildUserInfoHeaders(user),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setUserProfile({
+          phone: data.data.phone || '',
+          email: data.data.email || '',
+        });
+      }
+    } catch (error) {
+      console.error('加载用户资料失败:', error);
+    }
+  };
+
+  // 修改密码
+  const handleChangePassword = async () => {
+    if (!newPassword || !confirmPassword || !oldPassword) {
+      toast.error('请填写所有字段');
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast.error('新密码长度不能少于6位');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('两次输入的新密码不一致');
+      return;
+    }
+
+    setChangePasswordLoading(true);
+    try {
+      const res = await fetch('/api/users/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...buildUserInfoHeaders(user) },
+        body: JSON.stringify({ oldPassword, newPassword, confirmPassword }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        toast.success('密码修改成功');
+        setPasswordDialogOpen(false);
+        setOldPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+      } else {
+        toast.error(data.error || '密码修改失败');
+      }
+    } catch {
+      toast.error('密码修改失败，请重试');
+    } finally {
+      setChangePasswordLoading(false);
+    }
+  };
+
+  // 更新个人资料
+  const handleUpdateProfile = async () => {
+    if (!user) return;
+
+    try {
+      const res = await fetch('/api/users/me', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...buildUserInfoHeaders(user) },
+        body: JSON.stringify(userProfile),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        toast.success('资料更新成功');
+        setProfileDialogOpen(false);
+      } else {
+        toast.error(data.error || '资料更新失败');
+      }
+    } catch {
+      toast.error('资料更新失败，请重试');
+    }
+  };
+
+  // 打开个人资料弹窗
+  const handleOpenProfile = () => {
+    setUserMenuOpen(false);
+    loadUserProfile();
+    setProfileDialogOpen(true);
+  };
+
+  // 打开修改密码弹窗
+  const handleOpenPassword = () => {
+    setUserMenuOpen(false);
+    setPasswordDialogOpen(true);
   };
 
   if (isPublicPath) {
@@ -266,15 +382,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* User info */}
         <div className={`p-3 border-t border-sidebar-border bg-sidebar/50 shrink-0 ${collapsed ? 'text-center' : ''}`}>
           <div className={`flex items-center gap-3 ${collapsed ? 'justify-center' : ''}`}>
-            <div className="w-9 h-9 bg-gradient-to-br from-sidebar-primary to-sidebar-primary/80 rounded-full flex items-center justify-center shadow-sm">
+            <button
+              onClick={() => setUserMenuOpen(!userMenuOpen)}
+              className="w-9 h-9 bg-gradient-to-br from-sidebar-primary to-sidebar-primary/80 rounded-full flex items-center justify-center shadow-sm hover:opacity-90 transition-opacity"
+            >
               <User className="w-4 h-4 text-sidebar-primary-foreground" />
-            </div>
+            </button>
             {!collapsed && (
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-sidebar-foreground truncate">{user.realName || user.username}</p>
-                <p className="text-xs text-sidebar-foreground/60 truncate">
-                  {user.roleName || user.role}
-                </p>
+                <button
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  className="w-full text-left"
+                >
+                  <p className="text-sm font-medium text-sidebar-foreground truncate">{user.realName || user.username}</p>
+                  <p className="text-xs text-sidebar-foreground/60 truncate">
+                    {user.roleName || user.role}
+                  </p>
+                </button>
               </div>
             )}
             {!collapsed && (
@@ -288,6 +412,34 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </Button>
             )}
           </div>
+
+          {/* User dropdown menu */}
+          {userMenuOpen && !collapsed && (
+            <div className="absolute bottom-16 left-0 w-[200px] bg-sidebar border border-sidebar-border rounded-lg shadow-lg py-1 z-50">
+              <button
+                onClick={handleOpenProfile}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+              >
+                <UserCircle className="w-4 h-4" />
+                个人资料
+              </button>
+              <button
+                onClick={handleOpenPassword}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+              >
+                <Lock className="w-4 h-4" />
+                修改密码
+              </button>
+              <div className="my-1 border-t border-sidebar-border" />
+              <button
+                onClick={logout}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                退出登录
+              </button>
+            </div>
+          )}
         </div>
       </aside>
 
@@ -300,6 +452,149 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       >
         {children}
       </main>
+
+      {/* 修改密码对话框 */}
+      <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>修改密码</DialogTitle>
+            <DialogDescription>请输入您的新密码</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="old-password">原密码</Label>
+              <Input
+                id="old-password"
+                type="password"
+                placeholder="请输入原密码"
+                value={oldPassword}
+                onChange={(e) => setOldPassword(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-password">新密码</Label>
+              <Input
+                id="new-password"
+                type="password"
+                placeholder="至少6位字符"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">确认新密码</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                placeholder="再次输入新密码"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setPasswordDialogOpen(false);
+                setOldPassword('');
+                setNewPassword('');
+                setConfirmPassword('');
+              }}
+              className="w-full sm:w-auto"
+            >
+              取消
+            </Button>
+            <Button
+              onClick={handleChangePassword}
+              disabled={changePasswordLoading}
+              className="w-full sm:w-auto"
+            >
+              {changePasswordLoading ? '修改中...' : '确认修改'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 个人资料对话框 */}
+      <Dialog open={profileDialogOpen} onOpenChange={setProfileDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>个人资料</DialogTitle>
+            <DialogDescription>修改您的个人信息</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="profile-username">用户名</Label>
+              <Input
+                id="profile-username"
+                value={user?.username || ''}
+                disabled
+                className="bg-muted"
+              />
+              <p className="text-xs text-muted-foreground">用户名不可修改</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="profile-realname">姓名</Label>
+              <Input
+                id="profile-realname"
+                value={user?.realName || ''}
+                disabled
+                className="bg-muted"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="profile-role">角色</Label>
+              <Input
+                id="profile-role"
+                value={user?.roleName || user?.role || ''}
+                disabled
+                className="bg-muted"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="profile-phone" className="flex items-center gap-2">
+                <Phone className="w-4 h-4" />
+                手机号
+              </Label>
+              <Input
+                id="profile-phone"
+                placeholder="请输入手机号"
+                value={userProfile.phone}
+                onChange={(e) => setUserProfile({ ...userProfile, phone: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="profile-email" className="flex items-center gap-2">
+                <Mail className="w-4 h-4" />
+                邮箱
+              </Label>
+              <Input
+                id="profile-email"
+                type="email"
+                placeholder="请输入邮箱"
+                value={userProfile.email}
+                onChange={(e) => setUserProfile({ ...userProfile, email: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setProfileDialogOpen(false)}
+              className="w-full sm:w-auto"
+            >
+              取消
+            </Button>
+            <Button
+              onClick={handleUpdateProfile}
+              className="w-full sm:w-auto"
+            >
+              保存修改
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

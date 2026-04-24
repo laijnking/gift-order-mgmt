@@ -72,6 +72,7 @@ export async function GET(request: NextRequest) {
       ruleName: r.alert_rules?.name || r.rule_code,
       orderId: r.order_id,
       orderNo: r.order_no,
+      stockId: r.stock_id,
       customerCode: r.customer_code,
       productCode: r.product_code,
       supplierId: r.supplier_id,

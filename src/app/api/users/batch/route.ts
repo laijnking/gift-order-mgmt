@@ -40,8 +40,13 @@ export async function POST(request: NextRequest) {
       real_name: row.realName || row['姓名'] || '',
       role: row.role || row['角色'] || 'operator',
       department: row.department || row['部门'] || null,
-      is_active: (row.isActive || row['状态']) === '禁用' ? false : true,
+      is_active: (row.isActive || row['状态']) === '禁用' || (row.isActive || row['状态']) === '离职' ? false : true,
       password_hash: hashPassword(row.password || row['密码'] || '123456'),
+      // 新增字段
+      phone: row.phone || row['手机号'] || null,
+      email: row.email || row['邮箱'] || null,
+      remark: row.remark || row['备注'] || null,
+      data_scope: row.dataScope || row['数据权限'] || 'self',
     })).filter((u: { username: string; real_name: string }) => u.username && u.real_name);
 
     if (usersData.length === 0) {

@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker exec *)",
+      "Bash(cp /root/project/gift-order-mgmt/data/import_all_data.sql /root/project/gift-order-mgmt/data/import_all_data.sql.bak)",
+      "Bash(sed -i 's/INSERT INTO products \\(id, code,/INSERT INTO products \\(id, sku,/g' /root/project/gift-order-mgmt/data/import_all_data.sql)",
+      "Bash(sed -i 's/ON CONFLICT \\(code\\) DO UPDATE SET/ON CONFLICT \\(sku\\) DO UPDATE SET/g' /root/project/gift-order-mgmt/data/import_all_data.sql)",
+      "Bash(python3 *)",
+      "mcp__plugin_nimble_nimble-mcp-server__nimble_extract"
+    ]
+  }
+}

@@ -8,21 +8,21 @@ function transformCustomer(dbCustomer: Record<string, unknown>) {
     id: dbCustomer.id,
     code: dbCustomer.code,
     name: dbCustomer.name,
-    contactPerson: dbCustomer.contact_person,
-    contactPhone: dbCustomer.contact_phone,
-    contactEmail: dbCustomer.contact_email,
+    contactPerson: (dbCustomer as Record<string, unknown>).contact_person as string || dbCustomer.contact as string || '',
+    contactPhone: (dbCustomer as Record<string, unknown>).contact_phone as string || dbCustomer.phone as string || '',
+    contactEmail: (dbCustomer as Record<string, unknown>).contact_email as string || dbCustomer.email as string || '',
     address: dbCustomer.address,
-    province: dbCustomer.province,
-    city: dbCustomer.city,
-    district: dbCustomer.district,
-    salesUserId: dbCustomer.sales_user_id,
-    salesUserName: dbCustomer.sales_user_name,
-    operatorUserId: dbCustomer.operator_user_id,
-    operatorUserName: dbCustomer.operator_user_name,
+    province: dbCustomer.province as string || '',
+    city: dbCustomer.city as string || '',
+    district: (dbCustomer as Record<string, unknown>).district as string || '',
+    salesUserId: dbCustomer.salesperson_id,
+    salesUserName: dbCustomer.salesperson_name,
+    operatorUserId: dbCustomer.order_taker_id,
+    operatorUserName: dbCustomer.order_taker_name,
     creditLimit: dbCustomer.credit_limit,
     paymentDays: dbCustomer.payment_days,
     paymentStatus: dbCustomer.payment_status,
-    isActive: dbCustomer.is_active,
+    isActive: dbCustomer.status === 'active',
     remark: dbCustomer.remark,
     createdAt: dbCustomer.created_at,
     updatedAt: dbCustomer.updated_at,
@@ -49,15 +49,15 @@ export async function GET(request: NextRequest) {
     }
 
     if (salesUserId) {
-      query = query.eq('sales_user_id', salesUserId);
+      query = query.eq('salesperson_id', salesUserId);
     }
 
     if (operatorUserId) {
-      query = query.eq('operator_user_id', operatorUserId);
+      query = query.eq('order_taker_id', operatorUserId);
     }
 
     if (isActive === 'true') {
-      query = query.eq('is_active', true);
+      query = query.eq('status', 'active');
     }
 
     query = query.order('created_at', { ascending: false });
@@ -101,14 +101,14 @@ export async function POST(request: NextRequest) {
       province: body.province,
       city: body.city,
       district: body.district,
-      sales_user_id: body.salesUserId,
-      sales_user_name: body.salesUserName,
-      operator_user_id: body.operatorUserId,
-      operator_user_name: body.operatorUserName,
+      salesperson_id: body.salesUserId,
+      salesperson_name: body.salesUserName,
+      order_taker_id: body.operatorUserId,
+      order_taker_name: body.operatorUserName,
       credit_limit: body.creditLimit || 0,
       payment_days: body.paymentDays || 0,
       payment_status: body.paymentStatus || 'normal',
-      is_active: body.isActive !== false,
+      status: body.isActive !== false ? 'active' : 'inactive',
       remark: body.remark,
     };
 

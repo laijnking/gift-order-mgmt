@@ -28,6 +28,11 @@ function transformUser(dbUser: Record<string, unknown>) {
     lastLoginAt: dbUser.last_login_at,
     createdAt: dbUser.created_at,
     updatedAt: dbUser.updated_at,
+    // 新增字段
+    phone: dbUser.phone || null,
+    email: dbUser.email || null,
+    remark: dbUser.remark || null,
+    dataScope: dbUser.data_scope || 'self',
   };
 }
 
@@ -88,6 +93,11 @@ export async function PUT(
       department: body.department,
       is_active: body.isActive,
       updated_at: new Date().toISOString(),
+      // 新增字段
+      phone: body.phone || null,
+      email: body.email || null,
+      remark: body.remark || null,
+      data_scope: body.dataScope || 'self',
     };
 
     // 如果提供了新密码，则更新

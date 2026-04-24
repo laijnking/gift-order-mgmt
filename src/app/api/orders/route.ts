@@ -272,13 +272,13 @@ async function buildRelatedMaps(client: ReturnType<typeof getSupabaseClient>, or
   if (customerCodes.size > 0) {
     const { data: customers } = await client
       .from('customers')
-      .select('code, id, sales_user_name, operator_user_name')
+      .select('code, id, salesperson_name, order_taker_name')
       .in('code', Array.from(customerCodes));
     customers?.forEach(c => {
       customerMap[c.code] = {
         id: c.id,
-        salesUserName: c.sales_user_name || '',
-        operatorUserName: c.operator_user_name || '',
+        salesUserName: c.salesperson_name || '',
+        operatorUserName: c.order_taker_name || '',
       };
     });
   }
@@ -459,7 +459,7 @@ export async function GET(request: NextRequest) {
       const { data: userCustomers } = await client
         .from('customers')
         .select('code')
-        .or(`sales_user_name.ilike.%${pureName}%,operator_user_name.ilike.%${pureName}%`);
+        .or(`salesperson_name.ilike.%${pureName}%,order_taker_name.ilike.%${pureName}%`);
       
       const customerCodes = userCustomers?.map(c => c.code) || [];
       

@@ -15,6 +15,8 @@ type EnhancedStock = Record<string, unknown> & {
   availableQuantity: number;
   unitPrice: number;
   price: number;
+  minStock: number;
+  maxStock: number | null;
   isLowStock: boolean;
   stockLevel: 'out' | 'low' | 'normal';
   available: number;
@@ -25,6 +27,8 @@ function enhanceStock(stock: Record<string, unknown>): EnhancedStock {
   const reserved = toNumber(stock.reserved_quantity);
   const available = Math.max(0, toNumber(stock.available_quantity, quantity - reserved));
   const unitPrice = toNumber(stock.unit_price);
+  const minStock = toNumber(stock.min_stock, LOW_STOCK_THRESHOLD);
+  const maxStock = stock.max_stock != null ? toNumber(stock.max_stock) : null;
 
   return {
     ...stock,
@@ -33,6 +37,8 @@ function enhanceStock(stock: Record<string, unknown>): EnhancedStock {
     availableQuantity: available,
     unitPrice,
     price: unitPrice,
+    minStock,
+    maxStock,
     isLowStock: quantity > 0 && quantity <= LOW_STOCK_THRESHOLD,
     stockLevel: quantity === 0 ? 'out' : quantity <= LOW_STOCK_THRESHOLD ? 'low' : 'normal',
     available,
