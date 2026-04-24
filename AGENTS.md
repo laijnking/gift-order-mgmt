@@ -75,208 +75,254 @@
 
 ## 数据库表结构
 
-### shippers (发货方)
+数据库通过 SQL 迁移脚本管理，位于 `supabase/migrations/` 目录。重要说明：
+- **执行顺序**：`001_schema.sql` → `004_migrate-prod-schema.sql` → `007_sync-all-tables.sql` → `008_api-schema-align.sql`
+- **管理方式**：所有表通过 SQL 手动管理，不使用 ORM 迁移
+- **RLS**：所有表已启用行级安全策略（MVP 阶段为全开放策略）
+- **`product_mappings`**：使用 `VARCHAR(36)` 而非 `UUID` 作为主键（见 `001_fix_product_mappings.sql`）
+
+### orders (订单)
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| id | uuid | 主键 |
-| code | varchar | 发货方编码 |
-| name | varchar | 发货方名称 |
-| type | varchar | 类型(supplier/jd/pdd/self/third_party) |
-| send_type | varchar | 发货方式(download/jd/pdd/self) |
-| jd_channel_id | varchar | 京东渠道ID |
-| pdd_shop_id | varchar | 拼多多店铺ID |
-| can_jd | boolean | 是否支持京东发货 |
-| can_pdd | boolean | 是否支持拼多多发货 |
-| express_restrictions | jsonb | 快递限制 |
-| settlement_type | varchar | 结算方式 |
-| cost_factor | decimal | 成本系数 |
-| is_active | boolean | 是否启用 |
-| created_at | timestamp | 创建时间 |
+| id | varchar(36) | 主键 |
+| order_no | varchar(100) | 客户订单号 |
+| supplier_order_no | varchar(100) | 供应商单据号 |
+| status | varchar(30) | 状态(pending/assigned/partial_returned/returned/feedbacked/completed/cancelled) |
+| items | jsonb | 商品明细数组 |
+| receiver_name | varchar(100) | 收货人 |
+| receiver_phone | varchar(20) | 收货电话 |
+| receiver_address | text | 收货地址 |
+| province / city / district | varchar | 收货地址省市区 |
+| customer_id | uuid | 客户档案ID |
+| customer_code | varchar(50) | 客户代码 |
+| customer_name | varchar(100) | 客户名称 |
+| salesperson_id | uuid | 业务员ID |
+| salesperson | varchar(50) | 业务员名称(冗余) |
+| operator_id | uuid | 跟单员ID |
+| operator_name | varchar(50) | 跟单员名称(冗余) |
+| supplier_id | varchar(36) | 供应商ID |
+| supplier_name | varchar(100) | 供应商名称(冗余) |
+| warehouse_id | varchar(100) | 仓库ID |
+| warehouse | varchar(100) | 仓库名称(冗余) |
+| express_company | varchar(50) | 快递公司 |
+| tracking_no | varchar(100) | 快递单号 |
+| source | varchar(20) | 来源(excel/ai_parse/wechat/form/jushuitan) |
+| import_batch | varchar(50) | 导入批次号 |
+| assigned_batch | varchar(50) | 派发批次号 |
+| match_code | varchar(20) | 唯一匹配码 |
+| sys_order_no | varchar(50) | 系统订单号 |
+| amount / discount / tax_rate | numeric | 订单金额/折扣/税率 |
+| income_name / income_amount | varchar/numeric | 收票人/收票金额 |
+| invoice_required | boolean | 是否需要发票 |
+| express_fee / other_fee | numeric | 快递费/其他费用 |
+| returned_at | timestamp | 回单时间 |
+| bill_no / bill_date | varchar | 单据编号/日期 |
+| ext_field_1~20 | text | 备用扩展字段 |
+| assigned_at / completed_at | timestamp | 派发/完成时间 |
+| created_at / updated_at | timestamp | 创建/更新时间 |
 
 ### customers (客户)
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | id | uuid | 主键 |
-| name | varchar | 客户名称 |
-| code | varchar | 客户编码 |
+| code | varchar(50) | 客户编码(唯一) |
+| name | varchar(200) | 客户名称 |
+| type | varchar(20) | 类型(normal等) |
+| contact_person | varchar(100) | 联系人 |
+| contact_phone | varchar(20) | 联系电话 |
+| contact_email | varchar(100) | 联系邮箱 |
+| phone / mobile | varchar | 电话/手机 |
+| address | varchar(500) | 地址 |
+| province / city / district | varchar | 省市区 |
 | salesperson_id | uuid | 业务员ID |
+| salesperson_name | varchar(50) | 业务员名称 |
 | order_taker_id | uuid | 跟单员ID |
-| status | varchar | 状态 |
-| created_at | timestamp | 创建时间 |
+| order_taker_name | varchar(50) | 跟单员名称 |
+| credit_limit | numeric | 信用额度 |
+| payment_days / payment_status | integer/varchar | 账期/状态 |
+| settlement_cycle | varchar | 结算周期 |
+| status | varchar(20) | 状态(active/inactive) |
+| remark | text | 备注 |
 
 ### products (商品)
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | id | uuid | 主键 |
-| name | varchar | 商品名称 |
-| sku | varchar | SKU编码 |
-| brand | varchar | 品牌 |
-| category | varchar | 分类 |
-| unit_price | decimal | 单价 |
-| status | varchar | 状态(在售/停售/预售) |
-| created_at | timestamp | 创建时间 |
+| code | varchar(50) | 商品编码(唯一) |
+| sku | varchar(50) | SKU别名（前端展示） |
+| name | varchar(200) | 商品名称 |
+| barcode | varchar(50) | 条码 |
+| brand / category | varchar | 品牌/分类 |
+| spec | varchar(200) | 规格型号 |
+| unit | varchar(20) | 单位(默认"台") |
+| size | varchar(50) | 尺寸 |
+| weight | decimal | 重量 |
+| cost_price / retail_price | numeric | 成本价/零售价 |
+| lifecycle_status | varchar(20) | 生命周期(在售/停售等) |
+| length / width / height | decimal | 长/宽/高 |
+| volume | decimal | 体积 |
+| length_cm / width_cm / height_cm | decimal | 长/宽/高(CM) |
+| weight_kg | decimal | 重量(KG) |
+| volume_factor | integer | 体积重系数(默认6000) |
+| is_active | boolean | 是否启用 |
+
+### shippers (发货方)
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | uuid | 主键 |
+| code | varchar(50) | 发货方编码(唯一) |
+| name | varchar(200) | 发货方名称 |
+| short_name | varchar(100) | 简称 |
+| type | varchar(20) | 类型(supplier/jd/pdd/self/third_party) |
+| contact_person / contact_phone | varchar | 联系人/电话 |
+| province / city | varchar | 省市 |
+| address | varchar(500) | 地址 |
+| send_type | varchar(20) | 发货方式(download/jd/pdd/self) |
+| jd_channel_id / pdd_shop_id | varchar | 京东/拼多多渠道ID |
+| can_jd / can_pdd | boolean | 是否支持京东/拼多多 |
+| express_restrictions | jsonb | 快递限制 |
+| settlement_type | varchar | 结算方式 |
+| cost_factor | decimal | 成本系数 |
+| is_active | boolean | 是否启用 |
+
+### suppliers (供应商)
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | uuid | 主键 |
+| name | varchar(200) | 供应商名称 |
+| short_name | varchar(100) | 简称 |
+| type | varchar(20) | 类型(warehouse/supplier) |
+| contact / contact_person / contact_phone | varchar | 联系方式 |
+| province / city | varchar | 省市 |
+| send_type | varchar(20) | 发货方式 |
+| can_jd | boolean | 是否支持京东 |
+| express_restrictions | jsonb | 快递限制 |
+| cost_factor | integer | 成本系数(默认100) |
+| is_active | boolean | 是否启用 |
 
 ### warehouses (仓库)
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | id | uuid | 主键 |
-| name | varchar | 仓库名称 |
-| code | varchar | 仓库编码 |
-| type | varchar | 类型(自有/三方) |
-| address | varchar | 地址 |
-| contact | varchar | 联系人 |
-| phone | varchar | 联系电话 |
-| status | varchar | 状态 |
-| created_at | timestamp | 创建时间 |
+| code | varchar(50) | 仓库编码(唯一) |
+| name | varchar(200) | 仓库名称 |
+| short_name | varchar(100) | 简称 |
+| type | varchar(20) | 类型 |
+| address | varchar(500) | 地址 |
+| contact_person / contact_phone | varchar | 联系人/电话 |
+| province / city | varchar | 省市 |
+| status | varchar(20) | 状态 |
 
-### users (用户/员工)
+### stocks (库存)
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | id | uuid | 主键 |
-| name | varchar | 姓名 |
-| username | varchar | 用户名 |
-| role | varchar | 角色(业务员/跟单员/管理员) |
-| phone | varchar | 电话 |
-| email | varchar | 邮箱 |
+| product_id | uuid | 商品ID(NOT NULL) |
+| product_code / product_name | varchar | 商品编码/名称 |
+| supplier_id | uuid | 供应商ID(NOT NULL) |
+| supplier_name | varchar | 供应商名称 |
+| warehouse_id / warehouse_name | uuid/varchar | 仓库 |
+| quantity / reserved_quantity | integer | 库存/预留数量 |
+| available_quantity | integer GENERATED | 可用数量(自动计算) |
+| unit_price | numeric | 单价 |
+| min_stock / max_stock | integer | 最小/最大库存 |
 | status | varchar | 状态 |
-| created_at | timestamp | 创建时间 |
+| in_transit | integer | 在途数量 |
+| UNIQUE(product_id, supplier_id, warehouse_id) | | 唯一约束 |
 
 ### stock_versions (库存版本历史)
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | uuid | 主键 |
-| stock_id | uuid | 库存记录ID |
-| product_code | varchar | 商品编码 |
-| product_name | varchar | 商品名称 |
-| supplier_id | uuid | 供应商ID |
-| supplier_name | varchar | 供应商名称 |
-| before_quantity | integer | 变更前库存 |
-| after_quantity | integer | 变更后库存 |
-| change_quantity | integer | 库存变化 |
-| before_price | decimal | 变更前价格 |
-| after_price | decimal | 变更后价格 |
-| change_price | decimal | 价格变化 |
-| change_type | varchar | 变更类型(manual/import/order/adjust) |
-| change_reason | text | 变更原因 |
-| operator | varchar | 操作人 |
-| created_at | timestamp | 创建时间 |
+同 AGENTS.md 原内容，新增 warehouse_id/warehouse_name 字段。
 
 ### price_history (价格历史)
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | uuid | 主键 |
-| product_code | varchar | 商品编码 |
-| product_name | varchar | 商品名称 |
-| supplier_id | uuid | 供应商ID |
-| supplier_name | varchar | 供应商名称 |
-| before_price | decimal | 原价 |
-| after_price | decimal | 新价 |
-| change_price | decimal | 价格变化 |
-| change_type | varchar | 变更类型(manual/adjust/contract/market) |
-| change_reason | text | 变更原因 |
-| operator | varchar | 操作人 |
-| effective_from | timestamp | 生效时间 |
-| effective_to | timestamp | 失效时间 |
-| created_at | timestamp | 创建时间 |
+同 AGENTS.md 原内容。
 
 ### order_cost_history (历史成本库)
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | uuid | 主键 |
-| order_id | uuid | 订单ID |
-| order_no | varchar | 客户订单号 |
-| match_code | varchar | 匹配码 |
-| supplier_id | uuid | 供应商ID |
-| supplier_name | varchar | 供应商名称 |
-| warehouse_id | uuid | 仓库ID |
-| warehouse_name | varchar | 仓库名称 |
-| product_code | varchar | 商品编码 |
-| product_name | varchar | 商品名称 |
-| quantity | integer | 数量 |
-| unit_cost | decimal | 单台成本单价 |
-| total_cost | decimal | 总成本（不含运费） |
-| express_fee | decimal | 运费 |
-| other_fee | decimal | 其他费用 |
-| total_amount | decimal | 总金额（含运费） |
-| express_company | varchar | 快递公司 |
-| tracking_no | varchar | 物流单号 |
-| receiver_name | varchar | 收货人 |
-| receiver_phone | varchar | 收货电话 |
-| receiver_address | varchar | 收货地址 |
-| customer_code | varchar | 客户代码 |
-| customer_name | varchar | 客户名称 |
-| salesperson | varchar | 业务员 |
-| operator_name | varchar | 跟单员 |
-| order_date | date | 下单日期 |
-| shipped_date | date | 发货日期 |
-| returned_date | date | 回单日期 |
-| dispatch_batch | varchar | 派发批次 |
-| remark | text | 备注 |
-| created_at | timestamp | 创建时间 |
-| updated_at | timestamp | 更新时间 |
+同 AGENTS.md 原内容。字段对齐 API 实际使用的 `orders.express_fee` / `orders.other_fee` 写入路径。
 
 ### alert_rules (预警规则)
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | id | uuid | 主键 |
-| name | varchar | 规则名称 |
-| code | varchar | 规则编码(唯一) |
-| type | varchar | 规则类型(stock/order/price/customer) |
+| name / code | varchar | 规则名称/编码(唯一) |
+| type | varchar | 类型(stock/order/return) |
 | config | jsonb | 规则配置 |
-| priority | integer | 优先级 |
+| priority | integer | 优先级(默认5) |
 | is_enabled | boolean | 是否启用 |
 | notification_channels | jsonb | 通知渠道 |
-| description | text | 规则描述 |
-| created_at | timestamp | 创建时间 |
+| description / remark | text | 描述/备注 |
 
 ### alert_records (预警记录)
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | id | uuid | 主键 |
-| rule_id | uuid | 规则ID |
-| rule_code | varchar | 规则编码 |
-| order_id | uuid | 关联订单ID |
-| order_no | varchar | 订单号 |
-| alert_type | varchar | 预警类型 |
-| alert_level | varchar | 预警级别(info/warning/error/critical) |
-| title | varchar | 预警标题 |
-| content | text | 预警内容 |
-| is_read | boolean | 是否已读 |
-| is_resolved | boolean | 是否已处理 |
-| resolved_at | timestamp | 处理时间 |
-| resolved_by | varchar | 处理人 |
-| created_at | timestamp | 创建时间 |
+| rule_id / rule_code | uuid/varchar | 关联规则 |
+| order_id / order_no | uuid/varchar | 关联订单 |
+| stock_id | uuid | 关联库存 |
+| customer_code / product_code | varchar | 客户/商品编码(补充字段) |
+| supplier_id / supplier_name | uuid/varchar | 供应商(补充字段) |
+| alert_type / alert_level | varchar | 类型/级别 |
+| title / content | varchar/text | 标题/内容 |
+| data | jsonb | 附加数据 |
+| is_read / is_resolved | boolean | 已读/已处理 |
+| resolved_at / resolved_by | timestamp/varchar | 处理时间/人 |
 
-### roles (角色)
+### roles / permissions / role_permissions
+同 AGENTS.md 原内容。
+
+### templates (模板)
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | id | uuid | 主键 |
-| code | varchar | 角色编码(唯一) |
-| name | varchar | 角色名称 |
-| description | text | 角色描述 |
-| data_scope | varchar | 数据权限范围(self/department/all) |
-| is_system | boolean | 是否系统内置角色 |
+| code | varchar(100) | 模板编码(唯一) |
+| name / description | varchar/text | 名称/描述 |
+| type | varchar(20) | 类型(shipping/customer_feedback/common) |
+| target_type / target_id / target_name | varchar/uuid | 目标关联 |
+| field_mappings | jsonb | 字段映射 |
+| config | jsonb | 完整配置 |
+| is_default / is_active | boolean | 默认/启用状态 |
+
+### product_mappings (SKU映射)
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | **varchar**(主键) | 使用VARCHAR而非UUID |
+| product_id / product_code / product_name | uuid/varchar | 系统商品信息 |
+| customer_id / customer_code / customer_name | uuid/varchar | 客户信息 |
+| supplier_id / supplier_name | uuid/varchar | 供应商信息 |
+| customer_sku / customer_barcode | varchar | 客户SKU/条码 |
+| customer_product_name | **varchar**(NOT NULL) | 客户商品名称 |
+| price | numeric | 客户专属价格 |
 | is_active | boolean | 是否启用 |
-| created_at | timestamp | 创建时间 |
-| updated_at | timestamp | 更新时间 |
 
-### permissions (权限)
+### dispatch_records (派发记录)
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | varchar(36) | 主键 |
+| order_id | varchar(36) | 订单ID |
+| supplier_id / supplier_name | varchar | 供应商 |
+| batch_no | varchar(50) | 派发批次号 |
+| dispatch_at | timestamp | 派发时间 |
+| status | varchar | 状态(sent/dispatched等) |
+| items | jsonb | 派发明细 |
+
+### return_records / return_receipts / return_receipt_records (回单相关)
+字段对齐 API 使用，`supplier_id` / `record_id` / `order_id` 使用 `VARCHAR(36)` 类型以支持灵活关联。
+
+### export_records / batch_export_details (导出相关)
+同 AGENTS.md 原内容。
+
+### users (用户)
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | id | uuid | 主键 |
-| code | varchar | 权限编码(唯一) |
-| name | varchar | 权限名称 |
-| category | varchar | 权限分类 |
-| description | text | 权限描述 |
-| created_at | timestamp | 创建时间 |
-
-### role_permissions (角色权限关联)
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | uuid | 主键 |
-| role_id | uuid | 角色ID |
-| permission_id | uuid | 权限ID |
-| created_at | timestamp | 创建时间 |
+| username | varchar(50)(唯一) | 用户名 |
+| password_hash | varchar(255) | 密码哈希 |
+| real_name | varchar(100) | 真实姓名 |
+| role | varchar(20) | 角色(operator/admin等) |
+| department | varchar(100) | 部门 |
+| phone / email | varchar | 电话/邮箱 |
+| data_scope | varchar(20) | 数据权限(self/department/all) |
+| is_active | boolean | 是否启用 |
+| last_login_at | timestamp | 最后登录时间 |
 
 ## 数据模型
 
@@ -452,6 +498,10 @@ src/
 - [x] 合并供应商档案+仓库档案为发货方档案
 - [x] 商品档案增加尺寸/重量字段（用于运费计算）
 - [x] 隐藏未使用的 Agent配置 模块
+- [x] API-Schema 字段对齐（以 API 为准，补全缺失字段，修正类型不一致）
+- [x] 重写 schema.ts 包含全部 32 个数据表定义
+- [x] 更新 src/types/order.ts 与 API 实际字段对齐
+- [x] 新增 `008_api-schema-align.sql` 迁移脚本
 
 ### 待开发
 - [ ] 添加微信机器人对接
@@ -465,6 +515,21 @@ src/
 - [x] 修复发货通知模板 API `config` 字段默认值处理
 - [x] 创建 `shipping` 类型的发货通知模板
 - [x] 修复 Supabase 部署平台 schema 同步错误（`product_mappings` 表 id 类型改为 varchar）
+- [x] 修复 `buildRelatedMaps` 查询 customers 表列名错误（`sales_user_name` → `salesperson_name`，`operator_user_name` → `order_taker_name`）
+- [x] 修复 `stocks/[id]` 读取 `currentStock.price` 错误（应为 `unit_price`）
+- [x] 修复 `alert-records` GET 响应缺少 `stockId` 字段（`createLowStockAlert` 写入但 GET 未映射）
+- [x] 修复 `stocks` GET 响应缺少 `minStock`/`maxStock` 字段（写入 DB 但 enhanceStock 未读取）
+- [x] 清理 `suppliers` 和 `customers` transform 中的死代码（`contact`/`region` 旧字段回退读取）
+- [x] 清理 `schema.ts` 多处字段定义（`products.sku` → `products.code`、`dispatch_records` 补全 `warehouse_id`/`created_at`/`updated_at`、`return_receipts` 补全 `receipt_no`/`customer_id`/`updated_at`、`return_receipt_records` 补全 `product_id`/`quantity`/`price`）
+
+### API-Schema 对齐说明
+- **原则**：以 API 代码为事实来源（source of truth），Schema 和数据库跟随 API 实际使用的字段名
+- **命名规范**：数据库使用 `snake_case`，TypeScript 接口使用 `camelCase`
+- **数据库迁移**：`008_api-schema-align.sql` 负责以 `ADD COLUMN IF NOT EXISTS` 和 `ALTER COLUMN TYPE` 模式补充缺失字段和修正类型
+- **常见类型差异**：
+  - `order_cost_history.unit_cost`（API 写入）vs 期望的 `unit_price`（语义一致）
+  - `alert_rules.type`（API 写入）vs 期望的 `rule_type`（语义一致）
+  - `products.code`（DB 主键）vs `products.sku`（前端展示别名）
 
 ### 技术说明
 - **当前版本不使用大模型**：系统核心功能（订单解析、档案匹配、供应商匹配）均采用规则引擎实现，MVP阶段无需大模型

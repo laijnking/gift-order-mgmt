@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
       status: (row.isActive || row['状态']) === '禁用' ? 'inactive' : 'active',
       data_scope: row.dataScope || row['数据权限'] || 'self',
       department: row.department || row['部门'] || null,
+      remark: row.remark || row['备注'] || null,
     })).filter((u: { username: string; name: string }) => u.username && u.name);
 
     if (usersData.length === 0) {

@@ -411,15 +411,15 @@ async function main() {
   const selfCustomer = db.seed('customers', {
     code: `C-SELF-${token}`,
     name: `本人客户${token}`,
-    sales_user_name: selfPureName,
-    operator_user_name: operatorName,
+    salesperson_name: selfPureName,
+    order_taker_name: operatorName,
   });
 
   const otherCustomer = db.seed('customers', {
     code: `C-OTHER-${token}`,
     name: `他人客户${token}`,
-    sales_user_name: otherPureName,
-    operator_user_name: operatorName,
+    salesperson_name: otherPureName,
+    order_taker_name: operatorName,
   });
 
   const adminHeaders = buildAuthedHeaders(ADMIN_USER);
