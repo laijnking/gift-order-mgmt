@@ -100,7 +100,7 @@ export default function RolesPage() {
 
   const loadPermissions = useCallback(async () => {
     try {
-      const res = await fetch('/api/permissions');
+      const res = await fetch('/api/permissions', { headers: authHeaders() });
       const data = await res.json();
       if (data.success) {
         setPermissions(data.data || []);

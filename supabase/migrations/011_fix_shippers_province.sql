@@ -39,10 +39,10 @@ BEGIN
     RAISE NOTICE 'region -> province 数据迁移完成';
 
     -- 迁移 contact -> contact_person
-    EXECUTE "UPDATE shippers SET contact_person = contact
+    EXECUTE 'UPDATE shippers SET contact_person = contact
              WHERE contact IS NOT NULL
-               AND contact <> ''
-               AND (contact_person IS NULL OR contact_person = '')" ;
+               AND contact <> ''''
+               AND (contact_person IS NULL OR contact_person = '''')';
     RAISE NOTICE 'contact -> contact_person 数据迁移完成';
 
     -- 迁移 phone -> contact_phone

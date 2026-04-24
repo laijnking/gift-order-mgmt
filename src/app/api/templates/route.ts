@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requirePermission, requireAnyPermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { normalizeTemplateType, syncTemplateTargetLink, transformTemplateRecord, type TemplateRecord } from '@/lib/template-utils';
-import { requirePermission } from '@/lib/server-auth';
 import { PERMISSIONS } from '@/lib/permissions';
 
 // 获取模板列表
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
+  const authError = requireAnyPermission(request, [
+    PERMISSIONS.SETTINGS_VIEW,
+    PERMISSIONS.ORDERS_VIEW,
+    PERMISSIONS.ORDERS_EXPORT,
+  ]);
   if (authError) return authError;
 
   const client = getSupabaseClient();

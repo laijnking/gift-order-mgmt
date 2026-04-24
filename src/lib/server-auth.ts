@@ -46,3 +46,23 @@ export function requirePermission(request: NextRequest, permission: string) {
 
   return null;
 }
+
+export function requireAnyPermission(request: NextRequest, permissions: string[]) {
+  const user = parseUserInfoHeader(request);
+
+  if (!user) {
+    return NextResponse.json(
+      { success: false, error: '未登录或缺少用户上下文' },
+      { status: 401 }
+    );
+  }
+
+  if (!permissions.some(p => user.permissions?.includes(p))) {
+    return NextResponse.json(
+      { success: false, error: '当前账号没有执行此操作的权限' },
+      { status: 403 }
+    );
+  }
+
+  return null;
+}

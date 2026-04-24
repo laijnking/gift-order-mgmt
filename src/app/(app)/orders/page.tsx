@@ -213,11 +213,14 @@ export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [customerFilter, setCustomerFilter] = useState('');
+  const [customerSearch, setCustomerSearch] = useState('');
   const [supplierFilter, setSupplierFilter] = useState('');
+  const [supplierSearch, setSupplierSearch] = useState('');
+  const [quantityOp, setQuantityOp] = useState<'gt' | 'lt' | 'eq'>('eq');
+  const [quantityFilter, setQuantityFilter] = useState('');
   const [searchFields, setSearchFields] = useState<Record<string, string>>({
     orderNo: '',
     productName: '',
-    customerInfo: '',
     phone: '',
   });
 
@@ -282,8 +285,6 @@ export default function OrdersPage() {
   const [selectedSupplierId, setSelectedSupplierId] = useState('');
   // 批量派发时每个订单选择的供应商
   const [selectedSuppliers, setSelectedSuppliers] = useState<Record<string, string>>({});
-  // 供应商筛选搜索
-  const [supplierSearch, setSupplierSearch] = useState('');
   
   // 智能匹配相关状态
   const [matchResults, setMatchResults] = useState<Record<string, {
@@ -855,7 +856,7 @@ useEffect(() => {
 
   const fetchSuppliers = useCallback(async () => {
     try {
-      const res = await fetch('/api/suppliers');
+      const res = await fetch('/api/suppliers', { headers: authHeaders() });
       const data = await res.json();
       if (data.success) {
         setSuppliers((data.data || []).filter((s: Supplier) => s.id && s.name));
@@ -867,7 +868,7 @@ useEffect(() => {
 
   const fetchCustomers = useCallback(async () => {
     try {
-      const res = await fetch('/api/customers');
+      const res = await fetch('/api/customers', { headers: authHeaders() });
       const data = await res.json();
       if (data.success) {
         setCustomers((data.data || []).filter((c: Customer) => c.code && c.name));
@@ -928,10 +929,21 @@ useEffect(() => {
     // Supplier filter
     if (supplierFilter && order.supplierId !== supplierFilter) return false;
 
+    // Quantity filter
+    if (quantityFilter !== '') {
+      const qty = order.items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+      const target = parseInt(quantityFilter);
+      if (isNaN(target)) return false;
+      if (quantityOp === 'gt' && !(qty > target)) return false;
+      if (quantityOp === 'lt' && !(qty < target)) return false;
+      if (quantityOp === 'eq' && qty !== target) return false;
+    }
+
     // Search fields - 使用模糊匹配
     const allSearchFields = { ...searchFields, ...advancedFields };
     for (const [key, value] of Object.entries(allSearchFields)) {
       if (!value.trim()) continue;
+      if (key === 'customerInfo') continue; // 已在下拉筛选中覆盖
       const q = value.trim().toLowerCase();
       let matched = false;
       switch (key) {
@@ -1517,9 +1529,13 @@ useEffect(() => {
   // Clear all filters
   const clearAllFilters = () => {
     setStatusFilter('');
+    setSelectedStatuses([]);
     setCustomerFilter('');
+    setCustomerSearch('');
     setSupplierFilter('');
-    setSearchFields({ orderNo: '', productName: '', customerInfo: '', phone: '' });
+    setQuantityOp('eq');
+    setQuantityFilter('');
+    setSearchFields({ orderNo: '', productName: '', phone: '' });
     setAdvancedFields({});
   };
 
@@ -1527,6 +1543,7 @@ useEffect(() => {
     statusFilter ||
     customerFilter ||
     supplierFilter ||
+    quantityFilter !== '' ||
     Object.values(searchFields).some((v) => v.trim()) ||
     Object.values(advancedFields).some((v) => v.trim());
 
@@ -1953,10 +1970,80 @@ useEffect(() => {
 
       {/* Filter Area */}
       <Card id="filter-card">
-        <CardContent className="pt-4 pb-3">
-          {/* Row 1: Common search fields */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="space-y-1">
+        <CardContent className="pt-4 pb-3 space-y-3">
+          {/* Row 1: 订单状态快捷标签 - 一行展示，点击即选 */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => { setStatusFilter(''); setSelectedStatuses([]); }}
+              className={`h-7 px-3 text-xs rounded-full cursor-pointer transition-colors flex items-center gap-1.5 shrink-0 ${
+                !statusFilter && selectedStatuses.length === 0
+                  ? 'bg-primary text-primary-foreground font-medium shadow-sm'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
+              }`}
+            >
+              全部订单
+              <span className={`text-[10px] px-1 rounded-full ${
+                !statusFilter && selectedStatuses.length === 0 ? 'bg-primary-foreground/20' : 'bg-muted-foreground/20'
+              }`}>{orders.length}</span>
+            </button>
+            {ORDER_STATUS_OPTIONS.map((option) => {
+              const count = orders.filter(o => o.status === option.value).length;
+              const isActive = statusFilter === option.value && selectedStatuses.length === 0;
+              const isMultiSelected = selectedStatuses.includes(option.value);
+              return (
+                <button
+                  key={option.value}
+                  onClick={() => {
+                    setStatusFilter(''); // 清空单选
+                    setSelectedStatuses(prev =>
+                      prev.includes(option.value)
+                        ? prev.filter(k => k !== option.value)
+                        : [...prev, option.value]
+                    );
+                  }}
+                  className={`h-7 px-3 text-xs rounded-full cursor-pointer transition-colors flex items-center gap-1.5 shrink-0 ${
+                    isActive || isMultiSelected
+                      ? 'bg-primary text-primary-foreground font-medium shadow-sm'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  {option.label}
+                  <span className={`text-[10px] px-1 rounded-full ${
+                    isActive || isMultiSelected ? 'bg-primary-foreground/20' : 'bg-muted-foreground/20'
+                  }`}>{count}</span>
+                </button>
+              );
+            })}
+            {/* 多选切换 */}
+            {selectedStatuses.length > 0 && (
+              <button
+                onClick={() => setSelectedStatuses([])}
+                className="h-7 px-2.5 text-xs rounded-full cursor-pointer bg-primary/10 text-primary hover:bg-primary/20 transition-colors shrink-0"
+              >
+                已选 {selectedStatuses.length} 个状态
+              </button>
+            )}
+            {/* 右侧：筛选结果统计 */}
+            <div className="ml-auto flex items-center gap-3 shrink-0">
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-muted-foreground" onClick={clearAllFilters}>
+                  <X className="w-3 h-3 mr-1" />
+                  清除筛选
+                </Button>
+              )}
+              {selectedOrders.size > 0 && (
+                <Badge variant="secondary" className="text-xs">已选 {selectedOrders.size} 条</Badge>
+              )}
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                {filteredOrders.length} / {orders.length}
+              </span>
+            </div>
+          </div>
+
+          {/* Row 2: 条件筛选 */}
+          <div className="flex flex-wrap xl:flex-nowrap xl:items-end gap-3">
+            {/* 订单号 */}
+            <div className="space-y-1 min-w-0 flex-1">
               <Label className="text-xs text-muted-foreground">订单号</Label>
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -1968,7 +2055,8 @@ useEffect(() => {
                 />
               </div>
             </div>
-            <div className="space-y-1">
+            {/* 商品名称/型号 */}
+            <div className="space-y-1 min-w-0 flex-1">
               <Label className="text-xs text-muted-foreground">商品名称/型号</Label>
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -1980,19 +2068,8 @@ useEffect(() => {
                 />
               </div>
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">客户信息</Label>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                <Input
-                  placeholder="客户名称或编码"
-                  value={searchFields.customerInfo}
-                  onChange={(e) => updateSearchField('customerInfo', e.target.value)}
-                  className="pl-8 h-8 text-sm"
-                />
-              </div>
-            </div>
-            <div className="space-y-1">
+            {/* 电话号码 */}
+            <div className="space-y-1 min-w-0 flex-1">
               <Label className="text-xs text-muted-foreground">电话号码</Label>
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -2004,198 +2081,138 @@ useEffect(() => {
                 />
               </div>
             </div>
-          </div>
-
-          {/* Row 2: Status + Customer + Supplier dropdowns + More button */}
-          <div className="mt-3 flex flex-col gap-3 xl:flex-row xl:flex-wrap xl:items-end">
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">订单状态</Label>
+            {/* 客户 */}
+            <div className="space-y-1 min-w-0 flex-1">
+              <Label className="text-xs text-muted-foreground">客户</Label>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-8 w-full justify-between font-normal sm:min-w-[140px] sm:w-auto">
-                    {selectedStatuses.length > 0 ? (
-                      <span className="truncate">
-                        已选 {selectedStatuses.length} 个状态
-                      </span>
-                    ) : statusFilter ? (
-                      <span className="truncate">{getOrderStatusLabel(statusFilter)}</span>
+                  <Button variant="outline" size="sm" className="h-8 w-full justify-between font-normal">
+                    {customerFilter ? (
+                      <span className="truncate">{customers.find(c => c.code === customerFilter)?.name || customerFilter}</span>
                     ) : (
-                      <span className="text-muted-foreground truncate">全部状态</span>
+                      <span className="text-muted-foreground truncate">全部客户</span>
                     )}
                     <ChevronDown className="h-3 w-3 ml-1 shrink-0" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-48 p-0" align="start">
-                  <div className="p-2 border-b bg-muted/30">
-                    <div className="text-xs font-medium text-muted-foreground">选择状态（可多选）</div>
+                <PopoverContent className="w-[220px] p-0" align="start">
+                  <div className="p-2 border-b">
+                    <Input
+                      placeholder="搜索客户..."
+                      value={customerSearch}
+                      onChange={(e) => setCustomerSearch(e.target.value)}
+                      className="h-7 text-sm"
+                    />
                   </div>
-                  <div className="p-1 max-h-64 overflow-y-auto">
-                    {/* 单选模式：全部 */}
-                    <div className="px-2 py-1.5">
-                      <button
-                        onClick={() => {
-                          setStatusFilter('');
-                          setSelectedStatuses([]);
-                        }}
-                        className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-muted cursor-pointer flex items-center gap-2 ${
-                          !statusFilter && selectedStatuses.length === 0 ? 'bg-primary/10 text-primary' : ''
-                        }`}
-                      >
-                        <div className={`h-4 w-4 border rounded ${
-                          !statusFilter && selectedStatuses.length === 0 ? 'bg-primary border-primary' : 'border-muted-foreground'
-                        }`}>
-                          {!statusFilter && selectedStatuses.length === 0 && (
-                            <Check className="h-3 w-3 text-white" />
-                          )}
-                        </div>
-                        全部状态
-                      </button>
-                    </div>
-                    {/* 单选模式：单个状态 */}
-                    <div className="px-2 py-1.5">
-                      <div className="text-xs text-muted-foreground mb-1">单选</div>
-                      {ORDER_STATUS_OPTIONS.map((option) => (
+                  <div className="p-1 max-h-[200px] overflow-y-auto">
+                    <button
+                      onClick={() => { setCustomerFilter(''); setCustomerSearch(''); }}
+                      className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-muted cursor-pointer ${!customerFilter ? 'bg-primary/10 text-primary' : ''}`}
+                    >
+                      全部客户
+                    </button>
+                    {customers
+                      .filter(c => c.name.toLowerCase().includes(customerSearch.toLowerCase()) || c.code.toLowerCase().includes(customerSearch.toLowerCase()))
+                      .map((c) => (
                         <button
-                          key={option.value}
-                          onClick={() => {
-                            setStatusFilter(option.value);
-                            setSelectedStatuses([]);
-                          }}
-                          className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-muted cursor-pointer flex items-center gap-2 ${
-                            statusFilter === option.value && selectedStatuses.length === 0 ? 'bg-primary/10 text-primary' : ''
-                          }`}
+                          key={c.code}
+                          onClick={() => { setCustomerFilter(c.code); setCustomerSearch(''); }}
+                          className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-muted cursor-pointer truncate ${customerFilter === c.code ? 'bg-primary/10 text-primary' : ''}`}
                         >
-                          <div className={`h-4 w-4 border rounded ${
-                            statusFilter === option.value && selectedStatuses.length === 0 ? 'bg-primary border-primary' : 'border-muted-foreground'
-                          }`}>
-                            {statusFilter === option.value && selectedStatuses.length === 0 && (
-                              <Check className="h-3 w-3 text-white" />
-                            )}
-                          </div>
-                          {option.label}
+                          {c.name}
                         </button>
                       ))}
-                    </div>
-                    {/* 多选模式 */}
-                    <div className="px-2 py-1.5 border-t">
-                      <div className="text-xs text-muted-foreground mb-1">多选</div>
-                      {ORDER_STATUS_OPTIONS.map((option) => (
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+            {/* 商品数量 */}
+            <div className="space-y-1 min-w-0 flex-1">
+              <Label className="text-xs text-muted-foreground">商品数量</Label>
+              <div className="flex items-center gap-1">
+                <Select
+                  value={quantityOp || 'eq'}
+                  onValueChange={(v) => setQuantityOp(v as 'gt' | 'lt' | 'eq')}
+                >
+                  <SelectTrigger className="h-8 w-[70px] text-sm shrink-0">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="gt">大于</SelectItem>
+                    <SelectItem value="lt">小于</SelectItem>
+                    <SelectItem value="eq">等于</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  type="number"
+                  min="1"
+                  placeholder="数量"
+                  value={quantityFilter}
+                  onChange={(e) => setQuantityFilter(e.target.value)}
+                  className="h-8 text-sm w-full"
+                />
+              </div>
+            </div>
+            {/* 发货方 */}
+            <div className="space-y-1 min-w-0 flex-1">
+              <Label className="text-xs text-muted-foreground">发货方</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-8 w-full justify-between font-normal">
+                    {supplierFilter ? (
+                      <span className="truncate">{suppliers.find(s => s.id === supplierFilter)?.name || supplierFilter}</span>
+                    ) : (
+                      <span className="text-muted-foreground truncate">全部发货方</span>
+                    )}
+                    <ChevronDown className="h-3 w-3 ml-1 shrink-0" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[240px] p-0" align="start">
+                  <div className="p-2 border-b">
+                    <Input
+                      placeholder="搜索发货方..."
+                      value={supplierSearch}
+                      onChange={(e) => setSupplierSearch(e.target.value)}
+                      className="h-7 text-sm"
+                    />
+                  </div>
+                  <div className="p-1 max-h-[200px] overflow-y-auto">
+                    <button
+                      onClick={() => { setSupplierFilter(''); setSupplierSearch(''); }}
+                      className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-muted cursor-pointer ${!supplierFilter ? 'bg-primary/10 text-primary' : ''}`}
+                    >
+                      全部发货方
+                    </button>
+                    {suppliers
+                      .filter(s => s.name.toLowerCase().includes(supplierSearch.toLowerCase()))
+                      .map((s) => (
                         <button
-                          key={option.value}
-                          onClick={() => {
-                            setStatusFilter(''); // 清空单选
-                            setSelectedStatuses(prev => 
-                              prev.includes(option.value) 
-                                ? prev.filter(k => k !== option.value)
-                                : [...prev, option.value]
-                            );
-                          }}
-                          className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-muted cursor-pointer flex items-center gap-2 ${
-                            selectedStatuses.includes(option.value) ? 'bg-primary/10 text-primary' : ''
-                          }`}
+                          key={s.id}
+                          onClick={() => { setSupplierFilter(s.id); setSupplierSearch(''); }}
+                          className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-muted cursor-pointer truncate ${supplierFilter === s.id ? 'bg-primary/10 text-primary' : ''}`}
                         >
-                          <div className={`h-4 w-4 border rounded flex items-center justify-center ${
-                            selectedStatuses.includes(option.value) ? 'bg-primary border-primary' : 'border-muted-foreground'
-                          }`}>
-                            {selectedStatuses.includes(option.value) && (
-                              <Check className="h-3 w-3 text-white" />
-                            )}
-                          </div>
-                          {option.label}
+                          {s.name}
                         </button>
                       ))}
-                    </div>
                   </div>
                 </PopoverContent>
               </Popover>
             </div>
 
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">客户</Label>
-              <Select
-                value={customerFilter || 'all'}
-                onValueChange={(v) => setCustomerFilter(v === 'all' ? '' : v)}
-              >
-                <SelectTrigger className="h-8 w-full text-sm sm:w-[160px]">
-                  <SelectValue placeholder="全部客户" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">全部客户</SelectItem>
-                  {customers.map((c) => (
-                    <SelectItem key={c.code} value={c.code}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Spacer pushes actions to the end */}
+            <div className="hidden xl:block xl:flex-1" />
 
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">供应商</Label>
-              <Input
-                placeholder="搜索供应商..."
-                value={supplierSearch}
-                onChange={(e) => setSupplierSearch(e.target.value)}
-                className="h-8 w-full text-sm sm:w-[160px]"
-              />
-              <Select
-                value={supplierFilter || 'all'}
-                onValueChange={(v) => setSupplierFilter(v === 'all' ? '' : v)}
-              >
-                <SelectTrigger className="h-8 w-full text-sm sm:w-[160px]">
-                  <SelectValue placeholder="全部供应商" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[200px]">
-                  <SelectItem value="all">全部供应商</SelectItem>
-                  {suppliers
-                    .filter(s => s.name.toLowerCase().includes(supplierSearch.toLowerCase()))
-                    .map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.name}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
-
+            {/* 高级筛选按钮 */}
             <Button
               variant="outline"
               size="sm"
-              className="h-8"
+              className="h-8 shrink-0"
               onClick={() => setShowAdvancedFilter(!showAdvancedFilter)}
             >
               <SlidersHorizontal className="w-3.5 h-3.5 mr-1" />
-              更多
-              {showAdvancedFilter ? (
-                <ChevronUp className="w-3.5 h-3.5 ml-1" />
-              ) : (
-                <ChevronDown className="w-3.5 h-3.5 ml-1" />
-              )}
+              高级
+              {showAdvancedFilter ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />}
             </Button>
-
-            {hasActiveFilters && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 text-muted-foreground"
-                onClick={clearAllFilters}
-              >
-                <X className="w-3.5 h-3.5 mr-1" />
-                清除筛选
-              </Button>
-            )}
-
-            <div className="hidden flex-1 xl:block" />
-
-            {selectedOrders.size > 0 && (
-              <Badge variant="secondary" className="text-sm">
-                已选 {selectedOrders.size} 条
-              </Badge>
-            )}
-
-            <span className="text-sm text-muted-foreground">
-              筛选结果：{filteredOrders.length} / {orders.length}
-            </span>
           </div>
 
           {/* Advanced filter panel */}

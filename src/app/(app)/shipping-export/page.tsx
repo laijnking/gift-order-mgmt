@@ -115,6 +115,7 @@ export default function ShippingExportPage() {
   const [loading, setLoading] = useState(true);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
+  const [unassignedCount, setUnassignedCount] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'exported'>('all');
   const [exporting, setExporting] = useState(false);
@@ -162,6 +163,7 @@ export default function ShippingExportPage() {
       
       if (data.success) {
         setSuppliers(data.data || []);
+        setUnassignedCount(data.unassignedCount || 0);
       } else {
         throw new Error(data.error);
       }
@@ -212,11 +214,7 @@ export default function ShippingExportPage() {
       return true;
     })
     .sort((a, b) => {
-      // 优先显示：未导出 > 已导出，待发货多的在前
-      const aHasExported = a.lastExportTime !== null && a.lastExportTime !== undefined;
-      const bHasExported = b.lastExportTime !== null && b.lastExportTime !== undefined;
-      if (aHasExported !== bHasExported) return aHasExported ? 1 : -1; // 未导出的在前
-      if (a.pendingOrderCount !== b.pendingOrderCount) return b.pendingOrderCount - a.pendingOrderCount;
+      // 后端已按 pending 数量降序、上次导出时间排好，此处仅按名称二次排序
       return a.name.localeCompare(b.name);
     });
 
@@ -440,6 +438,35 @@ export default function ShippingExportPage() {
         </div>
       </div>
 
+      {/* 未分配供应商提醒 */}
+      {unassignedCount > 0 && (
+        <Card className="border-orange-300 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-800">
+          <CardContent className="flex items-center justify-between gap-4 py-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-orange-100 rounded-lg dark:bg-orange-900/50">
+                <Package className="h-5 w-5 text-orange-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-orange-800 dark:text-orange-200">
+                  有 {unassignedCount} 条待发货订单尚未分配供应商
+                </p>
+                <p className="text-xs text-orange-600 dark:text-orange-400">
+                  请先在订单中心为这些订单匹配供应商，再导出发货通知单
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-orange-300 text-orange-700 hover:bg-orange-100 dark:border-orange-700 dark:text-orange-300 dark:hover:bg-orange-900/30 shrink-0"
+              onClick={() => router.push('/orders?status=pending')}
+            >
+              去分配
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* 搜索栏 */}
       <Card>
         <CardContent className="pt-6">
@@ -495,6 +522,11 @@ export default function ShippingExportPage() {
             </div>
             <div className="text-sm text-muted-foreground xl:ml-auto">
               共 {filteredSuppliers.length} 个供应商
+              {unassignedCount > 0 && (
+                <span className="ml-3 text-orange-600">
+                  （{unassignedCount} 条未分配供应商）
+                </span>
+              )}
             </div>
           </div>
         </CardContent>
@@ -550,8 +582,14 @@ export default function ShippingExportPage() {
                     <TableCell>{supplier.code}</TableCell>
                     <TableCell>
                       <Badge variant="outline">
-                        {supplier.type === 'jd' ? '京东' : 
-                         supplier.type === 'pdd' ? '拼多多' : '自有'}
+                        {supplier.type === 'warehouse' ? '仓库' :
+                         supplier.type === 'supplier' ? '供应商' :
+                         supplier.type === 'jd' ? '京东' :
+                         supplier.type === 'pdd' ? '拼多多' :
+                         supplier.type === 'self' ? '自有' :
+                         supplier.type === '三方' || supplier.type === 'ThirdParty' ? '第三方' :
+                         supplier.type === '聚水潭' ? '聚水潭' :
+                         supplier.type || '其他'}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">

@@ -400,14 +400,36 @@ export async function POST(request: NextRequest) {
       const supplierExportFieldMappings = Object.keys(supplierFieldMappings).length > 0 ? supplierFieldMappings : DEFAULT_SHIPPING_FIELD_MAPPINGS;
       const isSupplierTemplate = Boolean(supplierTemplate?.target_type === 'supplier' && supplierTemplate?.target_id === supplierId);
 
-      const { data: orders, error: ordersError } = await client
+      // 查询待发货订单：优先按 supplier_id 精确匹配，回退按 supplier_name 匹配
+      const { data: ordersById, error: ordersErrorById } = await client
         .from('orders')
         .select('*')
         .eq('supplier_id', supplierId)
-        .in('status', ['pending', 'assigned'])
-        .order('created_at', { ascending: true });
-      if (ordersError) throw new Error(`查询订单失败: ${ordersError.message}`);
-      if (!orders || orders.length === 0) continue;
+        .in('status', ['pending', 'assigned']);
+
+      if (ordersErrorById) throw new Error(`查询订单失败: ${ordersErrorById.message}`);
+
+      const { data: ordersByName, error: ordersErrorByName } = await client
+        .from('orders')
+        .select('*')
+        .is('supplier_id', null)
+        .eq('supplier_name', (supplier as Record<string, unknown>).name as string)
+        .in('status', ['pending', 'assigned']);
+
+      if (ordersErrorByName) throw new Error(`按名称查询订单失败: ${ordersErrorByName.message}`);
+
+      // 合并去重
+      const orderMap = new Map<string, Record<string, unknown>>();
+      for (const o of (ordersById || []) as Record<string, unknown>[]) {
+        orderMap.set(o.id as string, o);
+      }
+      for (const o of (ordersByName || []) as Record<string, unknown>[]) {
+        if (!orderMap.has(o.id as string)) {
+          orderMap.set(o.id as string, o);
+        }
+      }
+      const orders = Array.from(orderMap.values());
+      if (orders.length === 0) continue;
 
       const exportRows: Array<Record<string, unknown>> = [];
       let supplierSuccessCount = 0;

@@ -3,7 +3,7 @@ import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission } from '@/lib/server-auth';
 import { PERMISSIONS } from '@/lib/permissions';
 
-// 获取待发货供应商列表
+// 获取待发货供应商列表（从订单出发，只返回有待发货的供应商）
 export async function GET(request: NextRequest) {
   const authError = requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
   if (authError) return authError;
@@ -13,37 +13,88 @@ export async function GET(request: NextRequest) {
   const status = searchParams.get('status') || 'active';
 
   try {
-    // 获取供应商列表
-    let query = client
-      .from('suppliers')
-      .select('*')
-      .order('created_at', { ascending: false });
+    // 第一步：从 pending/assigned 订单中找出所有有供应商的订单
+    const { data: pendingOrders, error: ordersError } = await client
+      .from('orders')
+      .select('id, supplier_id, supplier_name, status')
+      .in('status', ['pending', 'assigned'])
+      .or('supplier_id.not.is.null,supplier_name.not.is.null');
+
+    if (ordersError) throw new Error(`查询待发货订单失败: ${ordersError.message}`);
+
+    // 第二步：从第一步结果中找出已分配供应商的订单
+    const assignedOrders = (pendingOrders || []).filter(
+      (o) => o.supplier_id || o.supplier_name
+    );
+
+    if (assignedOrders.length === 0) {
+      return NextResponse.json({
+        success: true,
+        data: [],
+        unassignedCount: (pendingOrders || []).length,
+      });
+    }
+
+    // 第三步：获取这些订单关联的供应商 ID 和 name
+    const supplierIds = [...new Set(
+      assignedOrders
+        .map((o) => o.supplier_id)
+        .filter(Boolean)
+    )];
+    const supplierNames = [...new Set(
+      assignedOrders
+        .map((o) => o.supplier_name)
+        .filter(Boolean)
+    )];
+
+    // 第四步：查询供应商信息（只取有 pending 订单的那些）
+    let supplierQuery = client.from('suppliers').select('*');
+    if (supplierIds.length > 0 && supplierNames.length > 0) {
+      supplierQuery = supplierQuery.or(
+        `id.in.(${supplierIds.join(',')}),name.in.(${supplierNames.map(n => `"${n}"`).join(',')})`
+      );
+    } else if (supplierIds.length > 0) {
+      supplierQuery = supplierQuery.in('id', supplierIds);
+    } else {
+      supplierQuery = supplierQuery.in('name', supplierNames);
+    }
 
     if (status !== 'all') {
-      query = query.eq('is_active', status === 'active');
+      supplierQuery = supplierQuery.eq('is_active', status === 'active');
     }
 
-    const { data: suppliers, error: suppliersError } = await query;
+    const { data: suppliers, error: suppliersError } = await supplierQuery;
+    if (suppliersError) throw new Error(`查询供应商失败: ${suppliersError.message}`);
 
-    if (suppliersError) {
-      throw new Error(`查询供应商失败: ${suppliersError.message}`);
-    }
-
-    // 获取各供应商的待发货订单统计
+    // 第五步：为每个供应商计算 pending 订单数和获取上次导出时间
     const results = [];
-
     for (const supplier of (suppliers || [])) {
-      // 查询待发货订单：已选供应商但尚未回单/完成的 pending、assigned 都应该出现在这里。
-      const { data: orders, error: ordersError } = await client
-        .from('orders')
-        .select('id, order_no, status, assigned_at')
-        .eq('supplier_id', supplier.id)
-        .in('status', ['pending', 'assigned']);
+      // 按 supplier_id 或 supplier_name 统计
+      const { data: ordersById } = supplierIds.length > 0
+        ? await client
+            .from('orders')
+            .select('id')
+            .eq('supplier_id', supplier.id)
+            .in('status', ['pending', 'assigned'])
+        : { data: [] };
 
-      if (ordersError) {
-        console.error(`查询供应商 ${supplier.id} 订单失败:`, ordersError);
-        continue;
-      }
+      const { data: ordersByName } = supplierNames.includes(supplier.name)
+        ? await client
+            .from('orders')
+            .select('id')
+            .is('supplier_id', null)
+            .eq('supplier_name', supplier.name)
+            .in('status', ['pending', 'assigned'])
+        : { data: [] };
+
+      // 合并去重
+      const orderMap = new Map<string, string>();
+      for (const o of (ordersById || [])) orderMap.set(o.id, o.id);
+      for (const o of (ordersByName || [])) orderMap.set(o.id, o.id);
+      const pendingOrderCount = orderMap.size;
+
+      // 跳过 pending=0 的供应商（不显示）
+      if (pendingOrderCount === 0) continue;
 
       // 获取上次导出记录
       const { data: lastExport } = await client
@@ -58,16 +109,33 @@ export async function GET(request: NextRequest) {
       results.push({
         id: supplier.id,
         name: supplier.name,
-        code: supplier.code,
+        code: (supplier as Record<string, unknown>).code as string || String(supplier.id).slice(0, 8),
         type: supplier.type,
-        pendingOrderCount: orders?.length || 0,
+        pendingOrderCount,
         lastExportTime: lastExport?.created_at || null,
       });
     }
 
+    // 第六步：统计完全未分配供应商的订单数
+    const unassignedCount = (pendingOrders || []).filter(
+      (o) => !o.supplier_id && !o.supplier_name
+    ).length;
+
+    // 按 pending 数量降序，上次导出时间升序（未导出的在前）
+    results.sort((a, b) => {
+      if (b.pendingOrderCount !== a.pendingOrderCount) {
+        return b.pendingOrderCount - a.pendingOrderCount;
+      }
+      if (a.lastExportTime !== b.lastExportTime) {
+        return a.lastExportTime ? 1 : -1;
+      }
+      return a.name.localeCompare(b.name);
+    });
+
     return NextResponse.json({
       success: true,
       data: results,
+      unassignedCount,
     });
   } catch (error) {
     console.error('获取待发货供应商列表失败:', error);

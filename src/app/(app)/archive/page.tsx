@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import { ShieldAlert } from 'lucide-react';
 import { buildUserInfoHeaders, useAuth, usePermission } from '@/lib/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -90,7 +89,6 @@ const MODULES = [
 ];
 
 export default function ArchiveManagementPage() {
-  const pathname = usePathname();
   const { user } = useAuth();
   const { hasPermission, hasAnyPermission } = usePermission();
   const canViewArchive = hasAnyPermission(['customers:view', 'suppliers:view', 'products:view']);
@@ -289,11 +287,11 @@ export default function ArchiveManagementPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <ShieldAlert className="h-5 w-5 text-destructive" />
-              无权访问档案管理
+              无权访问档案概览
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">当前账号没有查看档案管理中心的权限，请联系管理员处理。</p>
+            <p className="text-sm text-muted-foreground">当前账号没有查看档案概览的权限，请联系管理员处理。</p>
             <Button asChild>
               <Link href="/">返回首页</Link>
             </Button>
@@ -315,7 +313,7 @@ export default function ArchiveManagementPage() {
                   <Settings className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold">档案管理中心</h1>
+                  <h1 className="text-xl font-bold">档案概览</h1>
                   <p className="text-sm text-gray-500">档案信息统一管理</p>
                 </div>
               </div>
@@ -326,34 +324,6 @@ export default function ArchiveManagementPage() {
             </div>
           </div>
         </header>
-
-        {/* Navigation Tabs */}
-        <div className="border-b bg-white">
-          <div className="container mx-auto px-4">
-            <nav className="flex gap-4 overflow-x-auto">
-              <Link 
-                href="/orders" 
-                className={`py-4 px-2 border-b-2 text-sm font-medium transition-colors ${
-                  pathname === '/orders' 
-                    ? 'border-blue-600 text-blue-600' 
-                    : 'border-transparent text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                订单中心
-              </Link>
-              <Link 
-                href="/archive" 
-                className={`py-4 px-2 border-b-2 text-sm font-medium transition-colors ${
-                  pathname === '/archive' 
-                    ? 'border-blue-600 text-blue-600' 
-                    : 'border-transparent text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                档案管理
-              </Link>
-            </nav>
-          </div>
-        </div>
 
         <main className="container mx-auto px-4 py-6">
           {/* 模块卡片网格 */}

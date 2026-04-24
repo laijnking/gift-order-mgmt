@@ -498,29 +498,6 @@ export default function CustomersPage() {
         </div>
       </header>
 
-      {/* Navigation */}
-      <div className="border-b bg-white">
-        <div className="container mx-auto px-4">
-          <nav className="flex gap-4 overflow-x-auto">
-            <Link href="/archive" className="py-4 px-2 border-b-2 border-transparent text-sm font-medium text-gray-600 hover:text-gray-900">
-              总览
-            </Link>
-            <Link href="/customers" className="py-4 px-2 border-b-2 border-blue-600 text-sm font-medium text-blue-600">
-              客户管理
-            </Link>
-            <Link href="/suppliers-manage" className="py-4 px-2 border-b-2 border-transparent text-sm font-medium text-gray-600 hover:text-gray-900">
-              供应商管理
-            </Link>
-            <Link href="/products" className="py-4 px-2 border-b-2 border-transparent text-sm font-medium text-gray-600 hover:text-gray-900">
-              商品管理
-            </Link>
-            <Link href="/warehouses-manage" className="py-4 px-2 border-b-2 border-transparent text-sm font-medium text-gray-600 hover:text-gray-900">
-              仓库管理
-            </Link>
-          </nav>
-        </div>
-      </div>
-
       <main className="container mx-auto px-4 py-6">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">

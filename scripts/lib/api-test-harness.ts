@@ -27,10 +27,20 @@ export const ADMIN_USER: MockUser = {
     'orders:delete',
     'orders:export',
     'customers:view',
+    'customers:create',
+    'customers:edit',
+    'customers:delete',
     'suppliers:view',
+    'suppliers:create',
+    'suppliers:edit',
     'products:view',
+    'products:create',
+    'products:edit',
     'stocks:view',
+    'stocks:edit',
     'users:view',
+    'users:create',
+    'users:edit',
     'settings:view',
   ],
 };
@@ -129,7 +139,8 @@ export async function fetchJson<T = unknown>(
   init?: RequestInit
 ): Promise<{ status: number; data: T }> {
   const response = await fetch(input, init);
-  const data = (await response.json()) as T;
+  const text = await response.text();
+  const data = text ? (JSON.parse(text) as T) : ({} as T);
   return {
     status: response.status,
     data,

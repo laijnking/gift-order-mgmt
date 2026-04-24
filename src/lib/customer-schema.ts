@@ -39,7 +39,7 @@ export function transformCustomerRecord(dbCustomer: Record<string, unknown>) {
   return {
     id: dbCustomer.id,
     code: dbCustomer.code,
-    name: dbCustomer.name,
+    name: normalizeTruthyString(dbCustomer.name),
     contactPerson: dbCustomer.contact_person || dbCustomer.contact || '',
     contactPhone: dbCustomer.contact_phone || dbCustomer.phone || dbCustomer.mobile || '',
     contactEmail: dbCustomer.contact_email || '',

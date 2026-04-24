@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: postgres123
       POSTGRES_DB: gift_order
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - /var/lib/docker/volumes/gift-order-mgmt_postgres_data/_data:/var/lib/postgresql/data
       - ./supabase/migrations:/docker-entrypoint-initdb.d
     restart: unless-stopped
     healthcheck:
@@ -46,7 +46,7 @@ services:
       - COZE_SUPABASE_ANON_KEY=local-anon-key
       - COZE_SUPABASE_SERVICE_ROLE_KEY=local-service-role-key
     volumes:
-      - app_data:/app/data
+      - /var/lib/docker/volumes/gift-order-mgmt_app_data/_data:/app/data
     depends_on:
       db:
         condition: service_healthy
@@ -93,7 +93,6 @@ services:
 
 volumes:
   postgres_data:
-  app_data:
   minio_data:
 
 networks:

@@ -752,7 +752,7 @@ export default function OrderParsePage() {
   }, [excelPreview, headerRow, normalizeHeadersForCompare]);
 
   // 加载映射历史版本
-  const loadMappingHistory = async (customerCode: string) => {
+  const loadMappingHistory = useCallback(async (customerCode: string) => {
     try {
       const res = await fetch(`/api/column-mappings/history?customerCode=${encodeURIComponent(customerCode)}`, {
         headers: buildUserInfoHeaders(),
@@ -764,7 +764,7 @@ export default function OrderParsePage() {
     } catch (error) {
       console.error('加载映射历史失败:', error);
     }
-  };
+  }, []);
 
   // 选择客户时：优先按 fingerprint 自动加载历史映射
   useEffect(() => {

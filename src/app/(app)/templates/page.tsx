@@ -224,7 +224,7 @@ export default function TemplatesPage() {
 
   const loadCustomers = async () => {
     try {
-      const res = await fetch('/api/customers');
+      const res = await fetch('/api/customers', { headers: authHeaders() });
       const data = await res.json();
       if (data.success) {
         setCustomers(data.data || []);
@@ -236,7 +236,7 @@ export default function TemplatesPage() {
 
   const loadSuppliers = async () => {
     try {
-      const res = await fetch('/api/suppliers');
+      const res = await fetch('/api/suppliers', { headers: authHeaders() });
       const data = await res.json();
       if (data.success) {
         setSuppliers(data.data || []);

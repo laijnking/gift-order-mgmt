@@ -255,7 +255,7 @@ export const mockMappings: ProductMapping[] = [
     id: 'MAP-001',
     customerProductName: '苏泊尔ZMD安心系列绞肉机',
     productName: '苏泊尔ZMD安心系列 升级搅菜杆双层四刃精钢刀锋绞肉机',
-    productCode: 'JRD05-U',
+    systemProductCode: 'JRD05-U',
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z'
   },
@@ -263,7 +263,7 @@ export const mockMappings: ProductMapping[] = [
     id: 'MAP-002',
     customerProductName: '九阳电蒸锅',
     productName: '九阳电蒸锅',
-    productCode: 'DZ100HG-GZ605',
+    systemProductCode: 'DZ100HG-GZ605',
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z'
   },
@@ -271,7 +271,7 @@ export const mockMappings: ProductMapping[] = [
     id: 'MAP-003',
     customerProductName: '苏泊尔果蔬清洗机',
     productName: '苏泊尔果蔬清洗机',
-    productCode: 'GS10',
+    systemProductCode: 'GS10',
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z'
   }

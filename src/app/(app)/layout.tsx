@@ -1,14 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
+import { useTabs, Tab } from '@/components/providers/tabs-context';
 import {
   Package, BarChart3, Warehouse, Users, Bot, FileText,
   Link2, Settings, ChevronLeft, ChevronRight, LogOut, User,
   Building2, Truck, Menu, X, ChevronDown, Bell, DollarSign,
-  UserCircle, Lock, Mail, Phone
+  UserCircle, Lock, Mail, Phone, XIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -69,6 +70,15 @@ const menuItems: MenuItem[] = [
   },
 ];
 
+// 首页固定不可关闭
+const DEFAULT_TAB: Tab = {
+  id: 'tab-home',
+  label: '首页',
+  href: '/',
+  icon: BarChart3,
+  closable: false,
+};
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -84,6 +94,42 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, isLoading, logout } = useAuth();
+  const { tabs, activeTabId, addTab, removeTab, setActiveTab } = useTabs();
+
+  // 确保首页 Tab 始终存在
+  useEffect(() => {
+    if (tabs.length === 0) {
+      addTab({ ...DEFAULT_TAB });
+    }
+  }, [tabs.length, addTab]);
+
+  // 根据路径查找菜单项
+  const findMenuItem = useCallback((href: string): MenuItem | null => {
+    for (const item of menuItems) {
+      if (item.href === href) return item;
+      if (item.children) {
+        for (const child of item.children) {
+          if (child.href === href) return child;
+        }
+      }
+    }
+    return null;
+  }, []);
+
+  // 路由变化时自动打开对应 Tab
+  useEffect(() => {
+    if (pathname === '/') return;
+
+    const menuItem = findMenuItem(pathname);
+    if (menuItem) {
+      addTab({
+        label: menuItem.label,
+        href: menuItem.href || pathname,
+        icon: menuItem.icon,
+        closable: true,
+      });
+    }
+  }, [pathname, addTab, findMenuItem]);
 
   // 公开路径
   const publicPaths = ['/login'];
@@ -213,6 +259,35 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setPasswordDialogOpen(true);
   };
 
+  // 点击 Tab 时导航
+  const handleTabClick = (tab: Tab) => {
+    setActiveTab(tab.id);
+    router.push(tab.href);
+  };
+
+  // 关闭 Tab
+  const handleCloseTab = (e: React.MouseEvent, tabId: string) => {
+    e.stopPropagation();
+    const tab = tabs.find(t => t.id === tabId);
+    if (!tab || !tab.closable) return;
+
+    removeTab(tabId);
+
+    // 如果关闭的是当前 Tab，切换到相邻的
+    if (activeTabId === tabId) {
+      const remainingTabs = tabs.filter(t => t.id !== tabId);
+      if (remainingTabs.length > 0) {
+        const closedIndex = tabs.findIndex(t => t.id === tabId);
+        const newActiveIndex = Math.min(closedIndex, remainingTabs.length - 1);
+        const newActive = remainingTabs[newActiveIndex];
+        setActiveTab(newActive.id);
+        router.push(newActive.href);
+      } else {
+        router.push('/');
+      }
+    }
+  };
+
   if (isPublicPath) {
     return <>{children}</>;
   }
@@ -275,7 +350,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   <Link
                     key={child.label}
                     href={child.href || '#'}
-                    onClick={() => setMobileOpen(false)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setMobileOpen(false);
+                      addTab({
+                        label: child.label,
+                        href: child.href || '#',
+                        icon: child.icon,
+                        closable: true,
+                      });
+                      router.push(child.href || '#');
+                    }}
                     className={`
                       flex items-center gap-3 px-3 py-2 rounded-lg text-sm
                       transition-colors
@@ -297,12 +382,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
 
     return (
-      <Link
+      <button
         key={item.label}
-        href={item.href || '#'}
-        onClick={() => setMobileOpen(false)}
+        onClick={() => {
+          setMobileOpen(false);
+          addTab({
+            label: item.label,
+            href: item.href || '#',
+            icon: item.icon,
+            closable: item.href !== '/',
+          });
+          router.push(item.href || '#');
+        }}
         className={`
-          flex items-center gap-3 px-3 py-2.5 rounded-lg
+          w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
           transition-all duration-200
           ${isActive 
             ? 'bg-gradient-to-r from-sidebar-primary/20 to-sidebar-primary/10 text-sidebar-primary border-l-2 border-sidebar-primary' 
@@ -314,12 +407,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       >
         <Icon className="w-5 h-5 flex-shrink-0" />
         {!hideSidebarLabels && <span className="text-sm font-medium">{item.label}</span>}
-      </Link>
+      </button>
     );
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Mobile menu button */}
       <div className="lg:hidden fixed left-3 top-3 z-50">
         <Button
@@ -457,14 +550,75 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* Main content */}
+      {/* Top Header with Tabs */}
+      <header className={`
+        fixed top-0 right-0 h-12 z-30
+        ${collapsed ? 'lg:left-[70px]' : 'lg:left-[240px]'}
+        left-0
+        bg-background/95 backdrop-blur border-b border-border
+        flex items-center justify-between px-4
+        transition-all duration-300
+      `}>
+        {/* Left: Tabs */}
+        <div className="flex-1 flex items-center gap-1 overflow-x-auto scrollbar-none">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = tab.id === activeTabId;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => handleTabClick(tab)}
+                className={`
+                  flex items-center gap-2 px-3 py-1.5 rounded-t-md text-sm font-medium
+                  transition-all duration-150 whitespace-nowrap
+                  ${isActive
+                    ? 'bg-primary/10 text-primary border-b-2 border-primary'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  }
+                `}
+              >
+                {Icon && <Icon className="w-4 h-4" />}
+                <span>{tab.label}</span>
+                {tab.closable && (
+                  <span
+                    onClick={(e) => handleCloseTab(e, tab.id)}
+                    className={`
+                      ml-1 p-0.5 rounded hover:bg-muted-foreground/20
+                      ${isActive ? 'text-primary/70 hover:text-primary' : 'text-muted-foreground/50 hover:text-muted-foreground'}
+                    `}
+                  >
+                    <XIcon className="w-3 h-3" />
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Right: User actions */}
+        <div className="flex items-center gap-2 ml-4 shrink-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={logout}
+            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+          >
+            <LogOut className="h-4 w-4" />
+          </Button>
+        </div>
+      </header>
+
+      {/* Main content area */}
       <main 
         className={`
-          min-h-screen transition-all duration-300 pt-16 lg:pt-0
+          flex-1 min-h-screen
+          transition-all duration-300 pt-12
           ${collapsed ? 'lg:ml-[70px]' : 'lg:ml-[240px]'}
         `}
       >
-        {children}
+        <div className="min-h-[calc(100vh-48px)]">
+          {children}
+        </div>
       </main>
 
       {/* 修改密码对话框 */}

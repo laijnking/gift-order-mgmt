@@ -161,7 +161,7 @@ export interface ProductMapping {
   customerProductName: string;
   systemProductId?: string;
   systemProductCode?: string;
-  systemProductName?: string;  // 用于mock数据
+  productName?: string;  // 系统商品名称
   createdAt: string;
   updatedAt: string;
 }
@@ -176,7 +176,10 @@ export interface SupplierStock {
   productCode: string;
   productSpec?: string;
   quantity: number;
-  price: number;
+  reservedQuantity?: number;
+  availableQuantity?: number;
+  unitPrice?: number;
+  price?: number;
   version?: string;
   createdAt: string;
   updatedAt: string;
@@ -189,8 +192,10 @@ export interface DispatchRecord {
   orderNo: string;
   supplierId: string;
   supplierName: string;
+  batchNo?: string;
   expressCompany?: string;
   trackingNo?: string;
+  items?: { productCode: string; productName: string; quantity: number }[];
   status: 'pending' | 'shipped' | 'delivered';
   createdAt: string;
   updatedAt: string;
@@ -203,6 +208,7 @@ export interface ReturnRecord {
   orderNo: string;
   expressCompany: string;
   trackingNo: string;
+  status?: string;
   receivedAt: string;
   note?: string;
   createdAt: string;
