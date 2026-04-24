@@ -497,23 +497,6 @@ export default function ShippersManagePage() {
         {/* Navigation */}
         <div className="border-b bg-white">
           <div className="container mx-auto px-4">
-            <nav className="flex gap-4 overflow-x-auto">
-              <Link href="/archive" className="py-4 px-2 border-b-2 border-transparent text-sm font-medium text-gray-600 hover:text-gray-900">
-                总览
-              </Link>
-              <Link href="/customers" className="py-4 px-2 border-b-2 border-transparent text-sm font-medium text-gray-600 hover:text-gray-900">
-                客户管理
-              </Link>
-              <Link href="/suppliers-manage" className="py-4 px-2 border-b-2 border-green-600 text-sm font-medium text-green-600">
-                发货方管理
-              </Link>
-              <Link href="/products" className="py-4 px-2 border-b-2 border-transparent text-sm font-medium text-gray-600 hover:text-gray-900">
-                商品管理
-              </Link>
-              <Link href="/sku-mappings" className="py-4 px-2 border-b-2 border-transparent text-sm font-medium text-gray-600 hover:text-gray-900">
-                SKU映射
-              </Link>
-            </nav>
           </div>
         </div>
 

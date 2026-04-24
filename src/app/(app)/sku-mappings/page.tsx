@@ -65,7 +65,9 @@ import {
   X,
 } from 'lucide-react';
 
-// Excel导入配置 - 客户商品映射
+// ============================================================
+// 客户商品映射 - 导入配置
+// ============================================================
 const CUSTOMER_IMPORT_CONFIG = {
   title: '客户商品映射',
   fields: ['customerCode', 'customerProductName', 'customerSku', 'customerSpec', 'productCode', 'productName', 'priority', 'remark'],
@@ -75,36 +77,9 @@ const CUSTOMER_IMPORT_CONFIG = {
   ],
 };
 
-// 客户SKU映射表中文列名映射
-const CUSTOMER_SKU_CHINESE_MAPPING: Record<string, string> = {
-  '客户名称': 'customerName',
-  '客户商品名称/商品规格/客户SKU': 'customerProductName',
-  '系统商品编码': 'productCode',
-  '价格': 'price',
-  '状态': 'status',
-};
-
-// 中文列名别名映射（用于匹配Excel表头）
-const COLUMN_ALIASES: Record<string, string[]> = {
-  'customerName': ['客户名称', '客户'],
-  'customerProductName': ['客户商品名称', '客户商品名称/商品规格/客户SKU', '商品名称', '商品规格', '客户SKU', 'SKU', '名称'],
-  'customerSpec': ['型号规格', '规格', '规格型号', '商品规格', '产品型号', '型号'],
-  'productCode': ['系统商品编码', '商品编码', '编码'],
-  'price': ['价格', '单价'],
-  'status': ['状态'],
-};
-
-// 系统字段配置
-const SYSTEM_FIELDS = [
-  { key: 'customerName', label: '客户名称', required: true, description: '客户名称，用于匹配客户档案' },
-  { key: 'customerProductName', label: '客户商品名称', required: true, description: '客户商品名称/品名' },
-  { key: 'customerSpec', label: '型号规格', required: false, description: '客户商品的规格型号' },
-  { key: 'productCode', label: '系统商品编码', required: true, description: '系统商品编码' },
-  { key: 'price', label: '价格', required: false, description: '客户采购价格' },
-  { key: 'status', label: '状态', required: false, description: '启用/禁用状态' },
-];
-
-// Excel导入配置 - 供应商商品映射
+// ============================================================
+// 供应商商品映射 - 导入配置
+// ============================================================
 const SUPPLIER_IMPORT_CONFIG = {
   title: '供应商商品映射',
   fields: ['supplierCode', 'supplierProductName', 'supplierSku', 'supplierSpec', 'productCode', 'productName', 'price', 'remark'],
@@ -113,6 +88,83 @@ const SUPPLIER_IMPORT_CONFIG = {
     { supplierCode: 'GYS-001', supplierProductName: '苏泊尔果蔬清洗机', supplierSku: 'GS10', supplierSpec: 'GS10', productCode: 'GS10', productName: '苏泊尔果蔬清洗机', price: '115.00', remark: '' },
   ],
 };
+
+// ============================================================
+// 根据当前 Tab 获取导入配置
+// ============================================================
+const getImportConfig = (tab: MappingType) =>
+  tab === 'customer' ? CUSTOMER_IMPORT_CONFIG : SUPPLIER_IMPORT_CONFIG;
+
+// ============================================================
+// 客户商品映射 - 列名映射
+// ============================================================
+const CUSTOMER_COLUMN_ALIASES: Record<string, string[]> = {
+  customerName: ['客户名称', '客户'],
+  customerProductName: ['客户商品名称', '客户商品名称/商品规格/客户SKU', '商品名称', '名称'],
+  customerSpec: ['型号规格', '规格', '规格型号', '商品规格', '产品型号', '型号'],
+  productCode: ['系统商品编码', '商品编码', '编码'],
+  price: ['价格', '单价'],
+  status: ['状态'],
+};
+const CUSTOMER_SKU_CHINESE_MAPPING: Record<string, string> = {
+  '客户名称': 'customerName',
+  '客户商品名称/商品规格/客户SKU': 'customerProductName',
+  '系统商品编码': 'productCode',
+  '价格': 'price',
+  '状态': 'status',
+};
+
+// ============================================================
+// 供应商商品映射 - 列名映射
+// ============================================================
+const SUPPLIER_COLUMN_ALIASES: Record<string, string[]> = {
+  supplierName: ['供应商名称', '供应商'],
+  supplierProductName: ['供应商商品名称', '商品名称', '名称', '供应商商品名称/商品规格/供应商SKU'],
+  supplierSpec: ['型号规格', '规格', '规格型号', '商品规格', '产品型号', '型号', '供应商商品规格'],
+  productCode: ['系统商品编码', '商品编码', '编码'],
+  price: ['价格', '单价'],
+  remark: ['备注'],
+};
+const SUPPLIER_SKU_CHINESE_MAPPING: Record<string, string> = {
+  '供应商名称': 'supplierName',
+  '供应商商品名称/商品规格/供应商SKU': 'supplierProductName',
+  '系统商品编码': 'productCode',
+  '价格': 'price',
+};
+
+// ============================================================
+// 客户商品映射 - 系统字段
+// ============================================================
+const CUSTOMER_SYSTEM_FIELDS = [
+  { key: 'customerName', label: '客户名称', required: true, description: '客户名称，用于匹配客户档案' },
+  { key: 'customerProductName', label: '客户商品名称', required: true, description: '客户商品名称/品名' },
+  { key: 'customerSpec', label: '型号规格', required: false, description: '客户商品的规格型号' },
+  { key: 'productCode', label: '系统商品编码', required: true, description: '系统商品编码' },
+  { key: 'price', label: '价格', required: false, description: '客户采购价格' },
+  { key: 'status', label: '状态', required: false, description: '启用/禁用状态' },
+];
+
+// ============================================================
+// 供应商商品映射 - 系统字段
+// ============================================================
+const SUPPLIER_SYSTEM_FIELDS = [
+  { key: 'supplierName', label: '供应商名称', required: true, description: '供应商名称' },
+  { key: 'supplierProductName', label: '供应商商品名称', required: true, description: '供应商商品名称' },
+  { key: 'supplierSpec', label: '型号规格', required: false, description: '供应商商品的规格型号' },
+  { key: 'productCode', label: '系统商品编码', required: true, description: '系统商品编码' },
+  { key: 'price', label: '价格', required: false, description: '供应商采购价格' },
+  { key: 'remark', label: '备注', required: false, description: '备注信息' },
+];
+
+// ============================================================
+// 根据 Tab 获取当前配置
+// ============================================================
+const getColumnAliases = (tab: MappingType) =>
+  tab === 'customer' ? CUSTOMER_COLUMN_ALIASES : SUPPLIER_COLUMN_ALIASES;
+const getChineseMapping = (tab: MappingType) =>
+  tab === 'customer' ? CUSTOMER_SKU_CHINESE_MAPPING : SUPPLIER_SKU_CHINESE_MAPPING;
+const getSystemFields = (tab: MappingType) =>
+  tab === 'customer' ? CUSTOMER_SYSTEM_FIELDS : SUPPLIER_SYSTEM_FIELDS;
 
 interface ProductMapping {
   id: string;
@@ -564,7 +616,7 @@ export default function ProductMappingsPage() {
   // 下载Excel模板
   const downloadTemplate = () => {
     try {
-      const config = activeTab === 'customer' ? CUSTOMER_IMPORT_CONFIG : SUPPLIER_IMPORT_CONFIG;
+      const config = getImportConfig(activeTab);
       const wsData = [
         config.fieldLabels,
         ...config.template.map(row => 
@@ -599,7 +651,7 @@ export default function ProductMappingsPage() {
       return row[fieldName];
     }
     // 检查列名别名
-    const aliases = COLUMN_ALIASES[fieldName];
+    const aliases = getColumnAliases(activeTab)[fieldName];
     if (aliases) {
       for (const alias of aliases) {
         if (row[alias] !== undefined && row[alias] !== null && row[alias] !== '') {
@@ -608,7 +660,8 @@ export default function ProductMappingsPage() {
       }
     }
     // 检查中文映射
-    for (const [chineseName, mappedField] of Object.entries(CUSTOMER_SKU_CHINESE_MAPPING)) {
+    const chineseMapping = getChineseMapping(activeTab);
+    for (const [chineseName, mappedField] of Object.entries(chineseMapping)) {
       if (mappedField === fieldName && row[chineseName] !== undefined) {
         return row[chineseName];
       }
@@ -641,8 +694,8 @@ export default function ProductMappingsPage() {
         
         // 自动匹配字段映射
         const autoMappings: Record<string, string> = {};
-        for (const field of SYSTEM_FIELDS) {
-          const aliases = COLUMN_ALIASES[field.key] || [];
+        for (const field of getSystemFields(activeTab)) {
+          const aliases = getColumnAliases(activeTab)[field.key] || [];
           for (const col of columns) {
             const colLower = col.trim().toLowerCase();
             // 检查是否完全匹配
@@ -669,7 +722,7 @@ export default function ProductMappingsPage() {
   // 确认字段映射并继续导入
   const confirmFieldMapping = () => {
     // 验证必填字段是否已映射
-    const requiredFields = SYSTEM_FIELDS.filter(f => f.required);
+    const requiredFields = getSystemFields(activeTab).filter(f => f.required);
     const missingFields = requiredFields.filter(f => !fieldMappings[f.key]);
     
     if (missingFields.length > 0) {
@@ -711,12 +764,11 @@ export default function ProductMappingsPage() {
         customerCodeToName[c.code] = c.name;
       });
       
-      // 分析Excel数据：是否包含客户名称列
+      // 检查是否提供了合作伙伴名称列（仅用于客户模式）
       const sampleRow = excelImportData[0];
-      const hasCustomerNameColumn = fieldMappings.customerName || getFieldValue(sampleRow, 'customerName') !== '' || 
-        sampleRow['客户名称'] !== undefined;
+      const hasPartnerNameColumn = !!fieldMappings.customerName || !!fieldMappings.supplierName;
       
-      if (!hasCustomerNameColumn && activeTab === 'customer') {
+      if (!hasPartnerNameColumn && activeTab === 'customer') {
         // 如果没有客户名称列，需要选择一个客户
         const partnerCode = activeTab === 'customer' ? selectedCustomer : selectedSupplier;
         if (!partnerCode) {
@@ -742,49 +794,55 @@ export default function ProductMappingsPage() {
       for (let i = 0; i < excelImportData.length; i++) {
         const row = excelImportData[i];
         
+        // 根据当前 Tab 获取正确的字段名
+        const systemFields = getSystemFields(activeTab);
+        const partnerNameField = activeTab === 'customer' ? 'customerName' : 'supplierName';
+        const partnerProductNameField = activeTab === 'customer' ? 'customerProductName' : 'supplierProductName';
+        const partnerSpecField = activeTab === 'customer' ? 'customerSpec' : 'supplierSpec';
+        
         // 获取客户名称和系统商品编码（使用自定义映射）
-        const customerName = getMappedValue(row, 'customerName');
-        const customerProductName = getMappedValue(row, 'customerProductName');
-        const customerSpec = getMappedValue(row, 'customerSpec');
+        const partnerName = getMappedValue(row, partnerNameField);
+        const partnerProductName = getMappedValue(row, partnerProductNameField);
+        const partnerSpec = getMappedValue(row, partnerSpecField);
         const productCode = getMappedValue(row, 'productCode');
         const priceStr = getMappedValue(row, 'price');
         const price = priceStr ? parseFloat(priceStr) : 0;
         
-        if (!customerProductName && !productCode) {
-          errors.push(`第 ${i + 2} 行：缺少客户商品名称和系统商品编码`);
+        if (!partnerProductName && !productCode) {
+          errors.push(`第 ${i + 2} 行：缺少${partnerLabel}商品名称和系统商品编码`);
           continue;
         }
         
-        let customerCode = '';
-        let partnerCode = activeTab === 'customer' ? selectedCustomer : selectedSupplier;
+        let partnerIdCode = '';
+        let partnerSelectedCode = activeTab === 'customer' ? selectedCustomer : selectedSupplier;
         
         if (activeTab === 'customer') {
-          if (hasCustomerNameColumn && customerName) {
+          if (fieldMappings.customerName && partnerName) {
             // 根据客户名称查找客户编码
-            customerCode = customerNameToCode[customerName];
-            if (!customerCode) {
-              errors.push(`第 ${i + 2} 行：客户 "${customerName}" 不存在，将跳过`);
+            partnerIdCode = customerNameToCode[partnerName];
+            if (!partnerIdCode) {
+              errors.push(`第 ${i + 2} 行：客户 "${partnerName}" 不存在，将跳过`);
               continue;
             }
-            partnerCode = customerCode;
+            partnerSelectedCode = partnerIdCode;
           }
         }
         
         mappings.push({
-          customerProductName: customerProductName || productCode || '',
-          customerSku: customerProductName, // 客户商品名称也作为SKU
-          customerSpec: customerSpec,
+          customerProductName: partnerProductName || productCode || '',
+          customerSku: partnerProductName, // 商品名称也作为SKU
+          customerSpec: partnerSpec,
           productCode: productCode || '',
           price: price,
           isActive: true,
           ...(activeTab === 'customer' 
             ? { 
-                customerCode: customerCode || partnerCode || '',
-                customerName: customerName || customerCodeToName[customerCode || partnerCode || ''] || '',
+                customerCode: partnerIdCode || partnerSelectedCode || '',
+                customerName: partnerName || customerCodeToName[partnerIdCode || partnerSelectedCode || ''] || '',
               }
             : { 
-                supplierId: partnerCode, 
-                supplierName: getPartnerName(partnerCode || ''),
+                supplierId: partnerSelectedCode, 
+                supplierName: getPartnerName(partnerSelectedCode || ''),
                 customerCode: '',
                 customerName: '',
               }
@@ -1246,7 +1304,7 @@ export default function ProductMappingsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {SYSTEM_FIELDS.map((field) => {
+                    {getSystemFields(activeTab).map((field) => {
                       const searchTerm = mappingSearchTerm[field.key] || '';
                       const filteredColumns = excelColumns.filter(col => 
                         col.toLowerCase().includes(searchTerm.toLowerCase())
@@ -1341,9 +1399,9 @@ export default function ProductMappingsPage() {
 
               {/* 映射统计 */}
               <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                <span>已映射: {Object.keys(fieldMappings).filter(k => fieldMappings[k]).length} / {SYSTEM_FIELDS.length}</span>
+                <span>已映射: {Object.keys(fieldMappings).filter(k => fieldMappings[k]).length} / {getSystemFields(activeTab).length}</span>
                 <span>|</span>
-                <span>必填项: {SYSTEM_FIELDS.filter(f => f.required && fieldMappings[f.key]).length} / {SYSTEM_FIELDS.filter(f => f.required).length}</span>
+                <span>必填项: {getSystemFields(activeTab).filter(f => f.required && fieldMappings[f.key]).length} / {getSystemFields(activeTab).filter(f => f.required).length}</span>
               </div>
             </div>
 
@@ -1374,13 +1432,13 @@ export default function ProductMappingsPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              {/* 客户名称匹配说明 */}
+              {/* 合作伙伴名称匹配说明 */}
               <div className="bg-muted/50 p-3 rounded-lg text-sm">
                 <p className="font-medium">导入说明：</p>
                 <ul className="list-disc list-inside mt-1 space-y-1 text-muted-foreground">
-                  <li>系统将根据 Excel 中的 &quot;客户名称&quot; 列自动匹配客户档案</li>
-                  <li>如果客户名称在系统中不存在，该行数据将被跳过</li>
-                  <li>客户商品名称和系统商品编码为必填项</li>
+                  <li>系统将根据 Excel 中的 &quot;{partnerLabel}名称&quot; 列自动匹配{partnerLabel}档案</li>
+                  <li>如果{partnerLabel}名称在系统中不存在，该行数据将被跳过</li>
+                  <li>{partnerLabel}商品名称和系统商品编码为必填项</li>
                 </ul>
               </div>
               
@@ -1389,21 +1447,25 @@ export default function ProductMappingsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[100px]">客户名称</TableHead>
-                      <TableHead>客户商品名称</TableHead>
+                      <TableHead className="w-[100px]">{partnerLabel}名称</TableHead>
+                      <TableHead>{partnerLabel}商品名称</TableHead>
                       <TableHead className="w-[120px]">系统商品编码</TableHead>
                       <TableHead className="w-[80px]">价格</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {excelImportData.slice(0, 10).map((row, idx) => (
-                      <TableRow key={idx}>
-                        <TableCell className="font-medium">{getFieldValue(row, 'customerName') || '-'}</TableCell>
-                        <TableCell>{getFieldValue(row, 'customerProductName') || '-'}</TableCell>
-                        <TableCell><code className="text-sm bg-muted px-1 rounded">{getFieldValue(row, 'productCode') || '-'}</code></TableCell>
-                        <TableCell className="text-right">{getFieldValue(row, 'price') || '-'}</TableCell>
-                      </TableRow>
-                    ))}
+                    {excelImportData.slice(0, 10).map((row, idx) => {
+                      const partnerNameField = activeTab === 'customer' ? 'customerName' : 'supplierName';
+                      const partnerProductNameField = activeTab === 'customer' ? 'customerProductName' : 'supplierProductName';
+                      return (
+                        <TableRow key={idx}>
+                          <TableCell className="font-medium">{getFieldValue(row, partnerNameField) || '-'}</TableCell>
+                          <TableCell>{getFieldValue(row, partnerProductNameField) || '-'}</TableCell>
+                          <TableCell><code className="text-sm bg-muted px-1 rounded">{getFieldValue(row, 'productCode') || '-'}</code></TableCell>
+                          <TableCell className="text-right">{getFieldValue(row, 'price') || '-'}</TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
                 {excelImportData.length > 10 && (

@@ -253,7 +253,7 @@ export default function StocksPage() {
 
       const [stocksRes, suppliersRes] = await Promise.all([
         fetch(`/api/stocks?${params.toString()}`, { headers: authHeaders() }),
-        fetch('/api/suppliers?active=true'),
+        fetch('/api/suppliers?active=true', { headers: authHeaders() }),
       ]);
 
       const stocksData = await stocksRes.json();

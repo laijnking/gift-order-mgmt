@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
       query = query.eq(schemaMode === 'modern' ? 'operator_user_id' : 'order_taker_id', operatorUserId);
     }
 
-    if (isActive === 'true') {
+    if (isActive !== 'false') {
       query = schemaMode === 'modern'
         ? query.eq('is_active', true)
         : query.eq('status', 'active');

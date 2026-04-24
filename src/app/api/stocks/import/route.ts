@@ -83,27 +83,69 @@ async function findSupplier(
   client: ReturnType<typeof getSupabaseClient>,
   row: NormalizedStockRow
 ): Promise<{ id: string; name: string } | null> {
+  // 注意：suppliers 表未使用，实际供应商档案在 shippers 表
+  // shippers 通过 type 字段区分类型：supplier/jd/self/third_party
   if (row.supplierCode) {
+    // 按发货方编码（code字段）精确匹配
     const { data } = await client
-      .from('suppliers')
+      .from('shippers')
       .select('id, name')
-      .eq('id', row.supplierCode)
+      .eq('code', row.supplierCode)
       .eq('is_active', true)
       .maybeSingle();
     if (data) return { id: data.id as string, name: data.name as string };
   }
 
   if (row.supplierName) {
+    // 按发货方名称模糊匹配（优先匹配 supplier 类型）
     const { data } = await client
-      .from('suppliers')
+      .from('shippers')
       .select('id, name')
-      .ilike('name', `%${row.supplierName}%`)
+      .eq('type', 'supplier')
       .eq('is_active', true)
+      .ilike('name', `%${row.supplierName}%`)
       .limit(1);
     if (data?.[0]) return { id: data[0].id as string, name: data[0].name as string };
+    // 回退：不限类型匹配
+    const { data: data2 } = await client
+      .from('shippers')
+      .select('id, name')
+      .eq('is_active', true)
+      .ilike('name', `%${row.supplierName}%`)
+      .limit(1);
+    if (data2?.[0]) return { id: data2[0].id as string, name: data2[0].name as string };
   }
 
   return null;
+}
+
+async function createSupplier(
+  client: ReturnType<typeof getSupabaseClient>,
+  row: NormalizedStockRow
+): Promise<{ id: string; name: string }> {
+  const id = crypto.randomUUID();
+  const supplierCode = row.supplierCode || `SUP-${Date.now().toString(36)}`;
+  const supplierName = row.supplierName || supplierCode;
+
+  // 实际写入 shippers 表（suppliers 表未使用）
+  const { error } = await client
+    .from('shippers')
+    .insert({
+      id,
+      code: supplierCode,
+      name: supplierName,
+      type: 'supplier',
+      send_type: 'download',
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+
+  if (error) {
+    throw new Error(`自动创建发货方档案失败: ${error.message}`);
+  }
+
+  return { id, name: supplierName };
 }
 
 async function matchProduct(
@@ -204,6 +246,7 @@ async function findWarehouseId(
   const { data } = await client
     .from('warehouses')
     .select('id')
+    .eq('status', 'active')
     .ilike('name', `%${warehouseName}%`)
     .limit(1);
   return (data?.[0]?.id as string) || null;
@@ -262,11 +305,16 @@ export async function POST(request: NextRequest) {
     const errors: string[] = [];
 
     for (const row of rows) {
-      const supplier = await findSupplier(client, row);
+      let supplier = await findSupplier(client, row);
       if (!supplier) {
-        const key = row.supplierCode || row.supplierName || '未知供应商';
-        if (!supplierNotFound.includes(key)) supplierNotFound.push(key);
-        continue;
+        try {
+          supplier = await createSupplier(client, row);
+          stats.inserted += 0; // don't double-count; stock insert will add
+        } catch (err) {
+          const key = row.supplierCode || row.supplierName || '未知供应商';
+          if (!supplierNotFound.includes(key)) supplierNotFound.push(key);
+          continue;
+        }
       }
 
       const product = await matchProduct(client, row);
@@ -358,11 +406,16 @@ export async function POST(request: NextRequest) {
 
     const total = stats.inserted + stats.updated;
     return NextResponse.json({
-      success: errors.length === 0,
+      success: errors.length === 0 && supplierNotFound.length === 0,
       data: { ...stats, total },
       supplierNotFound,
       errors,
-      message: `库存导入完成：新增 ${stats.inserted} 条，更新 ${stats.updated} 条，匹配商品 ${stats.matched} 条，未匹配 ${stats.unmatched} 条`,
+      message: [
+        `库存导入完成：新增 ${stats.inserted} 条，更新 ${stats.updated} 条`,
+        stats.matched > 0 ? `匹配商品 ${stats.matched} 条` : '',
+        stats.unmatched > 0 ? `未匹配 ${stats.unmatched} 条` : '',
+        supplierNotFound.length > 0 ? `有 ${supplierNotFound.length} 个供应商未找到并跳过` : '',
+      ].filter(Boolean).join('，'),
     }, { status: errors.length > 0 && total === 0 ? 500 : 200 });
   } catch (error) {
     console.error('供应商库存导入失败:', error);

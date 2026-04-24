@@ -7,29 +7,29 @@ import { PERMISSIONS } from '@/lib/permissions';
 function transformSupplier(dbSupplier: Record<string, unknown>) {
   return {
     id: dbSupplier.id,
-    code: (dbSupplier as Record<string, unknown>).code as string || '',
+    code: (dbSupplier.code || String(dbSupplier.id).slice(0, 8)) as string,
     name: dbSupplier.name,
-    shortName: dbSupplier.short_name || '',
-    type: dbSupplier.type,
-    contactPerson: (dbSupplier as Record<string, unknown>).contact_person as string || '',
-    contactPhone: (dbSupplier as Record<string, unknown>).contact_phone as string || '',
-    province: (dbSupplier as Record<string, unknown>).province as string || '',
-    city: (dbSupplier as Record<string, unknown>).city as string || '',
-    sendType: dbSupplier.send_type || 'download',
+    shortName: (dbSupplier.short_name || '') as string,
+    type: dbSupplier.type as string,
+    contactPerson: (dbSupplier.contact_person || '') as string,
+    contactPhone: (dbSupplier.contact_phone || '') as string,
+    province: (dbSupplier.province || '') as string,
+    city: (dbSupplier.city || '') as string,
+    sendType: (dbSupplier.send_type || 'download') as string,
     canJd: dbSupplier.can_jd ?? true,
     expressRestrictions: typeof dbSupplier.express_restrictions === 'string'
       ? JSON.parse(dbSupplier.express_restrictions)
       : (dbSupplier.express_restrictions as string[] | undefined),
     costFactor: dbSupplier.cost_factor as number | undefined,
-    settlementType: dbSupplier.settlement_type as string || 'monthly',
+    settlementType: (dbSupplier.settlement_type || 'monthly') as string,
     isActive: dbSupplier.is_active ?? true,
-    remark: (dbSupplier as Record<string, unknown>).remark as string || '',
+    remark: (dbSupplier.remark || '') as string,
     createdAt: dbSupplier.created_at,
     updatedAt: dbSupplier.updated_at as string | undefined,
   };
 }
 
-// 获取所有供应商
+// 获取所有活跃供应商
 export async function GET(request: NextRequest) {
   const authError = requirePermission(request, PERMISSIONS.SUPPLIERS_VIEW);
   if (authError) return authError;
@@ -37,12 +37,13 @@ export async function GET(request: NextRequest) {
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
   const type = searchParams.get('type'); // warehouse | supplier
-  const active = searchParams.get('active');
+  const active = searchParams.get('active'); // 显式传 false 才返回 inactive
 
   try {
     let query = client.from('suppliers').select('*');
 
-    if (active === 'true') {
+    // 默认只返回活跃供应商（除非显式传 active=false）
+    if (active !== 'false') {
       query = query.eq('is_active', true);
     }
 
@@ -93,6 +94,8 @@ export async function POST(request: NextRequest) {
       settlement_type: body.settlementType || 'monthly',
       is_active: true,
       remark: body.remark,
+      // code 由数据库迁移或 transformSupplier fallback 保证，此处可选传入
+      ...(body.code ? { code: body.code } : {}),
     };
 
     const { data, error } = await client

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requirePermission } from '@/lib/server-auth';
+import { requirePermission, requireAnyPermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { PERMISSIONS } from '@/lib/permissions';
 
@@ -28,7 +28,7 @@ function transformMapping(dbMapping: Record<string, unknown>) {
 
 // 获取SKU映射列表
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.PRODUCTS_VIEW);
+  const authError = requireAnyPermission(request, [PERMISSIONS.PRODUCTS_VIEW, PERMISSIONS.SUPPLIERS_VIEW]);
   if (authError) return authError;
 
   const client = getSupabaseClient();

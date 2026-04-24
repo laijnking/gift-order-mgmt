@@ -65,10 +65,11 @@ export async function POST(request: NextRequest) {
       message: `成功导入 ${data?.length || 0} 条映射`
     });
   } catch (error) {
-    console.error('批量导入SKU映射失败:', error);
+    const errMsg = error instanceof Error ? error.message : String(error);
+    console.error('批量导入SKU映射失败:', errMsg, error instanceof Error ? error.stack : '');
     return NextResponse.json({ 
       success: false, 
-      error: error instanceof Error ? error.message : '未知错误' 
+      error: `导入失败: ${errMsg}` 
     }, { status: 500 });
   }
 }
