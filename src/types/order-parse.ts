@@ -76,6 +76,7 @@ export interface ParsedOrderDraft {
 export interface ParsedOrderBundleDraft {
   id: string;
   orderNo: string;
+  customerOrderNo?: string;
   billDate: string;
   receiverName: string;
   receiverPhone: string;

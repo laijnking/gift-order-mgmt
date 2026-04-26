@@ -54,10 +54,11 @@ export function flattenBundleDraftsToFlatOrders(
   bundles: ParsedOrderBundleDraft[],
   fallbackCustomerCode = ''
 ): ParsedOrderDraft[] {
-  return bundles.flatMap((bundle, bundleIndex) =>
+  return bundles.flatMap((bundle) =>
     bundle.items.map((item, itemIndex) => ({
       id: item.id || `${bundle.id}_item_${itemIndex}`,
       orderNo: bundle.orderNo || '',
+      customerOrderNo: bundle.customerOrderNo || '',
       billDate: bundle.billDate || '',
       customer_code: fallbackCustomerCode,
       product_name: item.customerProductName || '',

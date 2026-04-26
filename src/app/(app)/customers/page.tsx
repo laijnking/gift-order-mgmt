@@ -17,7 +17,7 @@ import { buildUserInfoHeaders, useAuth, usePermission } from '@/lib/auth';
 import { isOperatorAssignableRole, isSalesAssignableRole } from '@/lib/roles';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
-import { Upload, Download, ArrowLeft, Search, Plus, Edit, Trash2, Users, AlertTriangle, Check, UsersRound, Filter, Loader2, X } from 'lucide-react';
+import { Upload, Download, ArrowLeft, Search, Plus, Edit, Trash2, Users, UsersRound, Loader2, X, Check } from 'lucide-react';
 
 // Excel导入配置
 const IMPORT_CONFIG = {
@@ -106,22 +106,20 @@ export default function CustomersPage() {
     remark: '',
   });
 
-  useEffect(() => {
-    fetchCustomers();
-    fetchUsers();
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchCustomers(); fetchUsers(); }, []);
 
   const authHeaders = useCallback(() => buildUserInfoHeaders(user), [user]);
 
   const fetchCustomers = async () => {
     try {
-      const res = await fetch('/api/customers', { headers: authHeaders() });
+      const res = await fetch('/api/customers?isActive=false', { headers: authHeaders() });
       const data = await res.json();
       if (data.success) {
         setCustomers(data.data);
       }
-    } catch (error) {
-      console.error('获取客户失败:', error);
+    } catch {
+      console.error('获取客户失败');
     } finally {
       setLoading(false);
     }
@@ -134,8 +132,8 @@ export default function CustomersPage() {
       if (data.success) {
         setUsers(data.data);
       }
-    } catch (error) {
-      console.error('获取用户失败:', error);
+    } catch {
+      console.error('获取用户失败');
     }
   };
 
@@ -147,7 +145,7 @@ export default function CustomersPage() {
         !customer.code.toLowerCase().includes(term) &&
         !customer.name.toLowerCase().includes(term) &&
         !(customer.contactPerson?.toLowerCase().includes(term)) &&
-        !customer.contactPhone?.includes(term)
+        !customer.contactPhone?.toString().includes(term)
       ) {
         return false;
       }
@@ -237,7 +235,7 @@ export default function CustomersPage() {
       } else {
         setAlert({ type: 'error', message: data.error || '操作失败' });
       }
-    } catch (error) {
+    } catch {
       setAlert({ type: 'error', message: '操作失败' });
     }
   };
@@ -251,7 +249,7 @@ export default function CustomersPage() {
         setDeleteConfirmId(null);
         fetchCustomers();
       }
-    } catch (error) {
+    } catch {
       setAlert({ type: 'error', message: '删除失败' });
     }
   };
@@ -329,7 +327,7 @@ export default function CustomersPage() {
       setBatchSalesUserId('');
       setBatchOperatorUserId('');
       fetchCustomers();
-    } catch (error) {
+    } catch {
       setAlert({ type: 'error', message: '批量交接失败' });
     }
   };
@@ -365,7 +363,7 @@ export default function CustomersPage() {
         setImportingData(jsonData);
         setImportDialogOpen(true);
         toast.success(`已读取 ${jsonData.length} 条数据`);
-      } catch (error) {
+      } catch {
         toast.error('文件解析失败，请检查文件格式');
       }
     };
@@ -430,7 +428,7 @@ export default function CustomersPage() {
       setImportDialogOpen(false);
       setImportingData([]);
       fetchCustomers();
-    } catch (error) {
+    } catch {
       console.error('导入失败:', error);
       toast.error('导入失败，请重试');
     } finally {
@@ -466,12 +464,6 @@ export default function CustomersPage() {
     toast.success('导出成功');
   };
 
-  const stats = {
-    total: customers.length,
-    active: customers.filter(c => c.isActive).length,
-    inactive: customers.filter(c => !c.isActive).length,
-  };
-
   return (
     <PageGuard permission="customers:view" title="无权查看客户" description="当前账号没有查看客户管理的权限。">
       <div className="min-h-screen bg-gray-50">
@@ -499,43 +491,6 @@ export default function CustomersPage() {
       </header>
 
       <main className="container mx-auto px-4 py-6">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">客户总数</p>
-                  <p className="text-2xl font-bold">{stats.total}</p>
-                </div>
-                <Users className="w-8 h-8 text-blue-500" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-green-200 bg-green-50">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-green-700">活跃客户</p>
-                  <p className="text-2xl font-bold text-green-700">{stats.active}</p>
-                </div>
-                <Check className="w-8 h-8 text-green-500" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-gray-200 bg-gray-50">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-700">已禁用</p>
-                  <p className="text-2xl font-bold text-gray-700">{stats.inactive}</p>
-                </div>
-                <AlertTriangle className="w-8 h-8 text-gray-400" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
         {/* Search and Actions */}
         <Card className="mb-6">
           <CardContent className="pt-6">

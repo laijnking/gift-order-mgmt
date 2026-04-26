@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -32,19 +32,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Switch } from '@/components/ui/switch';
 import { getOrderStatusBadgeClass, getOrderStatusLabel, isReturnProgressStatus, ORDER_STATUS_OPTIONS, ORDER_STATUS_PENDING, ORDER_STATUS_ASSIGNED, ORDER_STATUS_PARTIAL_RETURNED, ORDER_STATUS_RETURNED, ORDER_STATUS_FEEDBACKED, ORDER_STATUS_COMPLETED, ORDER_STATUS_CANCELLED } from '@/lib/order-status';
+import type { OrderStatus } from '@/types/order';
 import { toast } from 'sonner';
 import {
   Package,
   Search,
   Upload,
   Download,
+  FileDown,
   RefreshCw,
   Eye,
   CheckCircle,
   Truck,
-  MoreHorizontal,
   Plus,
   Send,
   Archive,
@@ -52,10 +52,7 @@ import {
   FileInput,
   ChevronDown,
   ChevronUp,
-  ChevronLeft,
-  ChevronRight,
   SlidersHorizontal,
-  Store,
   X,
   AlertTriangle,
   Bell,
@@ -67,8 +64,6 @@ import {
   AlertCircle,
   Sparkles,
   Loader2,
-  Circle,
-  Check,
 } from 'lucide-react';
 import {
   Popover,
@@ -76,8 +71,80 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { PageGuard } from '@/components/auth/page-guard';
-import { buildUserInfoHeaders, getCurrentUser, getUserDataScope } from '@/lib/auth';
-import { ProductPickerDialog, ProductPickerItem } from '@/components/product/product-picker-dialog';
+import { buildUserInfoHeaders } from '@/lib/auth';
+import { ProductPickerDialog } from '@/components/product/product-picker-dialog';
+
+// sessionStorage key，用于在路由变化导致组件重新挂载时恢复筛选状态
+const SESSION_KEY = 'orders_session_v1';
+
+// 防抖计时器引用
+let sessionSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+interface OrdersSessionState {
+  statusFilter: string;
+  selectedStatuses: string[];
+  customerFilter: string;
+  customerSearch: string;
+  supplierFilter: string;
+  supplierSearch: string;
+  quantityOp: 'gt' | 'lt' | 'eq';
+  quantityFilter: string;
+  searchFields: Record<string, string>;
+  showAdvancedFilter: boolean;
+  advancedFields: Record<string, string>;
+  selectedOrderIds: string[]; // 序列化 Set<Order>
+  alertPanelOpen: boolean;
+  savedAt: number;
+}
+
+function saveOrdersSession(state: Partial<OrdersSessionState>) {
+  // 防抖：500ms 内多次调用只保存最后一次
+  if (sessionSaveTimer) {
+    clearTimeout(sessionSaveTimer);
+  }
+  sessionSaveTimer = setTimeout(() => {
+    try {
+      const existing = sessionStorage.getItem(SESSION_KEY);
+      const prev: OrdersSessionState | null = existing ? JSON.parse(existing) : null;
+      const next: OrdersSessionState = {
+        statusFilter: state.statusFilter ?? prev?.statusFilter ?? '',
+        selectedStatuses: state.selectedStatuses ?? prev?.selectedStatuses ?? [],
+        customerFilter: state.customerFilter ?? prev?.customerFilter ?? '',
+        customerSearch: state.customerSearch ?? prev?.customerSearch ?? '',
+        supplierFilter: state.supplierFilter ?? prev?.supplierFilter ?? '',
+        supplierSearch: state.supplierSearch ?? prev?.supplierSearch ?? '',
+        quantityOp: state.quantityOp ?? prev?.quantityOp ?? 'eq',
+        quantityFilter: state.quantityFilter ?? prev?.quantityFilter ?? '',
+        searchFields: state.searchFields ?? prev?.searchFields ?? { orderNo: '', productName: '', phone: '' },
+        showAdvancedFilter: state.showAdvancedFilter ?? prev?.showAdvancedFilter ?? false,
+        advancedFields: state.advancedFields ?? prev?.advancedFields ?? {},
+        selectedOrderIds: state.selectedOrderIds ?? prev?.selectedOrderIds ?? [],
+        alertPanelOpen: state.alertPanelOpen ?? prev?.alertPanelOpen ?? true,
+        savedAt: Date.now(),
+      };
+      if (Date.now() - next.savedAt < 24 * 60 * 60 * 1000) {
+        sessionStorage.setItem(SESSION_KEY, JSON.stringify(next));
+      }
+    } catch {
+      // 序列化失败时静默忽略
+    }
+  }, 500);
+}
+
+function loadOrdersSession(): Partial<OrdersSessionState> | null {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as OrdersSessionState;
+    if (Date.now() - data.savedAt > 24 * 60 * 60 * 1000) {
+      sessionStorage.removeItem(SESSION_KEY);
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
 
 interface Order {
   id: string;
@@ -199,6 +266,11 @@ const FILTERABLE_FIELDS = [
 
 export default function OrdersPage() {
   const searchParams = useSearchParams();
+  // 尝试从 sessionStorage 恢复筛选状态（路由变化后组件重新挂载时）
+  const _ordersRestored = loadOrdersSession();
+
+  // 恢复选中订单时也跳过保存（避免循环触发）
+  const _applyingUrlParams = useRef(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -206,27 +278,25 @@ export default function OrdersPage() {
 
   // 预警相关状态
   const [alerts, setAlerts] = useState<AlertRecord[]>([]);
-  const [alertPanelOpen, setAlertPanelOpen] = useState(true);
+  const [alertPanelOpen, setAlertPanelOpen] = useState(_ordersRestored?.alertPanelOpen ?? true);
   const [unreadAlertCount, setUnreadAlertCount] = useState(0);
 
   // Common filter state
-  const [statusFilter, setStatusFilter] = useState('');
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
-  const [customerFilter, setCustomerFilter] = useState('');
-  const [customerSearch, setCustomerSearch] = useState('');
-  const [supplierFilter, setSupplierFilter] = useState('');
-  const [supplierSearch, setSupplierSearch] = useState('');
-  const [quantityOp, setQuantityOp] = useState<'gt' | 'lt' | 'eq'>('eq');
-  const [quantityFilter, setQuantityFilter] = useState('');
-  const [searchFields, setSearchFields] = useState<Record<string, string>>({
-    orderNo: '',
-    productName: '',
-    phone: '',
-  });
+  const [statusFilter, setStatusFilter] = useState(_ordersRestored?.statusFilter ?? '');
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(_ordersRestored?.selectedStatuses ?? []);
+  const [customerFilter, setCustomerFilter] = useState(_ordersRestored?.customerFilter ?? '');
+  const [customerSearch, setCustomerSearch] = useState(_ordersRestored?.customerSearch ?? '');
+  const [supplierFilter, setSupplierFilter] = useState(_ordersRestored?.supplierFilter ?? '');
+  const [supplierSearch, setSupplierSearch] = useState(_ordersRestored?.supplierSearch ?? '');
+  const [quantityOp, setQuantityOp] = useState<'gt' | 'lt' | 'eq'>(_ordersRestored?.quantityOp ?? 'eq');
+  const [quantityFilter, setQuantityFilter] = useState(_ordersRestored?.quantityFilter ?? '');
+  const [searchFields, setSearchFields] = useState<Record<string, string>>(
+    _ordersRestored?.searchFields ?? { orderNo: '', productName: '', phone: '' }
+  );
 
   // Advanced filter state
-  const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
-  const [advancedFields, setAdvancedFields] = useState<Record<string, string>>({});
+  const [showAdvancedFilter, setShowAdvancedFilter] = useState(_ordersRestored?.showAdvancedFilter ?? false);
+  const [advancedFields, setAdvancedFields] = useState<Record<string, string>>(_ordersRestored?.advancedFields ?? {});
 
   // 滚动相关状态
   const [isStickyTop, setIsStickyTop] = useState(false);
@@ -285,6 +355,51 @@ export default function OrdersPage() {
   const [selectedSupplierId, setSelectedSupplierId] = useState('');
   // 批量派发时每个订单选择的供应商
   const [selectedSuppliers, setSelectedSuppliers] = useState<Record<string, string>>({});
+
+  // 列表列可见性设置
+  type VisibleColumns = {
+    sysOrderNo: boolean;
+    customerCode: boolean;
+    customer: boolean;
+    receiver: boolean;
+    product: boolean;
+    quantity: boolean;
+    productSpec: boolean;
+    productCode: boolean;
+    salesperson: boolean;
+    operator: boolean;
+    supplier: boolean;
+    createdAt: boolean;
+  };
+  const DEFAULT_VISIBLE_COLUMNS: VisibleColumns = {
+    sysOrderNo: true,
+    customerCode: false,
+    customer: true,
+    receiver: true,
+    product: true,
+    quantity: true,
+    productSpec: true,
+    productCode: true,
+    salesperson: true,
+    operator: true,
+    supplier: true,
+    createdAt: true,
+  };
+  const [visibleColumns, setVisibleColumns] = useState<VisibleColumns>(() => {
+    try {
+      const saved = localStorage.getItem('orders_visible_columns');
+      if (saved) return JSON.parse(saved) as VisibleColumns;
+    } catch {}
+    return DEFAULT_VISIBLE_COLUMNS;
+  });
+  const [columnPickerOpen, setColumnPickerOpen] = useState(false);
+  const toggleColumn = (col: keyof VisibleColumns) => {
+    setVisibleColumns(prev => {
+      const next = { ...prev, [col]: !prev[col] };
+      try { localStorage.setItem('orders_visible_columns', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
   
   // 智能匹配相关状态
   const [matchResults, setMatchResults] = useState<Record<string, {
@@ -315,8 +430,6 @@ export default function OrdersPage() {
     newProductHint?: string;
   }>>({});
   const [isMatching, setIsMatching] = useState(false);
-  const [showMatchDetails, setShowMatchDetails] = useState(false);
-
   // 手动选择供应商对话框
   const [manualSelectOpen, setManualSelectOpen] = useState(false);
   const [manualSelectOrderId, setManualSelectOrderId] = useState<string | null>(null);
@@ -365,6 +478,10 @@ export default function OrdersPage() {
     expressRequirement: '',
     remark: '',
     status: '',
+    supplierId: '',
+    supplierName: '',
+    expressCompany: '',
+    trackingNo: '',
   });
   const [editLoading, setEditLoading] = useState(false);
 
@@ -386,7 +503,9 @@ export default function OrdersPage() {
     []
   );
 
+  // 从 URL 参数应用筛选条件（仅在首次渲染时生效，防止覆盖 sessionStorage 中的用户设置）
   useEffect(() => {
+    _applyingUrlParams.current = true;
     const importBatch = searchParams.get('importBatch')?.trim() || '';
     const status = searchParams.get('status')?.trim() || '';
 
@@ -411,18 +530,14 @@ export default function OrdersPage() {
       setStatusFilter('');
       setSelectedStatuses([]);
     }
+    // URL 参数应用完成后，恢复保存
+    requestAnimationFrame(() => {
+      _applyingUrlParams.current = false;
+    });
   }, [searchParams]);
 
   const fetchOrders = useCallback(async () => {
     try {
-      // 获取当前用户信息用于数据权限过滤
-      const currentUser = getCurrentUser();
-      const userInfo = {
-        username: currentUser?.username || '',
-        role: currentUser?.role || '',
-        dataScope: getUserDataScope(currentUser),
-      };
-
       const params = new URLSearchParams();
       const importBatch = searchParams.get('importBatch')?.trim();
       const status = searchParams.get('status')?.trim();
@@ -442,8 +557,8 @@ export default function OrdersPage() {
       } else {
         toast.error(data.error || '获取订单失败');
       }
-    } catch (error) {
-      console.error('获取订单失败:', error);
+    } catch {
+      console.error('获取订单失败');
       toast.error('获取订单失败');
     } finally {
       setLoading(false);
@@ -461,7 +576,7 @@ export default function OrdersPage() {
         setAlerts(data.data || []);
         setUnreadAlertCount((data.data || []).filter((a: AlertRecord) => !a.isRead).length);
       }
-    } catch (error) {
+    } catch {
       console.error('获取预警记录失败');
     }
   }, []);
@@ -476,7 +591,7 @@ export default function OrdersPage() {
       });
       setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, isRead: true } : a));
       setUnreadAlertCount(prev => Math.max(0, prev - 1));
-    } catch (error) {
+    } catch {
       console.error('标记已读失败');
     }
   }, [authHeaders]);
@@ -495,14 +610,14 @@ export default function OrdersPage() {
       setAlerts(prev => prev.map(a => ({ ...a, isRead: true })));
       setUnreadAlertCount(0);
       toast.success('已全部标记为已读');
-    } catch (error) {
+    } catch {
       console.error('批量标记已读失败');
     }
   }, [alerts, authHeaders]);
 
 // 预警类型定义
 interface OrderAlertSummary {
-  type: 'pending_to_assign' | 'assigned_to_returned' | 'overdue_24h';
+  type: 'pending_to_assign' | 'assigned_to_ship' | 'assigned_to_returned' | 'overdue_24h';
   label: string;
   description: string;
   count: number;
@@ -532,7 +647,22 @@ const calculateOrderAlerts = useMemo(() => {
     orders: pendingToAssign,
   });
   
-  // b. 通知发货 -> 导入回单：次日10点未回单
+  // b. 已派发 -> 导出发货单：派发超过24小时未导出发货单
+  const assignedToShip = orders.filter(o => {
+    if (o.status !== ORDER_STATUS_ASSIGNED) return false;
+    const assignedAt = o.assignedAt ? new Date(o.assignedAt) : new Date(o.createdAt);
+    const hoursDiff = (now.getTime() - assignedAt.getTime()) / (1000 * 60 * 60);
+    return hoursDiff > 24;
+  });
+  alerts.push({
+    type: 'assigned_to_ship',
+    label: '发货通知超时',
+    description: '已派发超过24小时未导出发货单',
+    count: assignedToShip.length,
+    orders: assignedToShip,
+  });
+  
+  // c. 通知发货 -> 导入回单：次日10点未回单
   const assignedToReturned = orders.filter(o => {
     if (o.status !== ORDER_STATUS_ASSIGNED) return false;
     const createdAt = new Date(o.createdAt);
@@ -546,7 +676,7 @@ const calculateOrderAlerts = useMemo(() => {
     orders: assignedToReturned,
   });
   
-  // c. 待发货 -> 反馈给客户：超过24小时
+  // d. 待发货 -> 反馈给客户：超过24小时
   const overdue24h = orders.filter(o => {
     const createdAt = new Date(o.createdAt);
     const hoursDiff = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60);
@@ -581,57 +711,6 @@ useEffect(() => {
   handleScroll();
   return () => window.removeEventListener('scroll', handleScroll);
 }, []);
-
-  // 搜索索引 - 用于快速定位筛选项
-  const searchIndex = useMemo(() => {
-    const index: Record<string, Set<string>> = {};
-    
-    orders.forEach(order => {
-      // 订单号索引
-      if (order.orderNo) {
-        if (!index.orderNo) index.orderNo = new Set();
-        index.orderNo.add(order.orderNo.toLowerCase());
-      }
-      if (order.sysOrderNo) {
-        if (!index.orderNo) index.orderNo = new Set();
-        index.orderNo.add(order.sysOrderNo.toLowerCase());
-      }
-      
-      // 商品名称索引（包括客户原始商品名称和系统商品名称）
-      order.items.forEach(item => {
-        // 索引客户原始商品名称
-        const cuName = (item as Record<string, unknown>).cuProductName as string || (item as Record<string, unknown>).product_name as string;
-        if (cuName) {
-          if (!index.productName) index.productName = new Set();
-          index.productName.add(cuName.toLowerCase());
-        }
-        // 索引系统商品名称（如果不同）
-        const sysName = (item as Record<string, unknown>).productName as string;
-        if (sysName && sysName !== cuName) {
-          if (!index.productName) index.productName = new Set();
-          index.productName.add(sysName.toLowerCase());
-        }
-      });
-      
-      // 客户信息索引
-      if (order.customerName) {
-        if (!index.customerInfo) index.customerInfo = new Set();
-        index.customerInfo.add(order.customerName.toLowerCase());
-      }
-      if (order.customerCode) {
-        if (!index.customerInfo) index.customerInfo = new Set();
-        index.customerInfo.add(order.customerCode.toLowerCase());
-      }
-      
-      // 电话索引
-      if (order.receiver.phone) {
-        if (!index.phone) index.phone = new Set();
-        index.phone.add(order.receiver.phone);
-      }
-    });
-    
-    return index;
-  }, [orders]);
 
   // 新增订单
   const handleCreateOrder = async () => {
@@ -696,8 +775,8 @@ useEffect(() => {
       } else {
         toast.error(data.error || '创建订单失败');
       }
-    } catch (error) {
-      console.error('创建订单失败:', error);
+    } catch {
+      console.error('创建订单失败');
       toast.error('创建订单失败');
     } finally {
       setCreateLoading(false);
@@ -723,6 +802,10 @@ useEffect(() => {
       expressRequirement: (order as unknown as Record<string, string>).expressRequirement || '',
       remark: (order as unknown as Record<string, string>).remark || '',
       status: order.status,
+      supplierId: order.supplierId || '',
+      supplierName: order.supplierName || '',
+      expressCompany: order.expressCompany || '',
+      trackingNo: order.trackingNo || '',
     });
     setEditDialogOpen(true);
   };
@@ -737,27 +820,47 @@ useEffect(() => {
     
     setEditLoading(true);
     try {
+      const updateData: Record<string, unknown> = {
+        customerCode: editForm.customerCode || 'UNKNOWN',
+        items: [{
+          product_name: editForm.productName || '未指定商品',
+          product_code: editForm.productCode || '',
+          product_spec: editForm.productSpec || '',
+          product_brand: editForm.productBrand || '',
+          quantity: editForm.quantity || 1,
+        }],
+        receiver: {
+          name: editForm.receiverName,
+          phone: editForm.receiverPhone,
+          address: editForm.receiverAddress,
+          province: editForm.receiverProvince || '',
+        },
+        expressRequirement: editForm.expressRequirement || '',
+        remark: editForm.remark || '',
+      };
+
+      // 未回单前允许修改供应商、状态、物流信息
+      const LOCKED_STATUSES: string[] = [ORDER_STATUS_RETURNED, ORDER_STATUS_FEEDBACKED, ORDER_STATUS_COMPLETED, ORDER_STATUS_CANCELLED];
+      if (!LOCKED_STATUSES.includes(editForm.status)) {
+        if (editForm.supplierId) {
+          updateData.supplierId = editForm.supplierId;
+          updateData.supplierName = editForm.supplierName;
+        }
+        if (editForm.status) {
+          updateData.status = editForm.status;
+        }
+        if (editForm.expressCompany) {
+          updateData.expressCompany = editForm.expressCompany;
+        }
+        if (editForm.trackingNo) {
+          updateData.trackingNo = editForm.trackingNo;
+        }
+      }
+
       const res = await fetch(`/api/orders?id=${editForm.id}`, {
         method: 'PATCH',
         headers: authHeaders(),
-        body: JSON.stringify({
-          customerCode: editForm.customerCode || 'UNKNOWN',
-          items: [{
-            product_name: editForm.productName || '未指定商品',
-            product_code: editForm.productCode || '',
-            product_spec: editForm.productSpec || '',
-            product_brand: editForm.productBrand || '',
-            quantity: editForm.quantity || 1,
-          }],
-          receiver: {
-            name: editForm.receiverName,
-            phone: editForm.receiverPhone,
-            address: editForm.receiverAddress,
-            province: editForm.receiverProvince || '',
-          },
-          expressRequirement: editForm.expressRequirement || '',
-          remark: editForm.remark || '',
-        }),
+        body: JSON.stringify(updateData),
       });
       const data = await res.json();
       
@@ -768,11 +871,58 @@ useEffect(() => {
       } else {
         toast.error(data.error || '更新订单失败');
       }
-    } catch (error) {
-      console.error('更新订单失败:', error);
+    } catch {
+      console.error('更新订单失败');
       toast.error('更新订单失败');
     } finally {
       setEditLoading(false);
+    }
+  };
+
+  // 导出发货通知单
+  const handleExportShipping = async (order: Order) => {
+    if (!order.supplierId) {
+      toast.error('订单未分配供应商，无法导出发货通知单');
+      return;
+    }
+    
+    try {
+      toast.loading('正在生成发货通知单...', { id: 'export-shipping' });
+      
+      const res = await fetch('/api/shipping-exports/batch', {
+        method: 'POST',
+        headers: {
+          ...authHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          supplierIds: [order.supplierId],
+          orderIds: [order.id],
+          executionMode: 'dispatch_with_persistence',
+        }),
+      });
+      
+      const data = await res.json();
+      
+      if (data.success) {
+        toast.success('发货通知单生成成功', { id: 'export-shipping' });
+        fetchOrders();
+        
+        // 自动下载文件
+        if (data.zipBase64) {
+          const link = document.createElement('a');
+          link.href = `data:application/zip;base64,${data.zipBase64}`;
+          link.download = data.zipFileName || 'shipping-notification.zip';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+      } else {
+        toast.error(data.error || '导出发货通知单失败', { id: 'export-shipping' });
+      }
+    } catch {
+      console.error('导出发货通知单失败');
+      toast.error('导出发货通知单失败', { id: 'export-shipping' });
     }
   };
 
@@ -798,8 +948,8 @@ useEffect(() => {
       } else {
         toast.error(data.error || '删除失败');
       }
-    } catch (error) {
-      console.error('删除订单失败:', error);
+    } catch {
+      console.error('删除订单失败');
       toast.error('删除订单失败');
     } finally {
       setDeleteLoading(false);
@@ -836,10 +986,10 @@ useEffect(() => {
   // 获取当前订单可编辑的字段提示
   const getEditableFieldsHint = (order: Order): string => {
     if (order.status === ORDER_STATUS_PENDING) return '可编辑所有信息';
-    if (order.status === ORDER_STATUS_ASSIGNED) return '仅可编辑收货人、电话、地址、备注';
-    if (order.status === ORDER_STATUS_RETURNED) return '可修正快递信息、收货信息、备注';
-    if (order.status === ORDER_STATUS_FEEDBACKED) return '已反馈客户，建议不再修改业务信息';
-    if (order.status === ORDER_STATUS_PARTIAL_RETURNED) return '仅可编辑收货人、电话、地址、备注';
+    if (order.status === ORDER_STATUS_ASSIGNED) return '可编辑：供应商、状态、物流信息、收货信息';
+    if (order.status === ORDER_STATUS_PARTIAL_RETURNED) return '可编辑：供应商、状态、物流信息、收货信息';
+    if (order.status === ORDER_STATUS_RETURNED) return '仅可编辑收货信息';
+    if (order.status === ORDER_STATUS_FEEDBACKED) return '仅可编辑收货信息';
     if (order.status === ORDER_STATUS_CANCELLED) return '可编辑所有信息';
     return '';
   };
@@ -861,21 +1011,23 @@ useEffect(() => {
       if (data.success) {
         setSuppliers((data.data || []).filter((s: Supplier) => s.id && s.name));
       }
-    } catch (error) {
+    } catch {
       console.error('获取供应商失败');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchCustomers = useCallback(async () => {
     try {
-      const res = await fetch('/api/customers', { headers: authHeaders() });
+      const res = await fetch('/api/customers?isActive=false', { headers: authHeaders() });
       const data = await res.json();
       if (data.success) {
         setCustomers((data.data || []).filter((c: Customer) => c.code && c.name));
       }
-    } catch (error) {
+    } catch {
       console.error('获取客户失败');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 初始化加载数据
@@ -886,6 +1038,61 @@ useEffect(() => {
     fetchAlerts();
   }, [fetchOrders, fetchSuppliers, fetchCustomers, fetchAlerts]);
 
+  // 筛选状态变更时自动保存到 sessionStorage（URL 参数应用期间跳过）
+  useEffect(() => {
+    if (_applyingUrlParams.current) return;
+    saveOrdersSession({
+      statusFilter,
+      selectedStatuses,
+      customerFilter,
+      customerSearch,
+      supplierFilter,
+      supplierSearch,
+      quantityOp,
+      quantityFilter,
+      searchFields,
+      showAdvancedFilter,
+      advancedFields,
+      alertPanelOpen,
+    });
+  }, [
+    statusFilter,
+    selectedStatuses,
+    customerFilter,
+    customerSearch,
+    supplierFilter,
+    supplierSearch,
+    quantityOp,
+    quantityFilter,
+    searchFields,
+    showAdvancedFilter,
+    advancedFields,
+    alertPanelOpen,
+  ]);
+
+  // 选中订单变更时保存 id 列表到 sessionStorage
+  useEffect(() => {
+    if (_applyingUrlParams.current) return;
+    saveOrdersSession({ selectedOrderIds: Array.from(selectedOrders).map((o) => o.id) });
+  }, [selectedOrders]);
+
+  // 恢复选中的订单（仅精确匹配 id）
+  useEffect(() => {
+    const restored = _ordersRestored;
+    if (!restored?.selectedOrderIds || restored.selectedOrderIds.length === 0) return;
+    console.log('[DEBUG] 恢复选中订单:', { ids: restored.selectedOrderIds, ordersCount: orders.length });
+    setSelectedOrders((prev) => {
+      const next = new Set(prev);
+      orders.forEach((order) => {
+        if (restored.selectedOrderIds!.includes(order.id)) {
+          next.add(order);
+        }
+      });
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders]); // 仅依赖 orders 加载完成
+
   // 模糊搜索匹配函数
   const fuzzyMatch = (text: string | undefined, query: string): boolean => {
     if (!query) return true;
@@ -894,19 +1101,6 @@ useEffect(() => {
     const queryLower = query.toLowerCase();
     // 支持前缀匹配和包含匹配
     return textLower.startsWith(queryLower) || textLower.includes(queryLower);
-  };
-
-  // 模糊搜索建议（基于索引）
-  const getSuggestions = (field: string, query: string): string[] => {
-    if (!query || !searchIndex[field]) return [];
-    const suggestions: Set<string> = new Set();
-    const queryLower = query.toLowerCase();
-    searchIndex[field].forEach(value => {
-      if (value.includes(queryLower)) {
-        suggestions.add(value);
-      }
-    });
-    return Array.from(suggestions).slice(0, 10);
   };
 
   // Combined filter logic - 默认排除已归档状态
@@ -1047,43 +1241,8 @@ useEffect(() => {
       } else {
         toast.error(data.error || '分配失败');
       }
-    } catch (error) {
+    } catch {
       toast.error('分配失败');
-    }
-  };
-
-  const handleBatchAssign = async () => {
-    if (selectedOrders.size === 0 || !selectedSupplierId) {
-      toast.error('请选择订单和供应商');
-      return;
-    }
-
-    try {
-      const supplier = suppliers.find((s) => s.id === selectedSupplierId);
-      const orderIds = Array.from(selectedOrders).map(o => o.id);
-      const promises = orderIds.map((orderId) =>
-        fetch('/api/orders', {
-          method: 'PATCH',
-          headers: authHeaders(),
-          body: JSON.stringify({
-            id: orderId,
-            supplierId: selectedSupplierId,
-            supplierName: supplier?.name || '',
-            status: 'pending', // 改为待派发状态
-          }),
-        })
-      );
-      const results = await Promise.all(promises);
-      const dataArr = await Promise.all(results.map((r) => r.json()));
-      const successCount = dataArr.filter((d) => d.success).length;
-      toast.success(`成功分配供应商，共 ${successCount} 条订单待派发`);
-      setSelectedOrders(new Set());
-      setAssignDialogOpen(false);
-      setSelectedSupplierId('');
-      setSelectedSuppliers({});
-      fetchOrders();
-    } catch (error) {
-      toast.error('批量分配失败');
     }
   };
 
@@ -1119,7 +1278,7 @@ useEffect(() => {
       setSelectedSuppliers({});
       setMatchResults({});
       fetchOrders();
-    } catch (error) {
+    } catch {
       toast.error('批量分配失败');
     }
   };
@@ -1203,9 +1362,9 @@ useEffect(() => {
       } else {
         toast.error(data.error || '匹配失败');
       }
-    } catch (error) {
+    } catch {
       toast.error('匹配请求失败');
-      console.error(error);
+      console.error('匹配失败');
     } finally {
       setIsMatching(false);
     }
@@ -1215,7 +1374,6 @@ useEffect(() => {
     setAssigningOrderId(orderId);
     setSelectedSupplierId('');
     setMatchResults({});
-    setShowMatchDetails(false);
     setAssignDialogOpen(true);
     
     // 如果是单个订单，自动触发智能匹配
@@ -1267,8 +1425,8 @@ useEffect(() => {
           toast.info(item.newProductHint);
         }
       }
-    } catch (error) {
-      console.error('快速匹配失败:', error);
+    } catch {
+      console.error('快速匹配失败');
     } finally {
       setIsMatching(false);
     }
@@ -1327,25 +1485,12 @@ useEffect(() => {
       setReturnExpressCompany('');
       setSelectedOrders(new Set());
       fetchOrders();
-    } catch (error) {
+    } catch {
       toast.error('回单失败');
     }
   };
 
   // --- Ship orders (供应商发货) ---
-  const handleBatchShip = async () => {
-    const targetIds: string[] = selectedOrders.size > 0
-      ? Array.from(selectedOrders).map(o => o.id)
-      : filteredOrders.filter((o) => o.status === ORDER_STATUS_ASSIGNED).map((o) => o.id);
-
-    if (targetIds.length === 0) {
-      toast.error('没有可发货的订单');
-      return;
-    }
-    // Ship means marking assigned orders as having tracking info
-    toast.info('请通过"物流回单"功能录入快递单号完成发货');
-  };
-
   // --- Export to Kingdee and archive (导出金蝶并归档) ---
   const handleExportKingdee = async () => {
     const targetIds: string[] = selectedOrders.size > 0
@@ -1398,7 +1543,7 @@ useEffect(() => {
       toast.success(`已导出金蝶并归档 ${successCount} 条订单`);
       setSelectedOrders(new Set());
       fetchOrders();
-    } catch (error) {
+    } catch {
       toast.error('导出金蝶失败');
     }
   };
@@ -1414,8 +1559,8 @@ useEffect(() => {
       return;
     }
 
-    toast.info('发货通知单请在“发货通知单”页面按供应商批量导出');
-    window.location.href = '/shipping-export';
+    toast.info('已打开发货通知单页面，请在新的页签中按供应商批量导出');
+    window.open('/shipping-export', '_blank');
   };
 
   // --- Feedback to customer (反馈给客户) ---
@@ -1451,7 +1596,7 @@ useEffect(() => {
       toast.success(`已复制 ${targetOrders.length} 条订单信息，并标记 ${successCount} 条为已反馈`);
       setSelectedOrders(new Set());
       fetchOrders();
-    } catch (error) {
+    } catch {
       toast.warning('已复制反馈内容，但状态标记失败，请稍后重试');
     }
   };
@@ -1632,6 +1777,67 @@ useEffect(() => {
             <RefreshCw className="w-4 h-4 mr-1" />
             刷新
           </Button>
+          <Popover open={columnPickerOpen} onOpenChange={setColumnPickerOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="w-full sm:w-auto">
+                <SlidersHorizontal className="w-4 h-4 mr-1" />
+                列表设置
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-0" align="end">
+              <div className="px-3 py-2 border-b bg-muted/50">
+                <p className="text-sm font-medium">选择列表显示字段</p>
+                <p className="text-xs text-muted-foreground">勾选要显示的列</p>
+              </div>
+              <div className="p-2 space-y-1">
+                {([
+                  ['sysOrderNo', '系统单号'],
+                  ['customerCode', '客户编码'],
+                  ['customer', '客户'],
+                  ['receiver', '收货人'],
+                  ['product', '商品名称'],
+                  ['quantity', '数量'],
+                  ['productSpec', '型号'],
+                  ['productCode', '商品编码'],
+                  ['salesperson', '业务员'],
+                  ['operator', '跟单员'],
+                  ['supplier', '供应商'],
+                  ['createdAt', '创建时间'],
+                ] as [keyof VisibleColumns, string][]).map(([key, label]) => (
+                  <label
+                    key={key}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/60 cursor-pointer text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={visibleColumns[key]}
+                      onChange={() => toggleColumn(key)}
+                      className="rounded"
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+              <div className="px-3 py-2 border-t bg-muted/30 flex justify-between">
+                <button
+                  className="text-xs text-muted-foreground hover:text-foreground underline"
+                  onClick={() => {
+                    setVisibleColumns(DEFAULT_VISIBLE_COLUMNS);
+                    try { localStorage.removeItem('orders_visible_columns'); } catch {}
+                    setColumnPickerOpen(false);
+                  }}
+                >
+                  恢复默认
+                </button>
+                <button
+                  className="text-xs text-primary hover:underline font-medium"
+                  onClick={() => setColumnPickerOpen(false)}
+                >
+                  完成
+                </button>
+              </div>
+            </PopoverContent>
+          </Popover>
           <Button variant="outline" size="sm" onClick={handleExport} className="w-full sm:w-auto">
             <Download className="w-4 h-4 mr-1" />
             导出
@@ -1803,7 +2009,7 @@ useEffect(() => {
                 onClick={() => {
                   // 筛选显示对应的订单
                   setStatusFilter(alert.type === 'pending_to_assign' ? 'pending' : 
-                                 alert.type === 'assigned_to_returned' ? 'assigned' : '');
+                                 alert.type === 'assigned_to_ship' || alert.type === 'assigned_to_returned' ? 'assigned' : '');
                 }}
               >
                 <div className="flex items-center justify-between">
@@ -2306,25 +2512,26 @@ useEffect(() => {
                     className="rounded"
                   />
                 </TableHead>
-                <TableHead>系统单号</TableHead>
-                <TableHead>客户单号</TableHead>
-                <TableHead>客户</TableHead>
-                <TableHead>收货人</TableHead>
-                <TableHead>商品</TableHead>
-                <TableHead className="text-center">数量</TableHead>
-                <TableHead>型号</TableHead>
-                <TableHead>业务员</TableHead>
-                <TableHead>跟单员</TableHead>
+                {visibleColumns.sysOrderNo && <TableHead>系统单号</TableHead>}
+                {visibleColumns.customerCode && <TableHead>客户单号</TableHead>}
+                {visibleColumns.customer && <TableHead>客户</TableHead>}
+                {visibleColumns.receiver && <TableHead>收货人</TableHead>}
+                {visibleColumns.product && <TableHead>商品</TableHead>}
+                {visibleColumns.quantity && <TableHead className="text-center">数量</TableHead>}
+                {visibleColumns.productSpec && <TableHead>型号</TableHead>}
+                {visibleColumns.productCode && <TableHead>商品编码</TableHead>}
+                {visibleColumns.salesperson && <TableHead>业务员</TableHead>}
+                {visibleColumns.operator && <TableHead>跟单员</TableHead>}
                 <TableHead>状态</TableHead>
-                <TableHead>供应商</TableHead>
-                <TableHead>创建时间</TableHead>
+                {visibleColumns.supplier && <TableHead>供应商</TableHead>}
+                {visibleColumns.createdAt && <TableHead>创建时间</TableHead>}
                 <TableHead className="text-right">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredOrders.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={15} className="text-center py-8 text-muted-foreground">
                     {orders.length === 0 ? '暂无订单数据' : '未找到匹配的订单'}
                   </TableCell>
                 </TableRow>
@@ -2342,87 +2549,122 @@ useEffect(() => {
                         className="rounded"
                       />
                     </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground max-w-[80px] truncate" title={order.sysOrderNo || '-'}>
-                      <div>{order.sysOrderNo ? order.sysOrderNo.split('-').slice(-1)[0] : '-'}</div>
-                      {order.importBatch && (
-                        <div className="mt-1 text-[10px] text-muted-foreground/80" title={order.importBatch}>
-                          批次 {order.importBatch.slice(-8)}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="font-mono text-sm text-muted-foreground max-w-[120px] truncate">
-                      {order.orderNo}
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        <div className="font-medium">{order.customerName || '-'}</div>
-                        {order.customerCode && order.customerCode !== 'UNKNOWN' && (
-                          <div className="text-muted-foreground text-xs">{order.customerCode}</div>
+                    {visibleColumns.sysOrderNo && (
+                      <TableCell className="font-mono text-xs text-muted-foreground max-w-[80px] truncate" title={order.sysOrderNo || '-'}>
+                        <div>{order.sysOrderNo ? order.sysOrderNo.split('-').slice(-1)[0] : '-'}</div>
+                        {order.importBatch && (
+                          <div className="mt-1 text-[10px] text-muted-foreground/80" title={order.importBatch}>
+                            批次 {order.importBatch.slice(-8)}
+                          </div>
                         )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        <div>{order.receiver.name}</div>
-                        <div className="text-muted-foreground text-xs">
-                          {order.receiver.phone}
+                      </TableCell>
+                    )}
+                    {visibleColumns.customerCode && (
+                      <TableCell className="font-mono text-sm text-muted-foreground max-w-[120px] truncate">
+                        {order.orderNo}
+                      </TableCell>
+                    )}
+                    {visibleColumns.customer && (
+                      <TableCell>
+                        <div className="text-sm">
+                          <div className="font-medium">{order.customerName || '-'}</div>
+                          {order.customerCode && order.customerCode !== 'UNKNOWN' && (
+                            <div className="text-muted-foreground text-xs">{order.customerCode}</div>
+                          )}
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">
+                      </TableCell>
+                    )}
+                    {visibleColumns.receiver && (
+                      <TableCell>
+                        <div className="text-sm">
+                          <div>{order.receiver.name}</div>
+                          <div className="text-muted-foreground text-xs">
+                            {order.receiver.phone}
+                          </div>
+                        </div>
+                      </TableCell>
+                    )}
+                    {visibleColumns.product && (
+                      <TableCell>
+                        <div className="text-sm">
+                          {order.items.slice(0, 2).map((item, i) => (
+                            <div key={i} className="truncate max-w-[150px]">
+                              {item.productName || item.product_name}
+                            </div>
+                          ))}
+                          {order.items.length > 2 && (
+                            <div className="text-muted-foreground text-xs">
+                              +{order.items.length - 2} 更多
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                    )}
+                    {visibleColumns.quantity && (
+                      <TableCell className="text-center">
+                        <div className="text-sm font-semibold">
+                          {order.items.reduce((sum, item) => sum + item.quantity, 0)}
+                        </div>
+                        {order.items.length > 1 && (
+                          <div className="text-muted-foreground text-xs">
+                            ({order.items.length}种)
+                          </div>
+                        )}
+                      </TableCell>
+                    )}
+                    {visibleColumns.productSpec && (
+                      <TableCell className="text-sm text-muted-foreground max-w-[120px] truncate">
                         {order.items.slice(0, 2).map((item, i) => (
-                          <div key={i} className="truncate max-w-[150px]">
-                            {item.product_name}
+                          <div key={i} className="truncate">
+                            {item.productSpec || item.product_spec || '-'}
                           </div>
                         ))}
                         {order.items.length > 2 && (
                           <div className="text-muted-foreground text-xs">
-                            +{order.items.length - 2} 更多
+                            ...
                           </div>
                         )}
-                      </div>
-                    </TableCell>
-                    {/* 数量列 */}
-                    <TableCell className="text-center">
-                      <div className="text-sm font-semibold">
-                        {order.items.reduce((sum, item) => sum + item.quantity, 0)}
-                      </div>
-                      {order.items.length > 1 && (
-                        <div className="text-muted-foreground text-xs">
-                          ({order.items.length}种)
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground max-w-[120px] truncate">
-                      {order.items.slice(0, 2).map((item, i) => (
-                        <div key={i} className="truncate">
-                          {item.product_spec || '-'}
-                        </div>
-                      ))}
-                      {order.items.length > 2 && (
-                        <div className="text-muted-foreground text-xs">
-                          ...
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {order.salespersonName || '-'}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {order.operatorName || '-'}
-                    </TableCell>
+                      </TableCell>
+                    )}
+                    {visibleColumns.productCode && (
+                      <TableCell className="text-sm text-muted-foreground max-w-[100px] truncate font-mono">
+                        {order.items.slice(0, 2).map((item, i) => (
+                          <div key={i} className="truncate" title={item.productCode || item.product_code || '-'}>
+                            {item.productCode || item.product_code || '-'}
+                          </div>
+                        ))}
+                        {order.items.length > 2 && (
+                          <div className="text-muted-foreground text-xs">
+                            ...
+                          </div>
+                        )}
+                      </TableCell>
+                    )}
+                    {visibleColumns.salesperson && (
+                      <TableCell className="text-sm">
+                        {order.salespersonName || '-'}
+                      </TableCell>
+                    )}
+                    {visibleColumns.operator && (
+                      <TableCell className="text-sm">
+                        {order.operatorName || '-'}
+                      </TableCell>
+                    )}
                     <TableCell>
                       <Badge className={getOrderStatusBadgeClass(order.status)}>
                         {getOrderStatusLabel(order.status)}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-sm">
-                      {order.supplierName || '-'}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {new Date(order.createdAt).toLocaleDateString('zh-CN')}
-                    </TableCell>
+                    {visibleColumns.supplier && (
+                      <TableCell className="text-sm">
+                        {order.supplierName || '-'}
+                      </TableCell>
+                    )}
+                    {visibleColumns.createdAt && (
+                      <TableCell className="text-sm text-muted-foreground">
+                        {new Date(order.createdAt).toLocaleDateString('zh-CN')}
+                      </TableCell>
+                    )}
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         <Button
@@ -2462,6 +2704,16 @@ useEffect(() => {
                             title="派发供应商"
                           >
                             <Send className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {order.status === ORDER_STATUS_ASSIGNED && order.supplierId && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleExportShipping(order)}
+                            title="导出发货通知单"
+                          >
+                            <FileDown className="w-4 h-4" />
                           </Button>
                         )}
                       </div>
@@ -2650,6 +2902,7 @@ useEffect(() => {
                       <TableRow>
                         <TableHead>商品名称</TableHead>
                         <TableHead>规格型号</TableHead>
+                        <TableHead>商品编码</TableHead>
                         <TableHead className="text-right">数量</TableHead>
                         <TableHead className="text-right">单价</TableHead>
                         <TableHead className="text-right">小计</TableHead>
@@ -2689,6 +2942,12 @@ useEffect(() => {
                                 <span className="text-muted-foreground">{item.cuProductSpec || item.productSpec || '-'}</span>
                               </div>
                             </div>
+                          </TableCell>
+                          <TableCell className="text-xs font-mono text-muted-foreground">
+                            <div>{item.product_code || '-'}</div>
+                            {item.cuProductCode && item.cuProductCode !== item.product_code && (
+                              <div className="text-orange-500">客:{item.cuProductCode}</div>
+                            )}
                           </TableCell>
                           <TableCell className="text-right">{item.quantity}</TableCell>
                           <TableCell className="text-right">
@@ -2759,7 +3018,6 @@ useEffect(() => {
           if (!open) {
             setAssigningOrderId(null);
             setMatchResults({});
-            setShowMatchDetails(false);
           }
         }}
       >
@@ -3260,131 +3518,221 @@ useEffect(() => {
 
       {/* 编辑订单对话框 */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>编辑订单</DialogTitle>
             <DialogDescription>
               {editForm.status && (
-                <div className="mt-1 flex items-center gap-2">
+                <div className="mt-1 flex items-center gap-2 flex-wrap">
                   <Badge className={getOrderStatusBadgeClass(editForm.status)}>
                     {getOrderStatusLabel(editForm.status)}
                   </Badge>
-                  {editForm.status === ORDER_STATUS_ASSIGNED || editForm.status === ORDER_STATUS_PARTIAL_RETURNED ? (
-                    <span className="text-xs text-muted-foreground">
-                      已派发订单仅可编辑收货信息
-                    </span>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">
-                      可编辑所有信息
-                    </span>
-                  )}
+                  {(() => {
+                    const LOCKED_STATUSES: OrderStatus[] = [ORDER_STATUS_RETURNED, ORDER_STATUS_FEEDBACKED, ORDER_STATUS_COMPLETED, ORDER_STATUS_CANCELLED];
+                    const isLocked = LOCKED_STATUSES.includes(editForm.status as OrderStatus);
+                    return isLocked ? (
+                      <span className="text-xs text-muted-foreground">
+                        已回单/已反馈订单，仅可修改收货信息
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        可修改：供应商、状态、物流信息、收货信息
+                      </span>
+                    );
+                  })()}
                 </div>
               )}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 max-h-[60vh] overflow-y-auto">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>订单号</Label>
-                <Input value={editForm.orderNo} disabled />
-              </div>
-              <div className="space-y-2">
-                <Label>客户代码</Label>
-                <Input
-                  value={editForm.customerCode}
-                  onChange={(e) => setEditForm({ ...editForm, customerCode: e.target.value })}
-                  disabled={editForm.status === ORDER_STATUS_ASSIGNED || editForm.status === ORDER_STATUS_PARTIAL_RETURNED}
-                  className={editForm.status === ORDER_STATUS_ASSIGNED || editForm.status === ORDER_STATUS_PARTIAL_RETURNED ? 'bg-muted' : ''}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label className={((editForm.status === ORDER_STATUS_ASSIGNED || editForm.status === ORDER_STATUS_PARTIAL_RETURNED) ? 'text-muted-foreground' : '')}>
-                商品名称 {editForm.status === ORDER_STATUS_ASSIGNED || editForm.status === ORDER_STATUS_PARTIAL_RETURNED && <span className="text-xs">(已派发订单不可修改)</span>}
-              </Label>
-              <div className="flex gap-2">
-                <Input
-                  value={editForm.productName}
-                  onChange={(e) => setEditForm({ ...editForm, productName: e.target.value })}
-                  disabled={editForm.status === ORDER_STATUS_ASSIGNED || editForm.status === ORDER_STATUS_PARTIAL_RETURNED}
-                  className={editForm.status === ORDER_STATUS_ASSIGNED || editForm.status === ORDER_STATUS_PARTIAL_RETURNED ? 'bg-muted flex-1' : 'flex-1'}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setEditProductPickerOpen(true)}
-                  disabled={editForm.status === ORDER_STATUS_ASSIGNED || editForm.status === ORDER_STATUS_PARTIAL_RETURNED}
-                  title="从商品目录选择"
-                >
-                  选择商品
-                </Button>
-              </div>
-              {editForm.productCode && (
-                <div className="text-xs text-muted-foreground">
-                  系统编码：<span className="font-mono">{editForm.productCode}</span>
-                  {editForm.productSpec && <span className="ml-2">规格：{editForm.productSpec}</span>}
-                  {editForm.productBrand && <span className="ml-2">品牌：{editForm.productBrand}</span>}
+            {/* 基本信息区域 */}
+            <div className="border-b pb-3">
+              <div className="text-sm font-medium text-muted-foreground mb-2">基本信息</div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>订单号</Label>
+                  <Input value={editForm.orderNo} disabled />
                 </div>
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className={((editForm.status === ORDER_STATUS_ASSIGNED || editForm.status === ORDER_STATUS_PARTIAL_RETURNED) ? 'text-muted-foreground' : '')}>
-                  数量 {editForm.status === ORDER_STATUS_ASSIGNED || editForm.status === ORDER_STATUS_PARTIAL_RETURNED && <span className="text-xs">(已派发订单不可修改)</span>}
+                <div className="space-y-2">
+                  <Label>客户代码</Label>
+                  <Input
+                    value={editForm.customerCode}
+                    onChange={(e) => setEditForm({ ...editForm, customerCode: e.target.value })}
+                    disabled
+                    className="bg-muted"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2 mt-3">
+                <Label className="text-muted-foreground">
+                  商品名称 <span className="text-xs">(已派发订单不可修改)</span>
                 </Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={editForm.productName}
+                    onChange={(e) => setEditForm({ ...editForm, productName: e.target.value })}
+                    disabled
+                    className="bg-muted flex-1"
+                  />
+                </div>
+                {editForm.productCode && (
+                  <div className="text-xs text-muted-foreground">
+                    系统编码：<span className="font-mono">{editForm.productCode}</span>
+                    {editForm.productSpec && <span className="ml-2">规格：{editForm.productSpec}</span>}
+                    {editForm.productBrand && <span className="ml-2">品牌：{editForm.productBrand}</span>}
+                  </div>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-4 mt-3">
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">数量</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={editForm.quantity}
+                    disabled
+                    className="bg-muted"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 供应商与状态区域 */}
+              <div className="border-b pb-3">
+                <div className="text-sm font-medium text-muted-foreground mb-2">供应商与状态</div>
+                {(() => {
+                  const LOCKED_STATUSES: OrderStatus[] = [ORDER_STATUS_RETURNED, ORDER_STATUS_FEEDBACKED, ORDER_STATUS_COMPLETED, ORDER_STATUS_CANCELLED];
+                  const isLocked = LOCKED_STATUSES.includes(editForm.status as OrderStatus);
+                return (
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label>发货方（供应商）</Label>
+                      <Select
+                        value={editForm.supplierId}
+                        onValueChange={(val) => {
+                          const supplier = suppliers.find(s => s.id === val);
+                          setEditForm({
+                            ...editForm,
+                            supplierId: val,
+                            supplierName: supplier?.name || '',
+                          });
+                        }}
+                        disabled={isLocked}
+                      >
+                        <SelectTrigger className={isLocked ? 'bg-muted' : ''}>
+                          <SelectValue placeholder="选择供应商" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {suppliers.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>订单状态</Label>
+                      <Select
+                        value={editForm.status}
+                        onValueChange={(val) => setEditForm({ ...editForm, status: val })}
+                        disabled={isLocked}
+                      >
+                        <SelectTrigger className={isLocked ? 'bg-muted' : ''}>
+                          <SelectValue placeholder="选择状态" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ORDER_STATUS_OPTIONS.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value as string}>{opt.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* 物流信息区域 */}
+            <div className="border-b pb-3">
+              <div className="text-sm font-medium text-muted-foreground mb-2">物流信息</div>
+              {(() => {
+                const LOCKED_STATUSES: OrderStatus[] = [ORDER_STATUS_RETURNED, ORDER_STATUS_FEEDBACKED, ORDER_STATUS_COMPLETED, ORDER_STATUS_CANCELLED];
+                const isLocked = LOCKED_STATUSES.includes(editForm.status as OrderStatus);
+                return (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>快递公司</Label>
+                      <Input
+                        value={editForm.expressCompany}
+                        onChange={(e) => setEditForm({ ...editForm, expressCompany: e.target.value })}
+                        placeholder="如：顺丰、圆通"
+                        disabled={isLocked}
+                        className={isLocked ? 'bg-muted' : ''}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>运单号</Label>
+                      <Input
+                        value={editForm.trackingNo}
+                        onChange={(e) => setEditForm({ ...editForm, trackingNo: e.target.value })}
+                        placeholder="请输入快递单号"
+                        disabled={isLocked}
+                        className={isLocked ? 'bg-muted' : ''}
+                      />
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* 收货信息区域 */}
+            <div>
+              <div className="text-sm font-medium text-muted-foreground mb-2">收货信息</div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>收货人 <span className="text-destructive">*</span></Label>
+                  <Input
+                    value={editForm.receiverName}
+                    onChange={(e) => setEditForm({ ...editForm, receiverName: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>联系电话 <span className="text-destructive">*</span></Label>
+                  <Input
+                    value={editForm.receiverPhone}
+                    onChange={(e) => setEditForm({ ...editForm, receiverPhone: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2 mt-3">
+                <Label>收货省份</Label>
                 <Input
-                  type="number"
-                  min="1"
-                  value={editForm.quantity}
-                  onChange={(e) => setEditForm({ ...editForm, quantity: parseInt(e.target.value) || 1 })}
-                  disabled={editForm.status === ORDER_STATUS_ASSIGNED || editForm.status === ORDER_STATUS_PARTIAL_RETURNED}
-                  className={editForm.status === ORDER_STATUS_ASSIGNED || editForm.status === ORDER_STATUS_PARTIAL_RETURNED ? 'bg-muted' : ''}
+                  value={editForm.receiverProvince}
+                  onChange={(e) => setEditForm({ ...editForm, receiverProvince: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label>收货人 <span className="text-destructive">*</span></Label>
-                <Input
-                  value={editForm.receiverName}
-                  onChange={(e) => setEditForm({ ...editForm, receiverName: e.target.value })}
+              <div className="space-y-2 mt-3">
+                <Label>收货地址 <span className="text-destructive">*</span></Label>
+                <Textarea
+                  rows={2}
+                  value={editForm.receiverAddress}
+                  onChange={(e) => setEditForm({ ...editForm, receiverAddress: e.target.value })}
                 />
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label>联系电话 <span className="text-destructive">*</span></Label>
-              <Input
-                value={editForm.receiverPhone}
-                onChange={(e) => setEditForm({ ...editForm, receiverPhone: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>收货省份</Label>
-              <Input
-                value={editForm.receiverProvince}
-                onChange={(e) => setEditForm({ ...editForm, receiverProvince: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>收货地址 <span className="text-destructive">*</span></Label>
-              <Textarea
-                rows={2}
-                value={editForm.receiverAddress}
-                onChange={(e) => setEditForm({ ...editForm, receiverAddress: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>快递要求</Label>
-              <Input
-                value={editForm.expressRequirement}
-                onChange={(e) => setEditForm({ ...editForm, expressRequirement: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>备注</Label>
-              <Textarea
-                rows={2}
-                value={editForm.remark}
-                onChange={(e) => setEditForm({ ...editForm, remark: e.target.value })}
-              />
+              <div className="space-y-2 mt-3">
+                <Label>快递要求</Label>
+                <Input
+                  value={editForm.expressRequirement}
+                  onChange={(e) => setEditForm({ ...editForm, expressRequirement: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2 mt-3">
+                <Label>备注</Label>
+                <Textarea
+                  rows={2}
+                  value={editForm.remark}
+                  onChange={(e) => setEditForm({ ...editForm, remark: e.target.value })}
+                />
+              </div>
             </div>
           </div>
           <DialogFooter>

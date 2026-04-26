@@ -1,7 +1,132 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+
+// 调试：追踪页面加载
+if (typeof window !== 'undefined') {
+  const count = (window as unknown as { __pageLoadCount?: number }).__pageLoadCount || 0;
+  (window as unknown as { __pageLoadCount: number }).__pageLoadCount = count + 1;
+  console.log('[DEBUG] 页面加载次数:', (window as unknown as { __pageLoadCount: number }).__pageLoadCount);
+
+  // 监听页面卸载前的事件
+  window.addEventListener('beforeunload', () => {
+    console.log('[DEBUG] 页面即将卸载 (beforeunload)');
+  });
+}
+
+// sessionStorage key，用于在路由变化导致组件重新挂载时恢复工作状态
+const SESSION_KEY = 'order_parse_session_v2';
+
+interface SessionState {
+  selectedCustomer: string;
+  salespersonId: string;
+  operatorId: string;
+  salespersonName: string;
+  operatorName: string;
+  inputMode: 'text' | 'excel';
+  inputText: string;
+  headerRow: number;
+  columnMapping: Record<string, string>;
+  parsedOrders: ParsedOrder[];
+  parseStats: {
+    totalItems: number;
+    matchedItems: number;
+    unmatchedItems: number;
+    ordersWithSupplier: number;
+    ordersWithoutSupplier: number;
+    totalHeaderCount?: number;
+    nonEmptyHeaderCount?: number;
+    mappedColumnCount?: number;
+    ignoredColumnCount?: number;
+    extensionColumnCount?: number;
+    recognizedFieldCount?: number;
+    coverageRate?: number;
+    conflictFields?: string[];
+    unrecognizedHeaders?: string[];
+  } | null;
+  parseResult: { duration: number; rawOutput?: string } | null;
+  excelSheetNames: string[];
+  selectedSheet: string;
+  excelRows: string[][];
+  excelPreview: string[][];
+  excelFileName: string;
+  excelFileSize: number;
+  mappingAutoLoaded: boolean;
+  mappingAutoLoadedId: string | null;
+  supplierMatchResults: Record<string, {
+    availableSuppliers: Array<{
+      supplierId: string;
+      supplierName: string;
+      supplierType?: string;
+      province?: string;
+      provinceMatch?: string;
+      productCode: string;
+      productName: string;
+      quantity: number;
+      price: number;
+      historyCost?: number | null;
+      hasStock?: boolean;
+    }>;
+    hasStockForProduct?: boolean;
+    newProductHint?: string;
+    recommendedSupplierId?: string;
+  }>;
+  savedAt: number;
+}
+
+function saveSession(state: Partial<SessionState>) {
+  try {
+    const existing = sessionStorage.getItem(SESSION_KEY);
+    const prev: SessionState | null = existing ? JSON.parse(existing) : null;
+    const next: SessionState = {
+      selectedCustomer: state.selectedCustomer ?? prev?.selectedCustomer ?? '',
+      salespersonId: state.salespersonId ?? prev?.salespersonId ?? '',
+      operatorId: state.operatorId ?? prev?.operatorId ?? '',
+      salespersonName: state.salespersonName ?? prev?.salespersonName ?? '',
+      operatorName: state.operatorName ?? prev?.operatorName ?? '',
+      inputMode: state.inputMode ?? prev?.inputMode ?? 'excel',
+      inputText: state.inputText ?? prev?.inputText ?? '',
+      headerRow: state.headerRow ?? prev?.headerRow ?? 0,
+      columnMapping: state.columnMapping ?? prev?.columnMapping ?? {},
+      parsedOrders: state.parsedOrders ?? prev?.parsedOrders ?? [],
+      parseStats: state.parseStats ?? prev?.parseStats ?? null,
+      parseResult: state.parseResult ?? prev?.parseResult ?? null,
+      excelSheetNames: state.excelSheetNames ?? prev?.excelSheetNames ?? [],
+      selectedSheet: state.selectedSheet ?? prev?.selectedSheet ?? '',
+      excelRows: state.excelRows ?? prev?.excelRows ?? [],
+      excelPreview: state.excelPreview ?? prev?.excelPreview ?? [],
+      excelFileName: state.excelFileName ?? prev?.excelFileName ?? '',
+      excelFileSize: state.excelFileSize ?? prev?.excelFileSize ?? 0,
+      mappingAutoLoaded: state.mappingAutoLoaded ?? prev?.mappingAutoLoaded ?? false,
+      mappingAutoLoadedId: state.mappingAutoLoadedId ?? prev?.mappingAutoLoadedId ?? null,
+      supplierMatchResults: state.supplierMatchResults ?? prev?.supplierMatchResults ?? {},
+      savedAt: Date.now(),
+    };
+    // 超过2小时的会话数据不再恢复
+    if (Date.now() - next.savedAt < 2 * 60 * 60 * 1000) {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(next));
+    }
+  } catch {
+    // 序列化失败时静默忽略
+  }
+}
+
+function loadSession(): Partial<SessionState> | null {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as SessionState;
+    // 超过2小时的会话数据视为过期
+    if (Date.now() - data.savedAt > 2 * 60 * 60 * 1000) {
+      sessionStorage.removeItem(SESSION_KEY);
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,7 +157,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { PageGuard } from '@/components/auth/page-guard';
 import { buildUserInfoHeaders } from '@/lib/auth';
 import { getColumnMappingDiagnostics } from '@/lib/column-mapping-diagnostics';
@@ -91,11 +215,7 @@ import type { ProductPickerItem } from '@/components/product/product-picker-dial
 
 // 字段选项定义
 const COLUMN_OPTIONS = [
-  { value: 'ignore', label: '忽略' },
-  { value: 'ext_keep', label: '保留（不处理）', group: '其他' },
-  { value: 'bill_no', label: '单据编号', group: '基础信息' },
   { value: 'bill_date', label: '单据日期', group: '基础信息' },
-  { value: 'order_no', label: '客户订单号', group: '基础信息' },
   { value: 'customer_order_no', label: '客户单据编号', group: '基础信息' },
   { value: 'supplier_order_no', label: '供应商单据号', group: '基础信息' },
   { value: 'customer_code', label: '客户代码', group: '基础信息' },
@@ -103,11 +223,9 @@ const COLUMN_OPTIONS = [
   { value: 'supplier_name', label: '发货供应商', group: '基础信息' },
   { value: 'salesperson', label: '业务员', group: '人员信息' },
   { value: 'operator', label: '跟单员', group: '人员信息' },
-  { value: 'product_name', label: '商品名称', group: '商品信息' },
   { value: 'customer_product_name', label: '客户商品名称', group: '商品信息' },
-  { value: 'product_code', label: '商品编码', group: '商品信息' },
-  { value: 'product_spec', label: '规格型号', group: '商品信息' },
-  { value: 'customer_product_spec', label: '客户规格型号(旧)', group: '商品信息(废弃)' },
+  { value: 'customer_product_code', label: '客户商品编码', group: '商品信息' },
+  { value: 'customer_product_spec', label: '客户商品型号', group: '商品信息' },
   { value: 'quantity', label: '数量', group: '商品信息' },
   { value: 'price', label: '单价', group: '商品信息' },
   { value: 'amount', label: '价税合计', group: '商品信息' },
@@ -140,13 +258,12 @@ const GROUPED_OPTIONS = COLUMN_OPTIONS.reduce((acc, opt) => {
 
 // 常用字段（置顶显示）
 const COMMON_FIELDS = [
-  'ignore',                      // 忽略
   'customer_order_no',           // 客户单据编号
-  'customer_product_name',       // 客户商品名称
-  'customer_product_spec',       // 客户规格型号
+  'customer_product_name',       // 商品名称
+  'customer_product_spec',       // 商品型号
+  'customer_product_code',       // 客户商品编码
   'quantity',                    // 数量
   'price',                       // 单价
-  'supplier_name',               // 发货供应商
   'receiver_name',               // 收货人
   'receiver_phone',              // 收货电话
   'receiver_address',            // 收货地址
@@ -252,6 +369,7 @@ function normalizeBundleDraftsForPage(
     ...bundle,
     id: String(bundle.id || `parsed_${Date.now()}_${index}`),
     orderNo: String(bundle.orderNo || ''),
+    customerOrderNo: String(bundle.customerOrderNo || ''),
     billDate: String(bundle.billDate || ''),
     receiverName: String(bundle.receiverName || ''),
     receiverPhone: String(bundle.receiverPhone || ''),
@@ -322,24 +440,29 @@ function getSubmitValidationSummary(orders: ParsedOrder[]): SubmitValidationSumm
 }
 
 export default function OrderParsePage() {
+  // 尝试从 sessionStorage 恢复工作状态（路由变化后组件重新挂载时）
+  const _restored = loadSession();
+
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [users, setUsers] = useState<UserInfo[]>([]);
-  const [selectedCustomer, setSelectedCustomer] = useState<string>('');
-  const [salespersonId, setSalespersonId] = useState<string>('');
-  const [operatorId, setOperatorId] = useState<string>('');
-  const [salespersonName, setSalespersonName] = useState<string>('');
-  const [operatorName, setOperatorName] = useState<string>('');
-  const [inputMode, setInputMode] = useState<'text' | 'excel'>('excel');
-  const [inputText, setInputText] = useState('');
+  const [selectedCustomer, setSelectedCustomer] = useState<string>(_restored?.selectedCustomer ?? '');
+  const [salespersonId, setSalespersonId] = useState<string>(_restored?.salespersonId ?? '');
+  const [operatorId, setOperatorId] = useState<string>(_restored?.operatorId ?? '');
+  const [salespersonName, setSalespersonName] = useState<string>(_restored?.salespersonName ?? '');
+  const [operatorName, setOperatorName] = useState<string>(_restored?.operatorName ?? '');
+  const [inputMode, setInputMode] = useState<'text' | 'excel'>(_restored?.inputMode ?? 'excel');
+  const [inputText, setInputText] = useState<string>(_restored?.inputText ?? '');
   const [excelFile, setExcelFile] = useState<File | null>(null);
-  const [excelRows, setExcelRows] = useState<string[][]>([]);
-  const [excelPreview, setExcelPreview] = useState<string[][]>([]);
-  const [excelSheetNames, setExcelSheetNames] = useState<string[]>([]);
-  const [selectedSheet, setSelectedSheet] = useState<string>('');
-  const [headerRow, setHeaderRow] = useState(0);
-  const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
-  const [parsedOrders, setParsedOrders] = useState<ParsedOrder[]>([]);
+  const [excelRows, setExcelRows] = useState<string[][]>(_restored?.excelRows ?? []);
+  const [excelPreview, setExcelPreview] = useState<string[][]>(_restored?.excelPreview ?? []);
+  const [excelFileName, setExcelFileName] = useState<string>(_restored?.excelFileName ?? '');
+  const [excelFileSize, setExcelFileSize] = useState<number>(_restored?.excelFileSize ?? 0);
+  const [excelSheetNames, setExcelSheetNames] = useState<string[]>(_restored?.excelSheetNames ?? []);
+  const [selectedSheet, setSelectedSheet] = useState<string>(_restored?.selectedSheet ?? '');
+  const [headerRow, setHeaderRow] = useState<number>(_restored?.headerRow ?? 0);
+  const [columnMapping, setColumnMapping] = useState<Record<string, string>>(_restored?.columnMapping ?? {});
+  const [parsedOrders, setParsedOrders] = useState<ParsedOrder[]>(_restored?.parsedOrders ?? []);
   const [parseStats, setParseStats] = useState<{
     totalItems: number;
     matchedItems: number;
@@ -355,14 +478,14 @@ export default function OrderParsePage() {
     coverageRate?: number;
     conflictFields?: string[];
     unrecognizedHeaders?: string[];
-  } | null>(null);
+  } | null>(_restored?.parseStats ?? null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [parseResult, setParseResult] = useState<{
     duration: number;
     rawOutput?: string;
-  } | null>(null);
+  } | null>(_restored?.parseResult ?? null);
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const [importResult, setImportResult] = useState<{
     open: boolean;
@@ -379,15 +502,15 @@ export default function OrderParsePage() {
   const [activeMappingMeta, setActiveMappingMeta] = useState<MappingHistory | null>(null);
   const [showMappingDialog, setShowMappingDialog] = useState(false);
   const [mappingSearchTerm, setMappingSearchTerm] = useState('');
-  const [mappingAutoLoaded, setMappingAutoLoaded] = useState(false);
+  const [mappingAutoLoaded, setMappingAutoLoaded] = useState(_restored?.mappingAutoLoaded ?? false);
   const [mappingCollapsed, setMappingCollapsed] = useState(false);
-  const [mappingAutoLoadedId, setMappingAutoLoadedId] = useState<string | null>(null);
+  const [mappingAutoLoadedId, setMappingAutoLoadedId] = useState<string | null>(_restored?.mappingAutoLoadedId ?? null);
   const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
   const [customerSearch, setCustomerSearch] = useState('');
   const [textInputCollapsed, setTextInputCollapsed] = useState(true);
   const salesUsers = users.filter((user) => isSalesAssignableRole(user.role));
   const operatorUsers = users.filter((user) => isOperatorAssignableRole(user.role));
-  
+
   // 供应商匹配状态
   const [supplierMatchResults, setSupplierMatchResults] = useState<Record<string, {
     availableSuppliers: Array<{
@@ -406,7 +529,7 @@ export default function OrderParsePage() {
     hasStockForProduct?: boolean;
     newProductHint?: string;
     recommendedSupplierId?: string;
-  }>>({});
+  }>>(_restored?.supplierMatchResults ?? {});
   const [matchingSupplierOrderId, setMatchingSupplierOrderId] = useState<string | null>(null);
   const [isMatchingSupplier, setIsMatchingSupplier] = useState(false);
   const [productPickerOpen, setProductPickerOpen] = useState(false);
@@ -438,6 +561,13 @@ export default function OrderParsePage() {
         { regex: /^订单编号$/, exact: true, priority: 9 },
         { regex: /^订单号$/, exact: true, priority: 9 },
       ],
+      // 客户单据编号（客户自己的订单/序号列）
+      customer_order_no: [
+        { regex: /^客户单据编号$/, exact: true, priority: 10 },
+        { regex: /^序号$/, exact: true, priority: 10 },
+        { regex: /^客户订单号$/, exact: true, priority: 9 },
+        { regex: /^订单号$/, exact: true, priority: 8 },
+      ],
       supplier_order_no: [
         { regex: /^供应商单据号$/, exact: true, priority: 10 },
         { regex: /^供应商订单号$/, exact: true, priority: 9 },
@@ -458,25 +588,36 @@ export default function OrderParsePage() {
         { regex: /^跟单员$/, exact: true, priority: 10 },
       ],
       // 客户商品名称
-      product_name: [
+      customer_product_name: [
+        { regex: /^商品$/, exact: true, priority: 10 },
         { regex: /^商品名称$/, exact: true, priority: 10 },
         { regex: /^商品名$/, exact: true, priority: 10 },
         { regex: /^货品名称$/, exact: true, priority: 9 },
         { regex: /^品名$/, exact: true, priority: 9 },
+        { regex: /^客户商品名称$/, exact: true, priority: 10 },
+        { regex: /^客户商品名$/, exact: true, priority: 10 },
+        { regex: /^客户货品名称$/, exact: true, priority: 9 },
       ],
       // 客户商品编码
-      product_code: [
+      customer_product_code: [
         { regex: /^商品编码$/, exact: true, priority: 10 },
         { regex: /^商品代码$/, exact: true, priority: 9 },
         { regex: /^货号$/, exact: true, priority: 8 },
+        { regex: /^客户商品编码$/, exact: true, priority: 10 },
+        { regex: /^客户商品代码$/, exact: true, priority: 9 },
+        { regex: /^客户货号$/, exact: true, priority: 8 },
       ],
-      // 客户规格型号
-      product_spec: [
+      // 客户商品规格
+      customer_product_spec: [
         { regex: /^商品规格$/, exact: true, priority: 10 },
         { regex: /^规格型号$/, exact: true, priority: 10 },
         { regex: /^型号规格$/, exact: true, priority: 9 },
         { regex: /^规格$/, exact: true, priority: 7 },
         { regex: /^型号$/, exact: true, priority: 7 },
+        { regex: /^商品型号$/, exact: true, priority: 10 },
+        { regex: /^客户商品规格$/, exact: true, priority: 10 },
+        { regex: /^客户规格型号$/, exact: true, priority: 10 },
+        { regex: /^客户型号规格$/, exact: true, priority: 9 },
       ],
       quantity: [
         { regex: /^商品数量$/, exact: true, priority: 10 },
@@ -517,6 +658,7 @@ export default function OrderParsePage() {
         { regex: /^会员昵称$/, exact: true, priority: 8 },
       ],
       receiver_phone: [
+        { regex: /^电话$/, exact: true, priority: 10 },
         { regex: /^收件人手机$/, exact: true, priority: 10 },
         { regex: /^收货人手机号$/, exact: true, priority: 10 },
         { regex: /^收货人电话$/, exact: true, priority: 9 },
@@ -557,9 +699,9 @@ export default function OrderParsePage() {
       ],
     };
 
-    // 需要自动忽略的字段模式（序号、行号等）
+    // 需要自动忽略的字段模式（操作类列名，用户字段不进入此列表，全部保留）
     const ignorePatterns = [
-      /^序号$/, /^行号$/, /^编号$/, /^#$/, /^NO\.?$/i,
+      /^#$/, /^NO\.?$/i,
       /^index$/i, /^id$/i, /^idx$/i, /^no$/i,
       /^选择$/, /^操作$/, /^勾选$/, /^checkbox$/i,
     ];
@@ -620,36 +762,9 @@ export default function OrderParsePage() {
     []
   );
 
-  // 加载客户列表
-  useEffect(() => {
-    loadCustomers();
-    loadSuppliers();
-    // 加载用户列表
-  const loadUsers = async () => {
-    try {
-      const res = await fetch('/api/users', { headers: buildUserInfoHeaders() });
-      const data = await res.json();
-        if (data.success) {
-          setUsers(data.data || []);
-        }
-      } catch (error) {
-        console.error('加载用户列表失败:', error);
-      }
-    };
-    loadUsers();
-  }, []);
-
-  // 表头行变化时重新检测映射
-  useEffect(() => {
-    if (excelPreview.length > headerRow) {
-      const detected = autoDetectMapping(excelPreview[headerRow]);
-      setColumnMapping(detected);
-    }
-  }, [headerRow, excelPreview, autoDetectMapping]);
-
   const loadCustomers = async () => {
     try {
-      const res = await fetch('/api/customers', { headers: buildUserInfoHeaders() });
+      const res = await fetch('/api/customers?isActive=false', { headers: buildUserInfoHeaders() });
       const data = await res.json();
       if (data.success) {
         setCustomers((data.data || []).filter((c: Customer) => c.code && c.name));
@@ -671,53 +786,100 @@ export default function OrderParsePage() {
     }
   };
 
-  // 计算当前 Excel header 的指纹
-  const computeCurrentFingerprint = useCallback(() => {
-    const headers = excelPreview[headerRow] || [];
-    const normalized = headers.map((h: string) => String(h || '').trim()).filter(Boolean);
-    // 使用与后端一致的 SHA-256 前16位
-    if (typeof window !== 'undefined' && window.crypto?.subtle) {
-      // 浏览器环境：使用 Web Crypto API
-      return normalizeHeadersForCompare(headers).join('|');
-    }
-    // 简单字符串作为备用
-    return normalized.join('|');
-  }, [excelPreview, headerRow, normalizeHeadersForCompare]);
-
-  // 加载保存的映射配置（用于手动加载）
-  const loadSavedMapping = useCallback(async (customerCode: string) => {
-    try {
-      const res = await fetch(`/api/column-mappings?customerCode=${encodeURIComponent(customerCode)}`, {
-        headers: buildUserInfoHeaders(),
-      });
-      const data = await res.json();
-      if (data.success && data.data) {
-        const savedMapping = data.data;
-        setColumnMapping(savedMapping.mapping_config || {});
-        setHeaderRow(savedMapping.header_row || 0);
-        setActiveMappingMeta(savedMapping);
-        const currentHeaders = normalizeHeadersForCompare(excelPreview[savedMapping.header_row || 0] || []);
-        const savedHeaders = normalizeHeadersForCompare(savedMapping.source_headers || []);
-        if (currentHeaders.length > 0 && savedHeaders.length > 0) {
-          const sameHeaderShape = JSON.stringify(currentHeaders) === JSON.stringify(savedHeaders);
-          if (!sameHeaderShape) {
-            toast.info(`已加载保存配置 (v${savedMapping.version})，但当前表头与保存版本不完全一致`);
-            return;
-          }
+  // 加载客户列表
+  useEffect(() => {
+    loadCustomers();
+    loadSuppliers();
+    // 加载用户列表
+    const loadUsers = async () => {
+      try {
+        const res = await fetch('/api/users', { headers: buildUserInfoHeaders() });
+        const data = await res.json();
+        if (data.success) {
+          setUsers(data.data || []);
         }
-        toast.success(`已加载保存的配置 (v${savedMapping.version})`);
-      } else {
-        setActiveMappingMeta(null);
+      } catch (error) {
+        console.error('加载用户列表失败:', error);
       }
-    } catch (error) {
-      console.error('加载映射配置失败:', error);
+    };
+    loadUsers();
+  }, []);
+
+  // 关键工作状态变更时自动保存到 sessionStorage
+  // 在路由变化（Next.js 客户端导航）导致组件重新挂载后，状态从 sessionStorage 恢复
+  useEffect(() => {
+    saveSession({
+      selectedCustomer,
+      salespersonId,
+      operatorId,
+      salespersonName,
+      operatorName,
+      inputMode,
+      inputText,
+      headerRow,
+      columnMapping,
+      parsedOrders,
+      parseStats,
+      parseResult,
+      excelSheetNames,
+      selectedSheet,
+      excelRows,
+      excelPreview,
+      excelFileName,
+      excelFileSize,
+      mappingAutoLoaded,
+      mappingAutoLoadedId,
+      supplierMatchResults,
+    });
+  }, [
+    selectedCustomer,
+    salespersonId,
+    operatorId,
+    salespersonName,
+    operatorName,
+    inputMode,
+    inputText,
+    headerRow,
+    columnMapping,
+    parsedOrders,
+    parseStats,
+    parseResult,
+    excelSheetNames,
+    selectedSheet,
+    excelRows,
+    excelPreview,
+    excelFileName,
+    excelFileSize,
+    mappingAutoLoaded,
+    mappingAutoLoadedId,
+    supplierMatchResults,
+  ]);
+
+  // 恢复会话时显示提示
+  useEffect(() => {
+    const restored = _restored;
+    if (!restored) return;
+    const hasWork = restored.parsedOrders && restored.parsedOrders.length > 0;
+    if (hasWork) {
+      toast.info(`已恢复上次的录入数据（${restored.parsedOrders!.length} 条订单）`);
     }
-  }, [excelPreview, normalizeHeadersForCompare]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // 避免覆盖用户手动映射或自动加载的历史映射
+  useEffect(() => {
+    // 只有当 columnMapping 为空时才自动检测（首次加载或清除后）
+    if (excelPreview.length > headerRow && Object.keys(columnMapping).length === 0) {
+      const detected = autoDetectMapping(excelPreview[headerRow]);
+      setColumnMapping(detected);
+    }
+  }, [headerRow, excelPreview, autoDetectMapping, columnMapping]);
 
   // 自动加载历史映射：按 fingerprint 精确匹配
   const autoLoadMappingByFingerprint = useCallback(async (customerCode: string) => {
     const currentHeaders = excelPreview[headerRow] || [];
-    if (currentHeaders.length === 0) return;
+    if (currentHeaders.length === 0) {
+      return;
+    }
 
     const normalizedHeaders = normalizeHeadersForCompare(currentHeaders);
     const fingerprint = normalizedHeaders.join('|');
@@ -841,6 +1003,8 @@ export default function OrderParsePage() {
   // 解析Excel文件
   const handleExcelUpload = useCallback((file: File) => {
     setExcelFile(file);
+    setExcelFileName(file.name);
+    setExcelFileSize(file.size);
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
@@ -861,7 +1025,8 @@ export default function OrderParsePage() {
           const detected = autoDetectMapping(preview[0]);
           setColumnMapping(detected);
         }
-      } catch {
+      } catch (error) {
+        console.error('[handleExcelUpload] Excel解析失败:', error);
         toast.error('Excel文件解析失败');
       }
     };
@@ -870,6 +1035,9 @@ export default function OrderParsePage() {
 
   const handleSheetChange = useCallback((sheetName: string) => {
     setSelectedSheet(sheetName);
+    // 切换 sheet 时清除旧的映射，避免不同 sheet 的列结构混淆
+    setColumnMapping({});
+    setHeaderRow(0);
     if (!excelFile) return;
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -923,8 +1091,6 @@ export default function OrderParsePage() {
 
       const data = await res.json();
       
-      console.log('【前端】API返回:', data);
-
       if (data.success) {
         const detailOrders = normalizeBundleDraftsForPage(data.data.orders || []);
         const orders = buildFlatOrdersForPage(detailOrders, selectedCustomer, 'text_flat');
@@ -948,12 +1114,6 @@ export default function OrderParsePage() {
 
   // 解析Excel为订单（增强版，支持SKU映射和供应商匹配）
   const handleParseExcel = async () => {
-    console.log('handleParseExcel called', {
-      excelPreviewLength: excelPreview.length,
-      excelFile: excelFile?.name,
-      columnMapping,
-    });
-
     if (excelPreview.length < 2) {
       toast.error('Excel数据不足，请先上传Excel文件');
       return;
@@ -972,15 +1132,6 @@ export default function OrderParsePage() {
       const { headers, dataRows } = resolveExcelParsePayload(excelRows, excelPreview, headerRow);
       const mappingDiagnostics = getColumnMappingDiagnostics(headers, columnMapping);
 
-      // 调试日志
-      console.log('Excel解析调试:', {
-        excelPreviewLength: excelPreview.length,
-        headerRow,
-        headers,
-        dataRowsLength: dataRows.length,
-        columnMapping,
-      });
-
       // 调用增强版解析API
       const res = await fetch('/api/order-parse/excel', {
         method: 'POST',
@@ -997,14 +1148,6 @@ export default function OrderParsePage() {
       });
 
       const data = await res.json();
-      
-      console.log('解析API返回:', {
-        success: data.success,
-        hasOrders: !!data.data?.orders,
-        ordersLength: data.data?.orders?.length,
-        firstOrder: data.data?.orders?.[0],
-        message: data.message,
-      });
 
       if (data.success) {
         // 设置解析统计信息
@@ -1026,12 +1169,6 @@ export default function OrderParsePage() {
         const detailOrders = normalizeBundleDraftsForPage(data.data.orders || []);
         const simpleOrders = buildFlatOrdersForPage(detailOrders, selectedCustomer, 'excel_flat');
         
-        console.log('转换后的订单:', {
-          detailOrdersCount: detailOrders.length,
-          simpleOrdersCount: simpleOrders.length,
-          firstSimpleOrder: simpleOrders[0],
-        });
-
         setParsedOrders(simpleOrders);
         setParseResult({
           duration: Date.now() - startTime,
@@ -1076,6 +1213,8 @@ export default function OrderParsePage() {
   const handleClear = () => {
     setInputText('');
     setExcelFile(null);
+    setExcelFileName('');
+    setExcelFileSize(0);
     setExcelRows([]);
     setExcelPreview([]);
     setExcelSheetNames([]);
@@ -1086,7 +1225,11 @@ export default function OrderParsePage() {
     setSupplierMatchResults({});
     setMatchingSupplierOrderId(null);
     setIsMatchingSupplier(false);
+    setMappingAutoLoaded(false);
+    setMappingAutoLoadedId(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
+    // 清除会话存储
+    sessionStorage.removeItem(SESSION_KEY);
   };
 
   const toggleOrder = (id: string) => {
@@ -1362,44 +1505,48 @@ export default function OrderParsePage() {
         salespersonName: salespersonName || selectedOrders[0]?.salesperson || '',
         operatorId: operatorId || '',
         operatorName: operatorName || selectedOrders[0]?.operator || '',
-        items: selectedOrders.map(o => ({
-          orderNo: o.orderNo || o.billNo || '',
-          billNo: o.billNo || '',
-          billDate: o.billDate || '',
-          supplierOrderNo: o.supplierOrderNo || '',
-          // 客户商品信息
-          productName: o.product_name,           // 客户商品名称
-          productCode: o.product_code || '',    // 客户商品编码
-          productSpec: o.product_spec || '',     // 客户规格型号
-          // 系统商品信息（自动匹配）
-          systemProductCode: o.mappedProductCode || '',  // 系统商品编码
-          systemProductName: o.mappedProductName || '',  // 系统商品名称
-          systemProductSpec: o.mappedProductSpec || '',   // 系统规格型号
-          systemProductBrand: o.mappedProductBrand || '',  // 系统商品品牌
-          systemProductId: o.systemProductId || '',      // 系统商品ID
-          quantity: o.quantity,
-          price: o.price || o.customerPrice || 0,
-          amount: o.amount,
-          discount: o.discount,
-          taxRate: o.taxRate,
-          warehouse: o.warehouse,
-          remark: o.remark,
-          supplierId: o.supplierId || '',
-          supplierName: o.supplierName || '',
-          receiver_name: o.receiver_name || '',
-          receiver_phone: o.receiver_phone || '',
-          receiver_address: o.receiver_address || '',
-          express_company: o.express_company,
-          tracking_no: o.tracking_no,
-          invoice_required: o.invoice_required,
-          income_name: o.income_name,
-          income_amount: o.income_amount,
-          salespersonId: o.salespersonId || '',
-          salesperson: o.salesperson,
-          operatorId: o.operatorId || '',
-          operator: o.operator,
-          extFields: o.extFields || {},
-        })),
+        items: selectedOrders.map(o => {
+          const price = o.price ?? o.customerPrice ?? 0;
+          return {
+            orderNo: o.orderNo || o.customerOrderNo || o.billNo || '',
+            customerOrderNo: o.customerOrderNo || o.orderNo || '',
+            billNo: o.billNo || '',
+            billDate: o.billDate || '',
+            supplierOrderNo: o.supplierOrderNo || '',
+            // 客户商品信息
+            productName: o.product_name,           // 客户商品名称
+            productCode: o.product_code || '',    // 客户商品编码
+            productSpec: o.product_spec || '',     // 客户规格型号
+            // 系统商品信息（自动匹配）
+            systemProductCode: o.mappedProductCode || '',  // 系统商品编码
+            systemProductName: o.mappedProductName || '',  // 系统商品名称
+            systemProductSpec: o.mappedProductSpec || '',   // 系统规格型号
+            systemProductBrand: o.mappedProductBrand || '',  // 系统商品品牌
+            systemProductId: o.systemProductId || '',      // 系统商品ID
+            quantity: o.quantity,
+            price,
+            amount: o.amount ?? null,
+            discount: o.discount ?? null,
+            taxRate: o.taxRate ?? null,
+            warehouse: o.warehouse ?? null,
+            remark: o.remark ?? '',
+            supplierId: o.supplierId || '',
+            supplierName: o.supplierName || '',
+            receiver_name: o.receiver_name || '',
+            receiver_phone: o.receiver_phone || '',
+            receiver_address: o.receiver_address || '',
+            express_company: o.express_company ?? null,
+            tracking_no: o.tracking_no ?? null,
+            invoice_required: o.invoice_required ?? null,
+            income_name: o.income_name ?? null,
+            income_amount: o.income_amount ?? null,
+            salespersonId: o.salespersonId || '',
+            salesperson: o.salesperson ?? '',
+            operatorId: o.operatorId || '',
+            operator: o.operator ?? '',
+            extFields: o.extFields || {},
+          };
+        }),
       };
 
       const res = await fetch('/api/orders', {
@@ -1415,17 +1562,46 @@ export default function OrderParsePage() {
 
       if (data.success) {
         const sysOrderNos = (data.data || []).map((o: Record<string, unknown>) => o.sys_order_no).filter(Boolean);
+        const createdCount = data.total || 0;
+        const skippedCount = data.duplicateSummary?.totalSkipped || 0;
+
+        // 所有选中的订单都是重复的，没有创建任何新订单
+        if (createdCount === 0 && skippedCount > 0) {
+          setIsSubmitting(false);
+          toast.error(
+            `所选订单均已在系统中存在，共 ${skippedCount} 条，无法重复录入`
+          );
+          return;
+        }
+
         setImportResult({
           open: true,
           success: true,
-          total: data.total || selectedOrders.length,
+          total: createdCount,
           importBatch: data.importBatch || '',
           sysOrderNos,
-          message: data.message || `成功创建 ${data.total || selectedOrders.length} 条订单`,
+          message: data.message || `成功创建 ${createdCount} 条订单`,
           customerName: customers.find(c => c.code === selectedCustomer)?.name || selectedCustomer,
           duplicateSummary: data.duplicateSummary,
           matchStats: data.matchStats,
         });
+        // 订单保存成功后：自动将当前映射保存到该客户（异步，不阻塞）
+        if (selectedCustomer && Object.keys(columnMapping).length > 0) {
+          fetch('/api/column-mappings', {
+            method: 'POST',
+            headers: {
+              ...buildUserInfoHeaders(),
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              customerCode: selectedCustomer,
+              mappingConfig: columnMapping,
+              headerRow,
+              sourceHeaders: (excelPreview[headerRow] || []) as string[],
+              feedbackExportHeaderOverrides: {},
+            }),
+          }).catch(err => console.warn('自动保存映射失败:', err));
+        }
         handleClear();
       } else {
         toast.error(data.error || '创建订单失败');
@@ -1468,9 +1644,10 @@ export default function OrderParsePage() {
       label: isAligned ? '匹配当前文件' : '与当前文件有差异',
     };
   };
-  const submitValidation = getSubmitValidationSummary(parsedOrders);
-  const selectedValidOrderCount =
-    parsedOrders.filter((order) => order.selected).length - submitValidation.invalidOrderIds.length;
+  const submitValidation = useMemo(() => getSubmitValidationSummary(parsedOrders), [parsedOrders]);
+  const selectedValidOrderCount = useMemo(() => {
+    return parsedOrders.filter((order) => order.selected).length - submitValidation.invalidOrderIds.length;
+  }, [parsedOrders, submitValidation]);
 
   return (
     <PageGuard
@@ -1555,69 +1732,60 @@ export default function OrderParsePage() {
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-[min(400px,calc(100vw-2rem))] p-0" align="start">
-                      <Command shouldFilter={true}>
-                        <CommandInput
+                      <div className="p-2 border-b">
+                        <Input
                           placeholder="输入客户名称或编码搜索..."
                           value={customerSearch}
-                          onValueChange={setCustomerSearch}
+                          onChange={(e) => setCustomerSearch(e.target.value)}
+                          className="h-9 text-sm"
                         />
-                        <CommandList>
-                          <CommandEmpty>未找到匹配的客户</CommandEmpty>
-                          <CommandGroup>
-                            {customers
-                              .slice(0, 50)
-                              .map((c) => (
-                                <CommandItem
-                                  key={c.code}
-                                  value={`${c.code} ${c.name}`}
-                                  onSelect={(value) => {
-                                    // 解析选择值，可能包含名称
-                                    const code = value.split(' ')[0];
-                                    const selectedCode = customers.find(cc => cc.code === code)?.code || '';
-                                    setSelectedCustomer(selectedCode);
-                                    setCustomerSearch('');
-                                    setCustomerSearchOpen(false);
-                                    if (selectedCode) {
-                                      const customer = customers.find(cc => cc.code === selectedCode);
-                                      const matchedSalesUser = findUserByIdOrName(users, {
-                                        id: customer?.salesUserId,
-                                        name: customer?.salesUserName,
-                                      });
-                                      const matchedOperatorUser = findUserByIdOrName(users, {
-                                        id: customer?.operatorUserId,
-                                        name: customer?.operatorUserName,
-                                      });
+                      </div>
+                      <div className="p-1 max-h-[300px] overflow-y-auto">
+                        {customers
+                          .filter(c => c.name.toLowerCase().includes(customerSearch.toLowerCase()) || c.code.toLowerCase().includes(customerSearch.toLowerCase()))
+                          .slice(0, 50)
+                          .map((c) => (
+                            <button
+                              key={c.code}
+                              onClick={() => {
+                                const selectedCode = c.code;
+                                setSelectedCustomer(selectedCode);
+                                setCustomerSearch('');
+                                setCustomerSearchOpen(false);
+                                const customer = c;
+                                const matchedSalesUser = findUserByIdOrName(users, {
+                                  id: customer?.salesUserId,
+                                  name: customer?.salesUserName,
+                                });
+                                const matchedOperatorUser = findUserByIdOrName(users, {
+                                  id: customer?.operatorUserId,
+                                  name: customer?.operatorUserName,
+                                });
 
-                                      const nextSalespersonId = matchedSalesUser?.id || customer?.salesUserId || '';
-                                      const nextSalespersonName = customer?.salesUserName || getUserDisplayName(matchedSalesUser);
-                                      const nextOperatorId = matchedOperatorUser?.id || customer?.operatorUserId || '';
-                                      const nextOperatorName = customer?.operatorUserName || getUserDisplayName(matchedOperatorUser);
+                                const nextSalespersonId = matchedSalesUser?.id || customer?.salesUserId || '';
+                                const nextSalespersonName = customer?.salesUserName || getUserDisplayName(matchedSalesUser);
+                                const nextOperatorId = matchedOperatorUser?.id || customer?.operatorUserId || '';
+                                const nextOperatorName = customer?.operatorUserName || getUserDisplayName(matchedOperatorUser);
 
-                                      setSalespersonId(nextSalespersonId);
-                                      setSalespersonName(nextSalespersonName);
-                                      setOperatorId(nextOperatorId);
-                                      setOperatorName(nextOperatorName);
-                                      syncGlobalAssigneeToOrders('salesperson', nextSalespersonId, nextSalespersonName, salespersonName);
-                                      syncGlobalAssigneeToOrders('operator', nextOperatorId, nextOperatorName, operatorName);
-                                    } else {
-                                      setSalespersonId('');
-                                      setOperatorId('');
-                                      setSalespersonName('');
-                                      setOperatorName('');
-                                      syncGlobalAssigneeToOrders('salesperson', '', '', salespersonName);
-                                      syncGlobalAssigneeToOrders('operator', '', '', operatorName);
-                                    }
-                                  }}
-                                >
-                                  <div className="flex flex-col">
-                                    <span className="font-medium">{c.name}</span>
-                                    <span className="text-xs text-muted-foreground">编码: {c.code}</span>
-                                  </div>
-                                </CommandItem>
-                              ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
+                                setSalespersonId(nextSalespersonId);
+                                setSalespersonName(nextSalespersonName);
+                                setOperatorId(nextOperatorId);
+                                setOperatorName(nextOperatorName);
+                                syncGlobalAssigneeToOrders('salesperson', nextSalespersonId, nextSalespersonName, salespersonName);
+                                syncGlobalAssigneeToOrders('operator', nextOperatorId, nextOperatorName, operatorName);
+                              }}
+                              className={`w-full text-left px-3 py-2 text-sm rounded hover:bg-muted cursor-pointer truncate ${selectedCustomer === c.code ? 'bg-primary/10 text-primary' : ''}`}
+                            >
+                              <div className="flex flex-col">
+                                <span className="font-medium truncate">{c.name}</span>
+                                <span className="text-xs text-muted-foreground">编码: {c.code}</span>
+                              </div>
+                            </button>
+                          ))}
+                        {customers.filter(c => c.name.toLowerCase().includes(customerSearch.toLowerCase()) || c.code.toLowerCase().includes(customerSearch.toLowerCase())).length === 0 && (
+                          <div className="px-3 py-6 text-center text-sm text-muted-foreground">未找到匹配的客户</div>
+                        )}
+                      </div>
                     </PopoverContent>
                   </Popover>
                   {selectedCustomer && (
@@ -1879,7 +2047,7 @@ export default function OrderParsePage() {
 
                   {/* Excel Input */}
                   <TabsContent value="excel" className="mt-0 flex-1 flex flex-col min-h-0">
-                    {!excelFile ? (
+                    {!excelFile && !excelFileName ? (
                       <div
                         className={`flex-1 border-2 rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors min-h-[150px] ${
                           isDragging 
@@ -1951,9 +2119,9 @@ export default function OrderParsePage() {
                         <div className="flex flex-col gap-2 rounded-md bg-muted p-2 text-sm sm:flex-row sm:items-center sm:justify-between shrink-0">
                           <div className="flex min-w-0 items-center gap-2 text-sm">
                             <FileSpreadsheet className="h-4 w-4 text-green-600" />
-                            <span className="max-w-[180px] truncate font-medium sm:max-w-[220px]">{excelFile.name}</span>
+                            <span className="max-w-[180px] truncate font-medium sm:max-w-[220px]">{excelFile?.name ?? excelFileName ?? '未知文件'}</span>
                             <span className="text-muted-foreground">
-                              ({(excelFile.size / 1024).toFixed(1)}KB)
+                              ({((excelFile?.size ?? excelFileSize ?? 0) / 1024).toFixed(1)}KB)
                             </span>
                           </div>
                           <Button
@@ -1962,6 +2130,8 @@ export default function OrderParsePage() {
                             className="h-7"
                             onClick={() => {
                               setExcelFile(null);
+                              setExcelFileName('');
+                              setExcelFileSize(0);
                               setExcelRows([]);
                               setExcelPreview([]);
                               if (fileInputRef.current) fileInputRef.current.value = '';
@@ -2085,7 +2255,7 @@ export default function OrderParsePage() {
                                     </code>
                                     <span className="text-muted-foreground text-xs flex-shrink-0">→</span>
                                     <Select
-                                      value={columnMapping[String(idx)] || 'ignore'}
+                                      value={columnMapping[String(idx)] || ''}
                                       onValueChange={(v) => {
                                         setMappingAutoLoaded(false);
                                         setColumnMapping(prev => {
@@ -2093,7 +2263,7 @@ export default function OrderParsePage() {
                                           if (v.startsWith('ext_field_')) {
                                             for (const [k, val] of Object.entries(updated)) {
                                               if (k !== String(idx) && val === v) {
-                                                updated[k] = 'ignore';
+                                                updated[k] = '';
                                               }
                                             }
                                           }
@@ -2560,8 +2730,8 @@ export default function OrderParsePage() {
                                   </div>
                                   <div className="space-y-1">
                                     {order.supplierMatches.slice(0, 3).map((supplier, idx) => (
-                                      <div 
-                                        key={supplier.supplierId}
+                                      <div
+                                        key={`${order.id}-${supplier.supplierId}`}
                                         className={`flex items-center justify-between text-xs p-1 rounded ${order.supplierId === supplier.supplierId ? 'bg-blue-100' : 'bg-white/50'}`}
                                       >
                                         <div className="flex items-center gap-2">
@@ -2919,8 +3089,8 @@ export default function OrderParsePage() {
                                           </TableHeader>
                                           <TableBody>
                                             {supplierMatchResults[order.id]!.availableSuppliers.map((supplier, idx) => (
-                                              <TableRow 
-                                                key={supplier.supplierId}
+                                              <TableRow
+                                                key={`${order.id}-${supplier.supplierId}`}
                                                 className={`cursor-pointer hover:bg-muted/50 ${order.supplierId === supplier.supplierId ? 'bg-primary/5' : ''} ${supplier.hasStock === false ? 'opacity-60' : ''}`}
                                                 onClick={() => handleSupplierChange(order.id, supplier.supplierId)}
                                               >
@@ -3156,7 +3326,7 @@ export default function OrderParsePage() {
               <ScrollArea className="h-[120px] rounded border bg-white">
                 <div className="space-y-2 p-2">
                   {importResult.duplicateSummary.details.map((item, index) => (
-                    <div key={`${item.orderNo}-${index}`} className="rounded border px-2 py-1">
+                    <div key={`${item.orderNo}-${item.reason}-${index}`} className="rounded border px-2 py-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-medium">{item.orderNo || '未提供订单号'}</span>
                         <Badge variant="outline" className="text-[10px]">

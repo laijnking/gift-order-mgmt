@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import {
   Table,
@@ -40,9 +40,7 @@ import {
   Command,
   CommandEmpty,
   CommandGroup,
-  CommandInput,
   CommandItem,
-  CommandList,
 } from '@/components/ui/command';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -319,7 +317,7 @@ export default function ProductMappingsPage() {
       const headers = buildUserInfoHeaders();
       const [mappingsRes, customersRes, suppliersRes, productsRes] = await Promise.all([
         fetch('/api/product-mappings', { headers }),
-        fetch('/api/customers', { headers }),
+        fetch('/api/customers?isActive=false', { headers }),
         fetch('/api/suppliers?active=true', { headers }),
         fetch('/api/products', { headers }),
       ]);
@@ -341,8 +339,8 @@ export default function ProductMappingsPage() {
       if (productsData.success) {
         setProducts((productsData.data || []).filter((p): p is Product => p.code !== undefined && p.name !== undefined));
       }
-    } catch (err) {
-      console.error('加载数据失败:', err);
+    } catch {
+      console.error('加载数据失败');
       toast.error('加载数据失败');
     } finally {
       setLoading(false);
@@ -412,8 +410,8 @@ export default function ProductMappingsPage() {
       } else {
         toast.error(data.error || '操作失败');
       }
-    } catch (err) {
-      console.error('操作失败:', err);
+    } catch {
+      console.error('操作失败');
       toast.error('操作失败');
     }
   };
@@ -462,7 +460,7 @@ export default function ProductMappingsPage() {
       } else {
         toast.error(data.error || '删除失败');
       }
-    } catch (err) {
+    } catch {
       console.error('删除失败:', err);
       toast.error('删除失败');
     }
@@ -488,7 +486,7 @@ export default function ProductMappingsPage() {
         toast.success('状态更新成功');
         loadData();
       }
-    } catch (err) {
+    } catch {
       console.error('更新失败:', err);
       toast.error('更新失败');
     }
@@ -581,7 +579,7 @@ export default function ProductMappingsPage() {
       } else {
         toast.error(data.error || '导入失败');
       }
-    } catch (err) {
+    } catch {
       console.error('导入失败:', err);
       toast.error('导入失败');
     }
@@ -711,7 +709,7 @@ export default function ProductMappingsPage() {
         setExcelImportData(jsonData);
         setFieldMappingDialogOpen(true);
         toast.success(`已读取 ${jsonData.length} 条数据，发现 ${columns.length} 列`);
-      } catch (err) {
+      } catch {
         toast.error('文件解析失败，请检查文件格式');
       }
     };
@@ -765,7 +763,6 @@ export default function ProductMappingsPage() {
       });
       
       // 检查是否提供了合作伙伴名称列（仅用于客户模式）
-      const sampleRow = excelImportData[0];
       const hasPartnerNameColumn = !!fieldMappings.customerName || !!fieldMappings.supplierName;
       
       if (!hasPartnerNameColumn && activeTab === 'customer') {
@@ -795,7 +792,6 @@ export default function ProductMappingsPage() {
         const row = excelImportData[i];
         
         // 根据当前 Tab 获取正确的字段名
-        const systemFields = getSystemFields(activeTab);
         const partnerNameField = activeTab === 'customer' ? 'customerName' : 'supplierName';
         const partnerProductNameField = activeTab === 'customer' ? 'customerProductName' : 'supplierProductName';
         const partnerSpecField = activeTab === 'customer' ? 'customerSpec' : 'supplierSpec';
@@ -894,7 +890,7 @@ export default function ProductMappingsPage() {
       setSelectedCustomer('');
       setSelectedSupplier('');
       loadData();
-    } catch (err) {
+    } catch {
       toast.error('导入失败');
     } finally {
       setImporting(false);

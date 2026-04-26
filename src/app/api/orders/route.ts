@@ -610,7 +610,8 @@ export async function POST(request: NextRequest) {
 
         ordersToInsert.push({
           sys_order_no: sysOrderNo,
-          order_no: item.orderNo || item.billNo || `ORD-${Date.now()}-${i}`,
+          customer_order_no: item.customerOrderNo || item.orderNo || '',
+          order_no: item.customerOrderNo || item.orderNo || item.billNo || `ORD-${Date.now()}-${i}`,
           bill_no: item.billNo || null,
           bill_date: item.billDate || null,
           supplier_order_no: item.supplierOrderNo || null,
@@ -625,11 +626,11 @@ export async function POST(request: NextRequest) {
             cu_product_spec: item.productSpec || '',
             cu_product_code: item.productCode || '',
             quantity: item.quantity || 1,
-            price: item.price || undefined,
-            amount: item.amount || undefined,
-            discount: item.discount || undefined,
-            tax_rate: item.taxRate || undefined,
-            warehouse: item.warehouse || undefined,
+            price: item.price ?? null,
+            amount: item.amount ?? null,
+            discount: item.discount ?? null,
+            tax_rate: item.taxRate ?? null,
+            warehouse: item.warehouse || null,
             remark: item.remark || ''
           }],
           receiver_name: receiverName,
@@ -918,7 +919,7 @@ export async function POST(request: NextRequest) {
           cu_product_spec: customerProductSpec,
           // 订单信息
           quantity,
-          price: price || undefined,
+          price: price || null,
           remark,
           // 匹配信息
           match_type: matchResult.matchType,

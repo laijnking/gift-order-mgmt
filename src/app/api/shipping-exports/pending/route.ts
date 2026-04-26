@@ -35,19 +35,49 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 第三步：获取这些订单关联的供应商 ID 和 name
+    // 第三步：查询 export_records，标记出哪些订单已经导出发货通知单
+    // order_ids 是 text[] 数组列，用 overlaps (PostgreSQL &&) 判断是否有交集
+    const allOrderIds = assignedOrders.map((o) => o.id);
+    const { data: exportRecords } = await client
+      .from('export_records')
+      .select('order_ids')
+      .eq('export_type', 'shipping_notice')
+      .overlaps('order_ids', allOrderIds);
+
+    // 收集所有已导出的订单ID
+    const exportedOrderIds = new Set<string>();
+    for (const record of (exportRecords || [])) {
+      for (const id of (record.order_ids || [])) {
+        exportedOrderIds.add(id);
+      }
+    }
+
+    // 第四步：过滤出"未导出"的订单（已派发但未在 export_records 中）
+    const unexportedOrders = assignedOrders.filter((o) => !exportedOrderIds.has(o.id));
+
+    // 第五步：从未导出订单中收集供应商 ID 和 name
     const supplierIds = [...new Set(
-      assignedOrders
+      unexportedOrders
         .map((o) => o.supplier_id)
         .filter(Boolean)
     )];
     const supplierNames = [...new Set(
-      assignedOrders
+      unexportedOrders
         .map((o) => o.supplier_name)
         .filter(Boolean)
     )];
 
-    // 第四步：查询供应商信息（只取有 pending 订单的那些）
+    if (unexportedOrders.length === 0) {
+      return NextResponse.json({
+        success: true,
+        data: [],
+        unassignedCount: (pendingOrders || []).filter(
+          (o) => !o.supplier_id && !o.supplier_name
+        ).length,
+      });
+    }
+
+    // 第六步：查询供应商信息
     let supplierQuery = client.from('suppliers').select('*');
     if (supplierIds.length > 0 && supplierNames.length > 0) {
       supplierQuery = supplierQuery.or(
@@ -66,35 +96,38 @@ export async function GET(request: NextRequest) {
     const { data: suppliers, error: suppliersError } = await supplierQuery;
     if (suppliersError) throw new Error(`查询供应商失败: ${suppliersError.message}`);
 
-    // 第五步：为每个供应商计算 pending 订单数和获取上次导出时间
+    // 第七步：为每个供应商计算未导出订单数，并获取上次导出时间
     const results = [];
     for (const supplier of (suppliers || [])) {
-      // 按 supplier_id 或 supplier_name 统计
-      const { data: ordersById } = supplierIds.length > 0
+      // 按 supplier_id 精确匹配
+      const { data: ordersById } = supplier.id
         ? await client
             .from('orders')
-            .select('id')
+            .select('id, status')
             .eq('supplier_id', supplier.id)
             .in('status', ['pending', 'assigned'])
         : { data: [] };
 
-      const { data: ordersByName } = supplierNames.includes(supplier.name)
+      // 按 supplier_name 匹配 supplier_id 为 null 的订单
+      const { data: ordersByName } = supplier.name
         ? await client
             .from('orders')
-            .select('id')
+            .select('id, status')
             .is('supplier_id', null)
             .eq('supplier_name', supplier.name)
             .in('status', ['pending', 'assigned'])
         : { data: [] };
 
-      // 合并去重
-      const orderMap = new Map<string, string>();
-      for (const o of (ordersById || [])) orderMap.set(o.id, o.id);
-      for (const o of (ordersByName || [])) orderMap.set(o.id, o.id);
-      const pendingOrderCount = orderMap.size;
+      // 合并去重，过滤掉已导出的
+      const allIds = new Set([
+        ...(ordersById || []).map((o) => o.id),
+        ...(ordersByName || []).map((o) => o.id),
+      ]);
+
+      const unexportedCount = [...allIds].filter((id) => !exportedOrderIds.has(id)).length;
 
       // 跳过 pending=0 的供应商（不显示）
-      if (pendingOrderCount === 0) continue;
+      if (unexportedCount === 0) continue;
 
       // 获取上次导出记录
       const { data: lastExport } = await client
@@ -111,12 +144,12 @@ export async function GET(request: NextRequest) {
         name: supplier.name,
         code: (supplier as Record<string, unknown>).code as string || String(supplier.id).slice(0, 8),
         type: supplier.type,
-        pendingOrderCount,
+        pendingOrderCount: unexportedCount,
         lastExportTime: lastExport?.created_at || null,
       });
     }
 
-    // 第六步：统计完全未分配供应商的订单数
+    // 第八步：统计完全未分配供应商的订单数
     const unassignedCount = (pendingOrders || []).filter(
       (o) => !o.supplier_id && !o.supplier_name
     ).length;

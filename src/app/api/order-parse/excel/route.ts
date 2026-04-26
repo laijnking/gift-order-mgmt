@@ -11,16 +11,17 @@ import type {
 // 中文列名自动映射配置（简化为最常用的精确匹配，避免冲突）
 const CHINESE_COLUMN_MAPPING: Record<string, string[]> = {
   // 基础信息
-  order_no: ['客户订单号', '商户订单号', '来源订单', '订单编号', '订单号'],
+  order_no: [],
+  customer_order_no: ['客户单据编号', '序号', '客户订单号', '订单号','客户订单号','商户订单号', '来源订单', '订单编号'],
   bill_date: ['单据日期', '订单日期', '订单创建日期', '创建日期', '下单时间'],
   bill_no: ['单据编号'],
   supplier_order_no: ['供应商单据号', '供应商订单号'],
   customer_code: ['客户代码', '客户编码'],
   customer_name: ['客户名称', '客户姓名'],
-  // 客户商品信息
-  product_name: ['商品名称', '商品名', '货品名称', '品名'],
-  product_code: ['商品编码', '商品代码', '货号'],
-  product_spec: ['商品规格', '规格型号', '型号规格', '规格', '型号'],
+  // 客户商品信息（使用 customer_product_* 作为内部字段名）
+  customer_product_name: ['商品', '商品名称', '商品名', '货品名称', '品名', '客户商品名称', '客户商品名', '客户货品名称'],
+  customer_product_code: ['商品编码', '商品代码', '货号', '客户商品编码', '客户商品代码', '客户货号'],
+  customer_product_spec: ['商品规格', '规格/型号', '规格型号', '型号规格', '规格', '型号', '商品型号', '客户商品规格', '客户规格型号', '客户型号规格'],
   quantity: ['商品数量', '下单数量', '数量', '件数', '台数'],
   price: ['单价', '售价'],
   amount: ['价税合计', '含税金额', '金额'],
@@ -30,7 +31,7 @@ const CHINESE_COLUMN_MAPPING: Record<string, string[]> = {
   remark: ['备注', '商品行备注'],
   // 收货信息
   receiver_name: ['收件人姓名', '收货人姓名', '收货人', '收件人', '会员昵称'],
-  receiver_phone: ['收件人手机', '收货人手机号', '收货人电话', '收件人电话', '收货电话', '收件电话', '手机号码', '联系电话'],
+  receiver_phone: ['电话', '收件人手机', '收货人手机号', '收货人电话', '收件人电话', '收货电话', '收件电话', '手机号码', '联系电话'],
   receiver_address: ['收件人地址', '收货详细地址', '收货人地址', '收货地址', '收件地址', '详细地址'],
   // 快递信息
   express_company: ['物流公司', '快递公司', '承运商'],
@@ -40,9 +41,6 @@ const CHINESE_COLUMN_MAPPING: Record<string, string[]> = {
   income_name: ['收入名称'],
   income_amount: ['应收金额', '收入金额'],
 };
-
-// 匹配精度排序
-const MATCH_PRIORITY = ['spec', 'code', 'barcode', 'name'];
 
 // 从地址中提取省市区
 function extractAddressParts(address: string): { province: string; city: string; district: string } {
@@ -349,6 +347,30 @@ async function matchSupplierStocks(
   return sortedStocks.slice(0, 5); // 最多返回5个供应商
 }
 
+// 字段别名映射（前端字段名 -> 后端内部字段名）
+const FIELD_ALIASES: Record<string, string[]> = {
+  // 客户商品字段（内部统一使用 customer_product_*）
+  'customer_product_name': ['customer_product_name'],
+  'customer_product_spec': ['customer_product_spec'],
+  'customer_product_code': ['customer_product_code'],
+};
+
+// 获取字段值（支持别名）
+function getFieldValue(row: (string | number | null)[], columnMapping: Record<string, string>, field: string): string {
+  // 可能的字段名列表（包括原始字段名和别名）
+  const possibleFields = [field, ...(FIELD_ALIASES[field] || [])];
+
+  for (const f of possibleFields) {
+    for (const [colIdx, mappedField] of Object.entries(columnMapping)) {
+      if (mappedField === f) {
+        const value = row[parseInt(colIdx)];
+        return value === null || value === undefined ? '' : String(value).trim();
+      }
+    }
+  }
+  return '';
+}
+
 // 批量解析Excel数据
 async function parseExcelData(
   client: ReturnType<typeof getSupabaseClient>,
@@ -357,40 +379,39 @@ async function parseExcelData(
   customerCode: string
 ): Promise<ParsedOrderBundleDraft[]> {
   const orders: Map<string, ParsedOrderBundleDraft> = new Map();
-  
+
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-    
-    // 提取各字段值
-    const getField = (field: string): string => {
-      for (const [colIdx, mappedField] of Object.entries(columnMapping)) {
-        if (mappedField === field) {
-          // 二维数组格式：用列索引获取值
-          const value = row[parseInt(colIdx)];
-          return value === null || value === undefined ? '' : String(value).trim();
-        }
-      }
-      return '';
-    };
-    
-    const orderNo = getField('order_no') || `AUTO-${Date.now()}-${i}`;
-    const productName = getField('product_name');
-    const productSpec = getField('product_spec');
-    const productCode = getField('product_code');
-    const barcode = getField('barcode');
-    const quantity = parseInt(getField('quantity')) || 1;
-    const price = parseFloat(getField('price')) || null;
-    const receiverName = getField('receiver_name');
-    const receiverPhone = getField('receiver_phone');
-    const receiverAddress = getField('receiver_address');
-    const expressCompany = getField('express_company');
-    const trackingNo = getField('tracking_no');
-    const remark = getField('remark');
-    const billDate = getField('bill_date');
-    
+
+    const customerOrderNo = getFieldValue(row, columnMapping, 'customer_order_no');
+    const orderNo = getFieldValue(row, columnMapping, 'order_no') || customerOrderNo || `AUTO-${Date.now()}-${i}`;
+
+    // 读取客户商品字段和系统商品字段，优先使用客户商品字段
+    const customerProductName = getFieldValue(row, columnMapping, 'customer_product_name');
+    const customerProductSpec = getFieldValue(row, columnMapping, 'customer_product_spec');
+    const customerProductCode = getFieldValue(row, columnMapping, 'customer_product_code');
+    const productName = getFieldValue(row, columnMapping, 'product_name');
+    const productSpec = getFieldValue(row, columnMapping, 'product_spec');
+    const productCode = getFieldValue(row, columnMapping, 'product_code');
+    const barcode = getFieldValue(row, columnMapping, 'barcode');
+    const quantity = parseInt(getFieldValue(row, columnMapping, 'quantity')) || 1;
+    const price = parseFloat(getFieldValue(row, columnMapping, 'price')) || null;
+    const receiverName = getFieldValue(row, columnMapping, 'receiver_name');
+    const receiverPhone = getFieldValue(row, columnMapping, 'receiver_phone');
+    const receiverAddress = getFieldValue(row, columnMapping, 'receiver_address');
+    const expressCompany = getFieldValue(row, columnMapping, 'express_company');
+    const trackingNo = getFieldValue(row, columnMapping, 'tracking_no');
+    const remark = getFieldValue(row, columnMapping, 'remark');
+    const billDate = getFieldValue(row, columnMapping, 'bill_date');
+
+    // 最终使用的客户商品信息：优先使用 customer_product_* 字段，若为空则降级到 product_*
+    const finalProductName = customerProductName || productName;
+    const finalProductSpec = customerProductSpec || productSpec;
+    const finalProductCode = customerProductCode || productCode;
+
     // 如果没有商品名称，跳过此行
-    if (!productName) continue;
-    
+    if (!finalProductName) continue;
+
     // 获取或创建订单
     let order = orders.get(orderNo);
     if (!order) {
@@ -398,6 +419,7 @@ async function parseExcelData(
       order = {
         id: `order_${Date.now()}_${orders.size}`,
         orderNo,
+        customerOrderNo,
         billDate,
         receiverName,
         receiverPhone,
@@ -412,17 +434,17 @@ async function parseExcelData(
       };
       orders.set(orderNo, order);
     }
-    
+
     // 匹配系统商品
     const matchedProduct = await matchSystemProduct(
       client,
       customerCode,
-      productName,
-      productSpec,
-      productCode,
+      finalProductName,
+      finalProductSpec,
+      finalProductCode,
       barcode
     );
-    
+
     // 匹配供应商库存
     const supplierMatches = await matchSupplierStocks(
       client,
@@ -431,13 +453,13 @@ async function parseExcelData(
       matchedProduct.productCode,
       order.province
     );
-    
+
     // 创建订单商品明细
     const orderItem: ParsedOrderDraftItem = {
       id: `item_${Date.now()}_${i}`,
-      customerProductName: productName,
-      customerProductSpec: productSpec,
-      customerProductCode: productCode,
+      customerProductName: finalProductName,
+      customerProductSpec: finalProductSpec,
+      customerProductCode: finalProductCode,
       customerBarcode: barcode,
       systemProductId: matchedProduct.productId,
       systemProductName: matchedProduct.productName,
@@ -452,10 +474,10 @@ async function parseExcelData(
       price: price || matchedProduct.price,
       remark: '',
     };
-    
+
     order.items.push(orderItem);
   }
-  
+
   return Array.from(orders.values());
 }
 
@@ -495,7 +517,7 @@ export async function POST(request: NextRequest) {
     if (orders.length === 0 && rows.length > 0) {
       for (let i = 0; i < Math.min(3, rows.length); i++) {
         const row = rows[i];
-        const productName = mapping ? Object.entries(mapping).find(([k, v]) => v === 'product_name')?.[0] : null;
+        const productName = mapping ? Object.entries(mapping).find(([, v]) => v === 'product_name')?.[0] : null;
         const productNameValue = productName ? row[parseInt(productName)] : null;
         console.log(`【API】第${i}行原始数据:`, row, '-> 商品名称值:', productNameValue);
       }
@@ -565,7 +587,7 @@ export async function GET(request: NextRequest) {
       suggestedField: mapping[index] === 'ignore' ? null : mapping[index],
       suggestions: mapping[index] === 'ignore' 
         ? Object.entries(CHINESE_COLUMN_MAPPING)
-            .filter(([_, aliases]) => aliases.some(a => header.toLowerCase().includes(a.toLowerCase())))
+            .filter(([, aliases]) => aliases.some(a => header.toLowerCase().includes(a.toLowerCase())))
             .map(([field]) => field)
         : [],
     }));

@@ -3,16 +3,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { PageGuard } from '@/components/auth/page-guard';
 import { buildUserInfoHeaders, useAuth } from '@/lib/auth';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -28,17 +27,13 @@ import {
   StarOff,
   Search,
   Eye,
-  Settings,
   Check,
   X,
   Building2,
   Users,
   Upload,
   Download,
-  FileUp,
   Columns,
-  Zap,
-  Filter,
   RefreshCw,
 } from 'lucide-react';
 
@@ -202,6 +197,7 @@ export default function TemplatesPage() {
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadData = async () => {
@@ -217,19 +213,19 @@ export default function TemplatesPage() {
       if (data.success) {
         setTemplates(data.data || []);
       }
-    } catch (error) {
+    } catch {
       console.error('获取模板失败:', error);
     }
   };
 
   const loadCustomers = async () => {
     try {
-      const res = await fetch('/api/customers', { headers: authHeaders() });
+      const res = await fetch('/api/customers?isActive=false', { headers: authHeaders() });
       const data = await res.json();
       if (data.success) {
         setCustomers(data.data || []);
       }
-    } catch (error) {
+    } catch {
       console.error('获取客户失败:', error);
     }
   };
@@ -241,7 +237,7 @@ export default function TemplatesPage() {
       if (data.success) {
         setSuppliers(data.data || []);
       }
-    } catch (error) {
+    } catch {
       console.error('获取供应商失败:', error);
     }
   };
@@ -416,7 +412,7 @@ export default function TemplatesPage() {
       toast.success('模板导入成功');
       setImportDialogOpen(false);
       loadTemplates();
-    } catch (error) {
+    } catch {
       console.error('导入模板失败:', error);
       toast.error('模板文件解析失败');
     } finally {
@@ -460,7 +456,7 @@ export default function TemplatesPage() {
       } else {
         toast.error(data.error || '操作失败');
       }
-    } catch (error) {
+    } catch {
       toast.error('操作失败');
     }
   };
@@ -474,7 +470,7 @@ export default function TemplatesPage() {
         setDeleteConfirmId(null);
         loadTemplates();
       }
-    } catch (error) {
+    } catch {
       toast.error('删除失败');
     }
   };
@@ -491,7 +487,7 @@ export default function TemplatesPage() {
         toast.success('已设为默认模板');
         loadTemplates();
       }
-    } catch (error) {
+    } catch {
       toast.error('设置失败');
     }
   };
@@ -513,7 +509,7 @@ export default function TemplatesPage() {
         toast.success('模板复制成功');
         loadTemplates();
       }
-    } catch (error) {
+    } catch {
       toast.error('复制失败');
     }
   };
@@ -530,7 +526,7 @@ export default function TemplatesPage() {
         toast.success(template.isActive ? '已禁用' : '已启用');
         loadTemplates();
       }
-    } catch (error) {
+    } catch {
       toast.error('操作失败');
     }
   };
