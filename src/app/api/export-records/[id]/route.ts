@@ -135,11 +135,11 @@ export async function GET(
       details = record.metadata.details;
     }
 
-    // 获取供应商/客户信息
+    // 获取供应商/客户信息（统一查询 shippers 表）
     let entityName = '';
     if (record.supplier_id) {
       const { data: supplier } = await client
-        .from('suppliers')
+        .from('shippers')
         .select('name')
         .eq('id', record.supplier_id)
         .single();

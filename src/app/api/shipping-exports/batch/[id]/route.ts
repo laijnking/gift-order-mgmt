@@ -92,6 +92,7 @@ export async function POST(
         exportedBy: record.exported_by || 'system',
         dispatchMode: 'dispatch',
         persistenceMode: 'full',
+        mode: 'reexport',
       }),
     });
 

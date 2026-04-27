@@ -207,20 +207,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: '请选择要匹配的订单' }, { status: 400 });
     }
 
-    const [{ data: dbOrders, error: orderError }, { data: suppliers, error: supplierError }, { data: stocks, error: stockError }, { data: costHistory }] = await Promise.all([
+    const [{ data: dbOrders, error: orderError }, { data: shippers, error: shipperError }, { data: stocks, error: stockError }, { data: costHistory }] = await Promise.all([
       orderIds.length > 0
         ? client.from('orders').select('*').in('id', orderIds)
         : Promise.resolve({ data: [], error: null }),
-      client.from('suppliers').select('*').eq('is_active', true),
+      client.from('shippers').select('*').eq('is_active', true),
       client.from('stocks').select('*').eq('status', 'active'),
       client.from('order_cost_history').select('product_code, supplier_id, unit_cost').order('created_at', { ascending: false }),
     ]);
 
     if (orderError) throw new Error(`查询订单失败: ${orderError.message}`);
-    if (supplierError) throw new Error(`查询供应商失败: ${supplierError.message}`);
+    if (shipperError) throw new Error(`查询供应商失败: ${shipperError.message}`);
     if (stockError) throw new Error(`查询库存失败: ${stockError.message}`);
 
-    const activeSuppliers = (suppliers || []) as Record<string, unknown>[];
+    const activeSuppliers = (shippers || []) as Record<string, unknown>[];
     const activeStocks = ((stocks || []) as Record<string, unknown>[]).filter((stock) => toNumber(stock.quantity) > 0);
     const costs = (costHistory || []) as Record<string, unknown>[];
     const dbOrderIds = new Set(((dbOrders || []) as Record<string, unknown>[]).map((order) => order.id));

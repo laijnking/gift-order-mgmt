@@ -91,14 +91,14 @@ export async function POST(request: NextRequest) {
           };
           
           const { data: existing } = await client
-            .from('suppliers')
+            .from('shippers')
             .select('id')
             .eq('name', item.name)
             .maybeSingle();
           
           if (existing) {
             const { error } = await client
-              .from('suppliers')
+              .from('shippers')
               .update(supplierData)
               .eq('id', existing.id);
             
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
             }
           } else {
             const { error } = await client
-              .from('suppliers')
+              .from('shippers')
               .insert(supplierData);
             
             if (error) {
@@ -161,7 +161,7 @@ export async function POST(request: NextRequest) {
           
           if (!supplierId && item.supplier_name) {
             const { data: supplier } = await client
-              .from('suppliers')
+              .from('shippers')
               .select('id')
               .eq('name', item.supplier_name)
               .maybeSingle();

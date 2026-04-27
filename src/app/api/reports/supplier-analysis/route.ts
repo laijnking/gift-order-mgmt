@@ -14,9 +14,9 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate') || new Date().toISOString().slice(0, 10);
 
-    // 查询所有供应商
-    const { data: suppliers, error: supplierError } = await supabase
-      .from('suppliers')
+    // 查询所有供应商（统一查询 shippers 表）
+    const { data: shippers, error: supplierError } = await supabase
+      .from('shippers')
       .select('*')
       .order('name');
 
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     }
 
     const allOrders = orders || [];
-    const allSuppliers = suppliers || [];
+    const allSuppliers = shippers || [];
 
     // 按供应商统计
     const bySupplier: Record<string, {
@@ -64,13 +64,14 @@ export async function GET(request: NextRequest) {
     }> = {};
 
     // 初始化供应商统计
-    allSuppliers.forEach(supplier => {
-      const name = supplier.name || '未知供应商';
-      bySupplier[supplier.id] = {
-        id: supplier.id,
+    allSuppliers.forEach((supplier: Record<string, unknown>) => {
+      const name = String(supplier.name || '未知供应商');
+      const supplierId = String(supplier.id || '');
+      bySupplier[supplierId] = {
+        id: supplierId,
         name,
-        code: supplier.code || '',
-        type: supplier.type || 'supplier',
+        code: String(supplier.code || ''),
+        type: String(supplier.type || 'supplier'),
         orderCount: 0,
         totalQuantity: 0,
         statusBreakdown: {
@@ -93,7 +94,7 @@ export async function GET(request: NextRequest) {
       // 尝试通过名称匹配供应商
       let matchedSupplierId = supplierId;
       if (!matchedSupplierId && supplierName) {
-        const matched = allSuppliers.find(s => s.name === supplierName);
+        const matched = allSuppliers.find((s: Record<string, unknown>) => s.name === supplierName);
         if (matched) {
           matchedSupplierId = matched.id;
         }

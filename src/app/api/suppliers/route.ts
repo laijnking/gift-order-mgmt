@@ -3,7 +3,7 @@ import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { PERMISSIONS } from '@/lib/permissions';
 
-// 数据库字段转前端格式
+// 数据库字段转前端格式（统一使用 shippers 表）
 function transformSupplier(dbSupplier: Record<string, unknown>) {
   return {
     id: dbSupplier.id,
@@ -11,12 +11,16 @@ function transformSupplier(dbSupplier: Record<string, unknown>) {
     name: dbSupplier.name,
     shortName: (dbSupplier.short_name || '') as string,
     type: dbSupplier.type as string,
-    contactPerson: (dbSupplier.contact_person || '') as string,
-    contactPhone: (dbSupplier.contact_phone || '') as string,
+    contactPerson: ((dbSupplier.contact_person as string) || (dbSupplier.contact as string) || '') as string,
+    contactPhone: (dbSupplier.contact_phone || (dbSupplier.phone as string) || '') as string,
     province: (dbSupplier.province || '') as string,
     city: (dbSupplier.city || '') as string,
+    address: (dbSupplier.address || '') as string,
     sendType: (dbSupplier.send_type || 'download') as string,
     canJd: dbSupplier.can_jd ?? true,
+    canPdd: dbSupplier.can_pdd ?? false,
+    jdChannelId: (dbSupplier.jd_channel_id || '') as string,
+    pddShopId: (dbSupplier.pdd_shop_id || '') as string,
     expressRestrictions: typeof dbSupplier.express_restrictions === 'string'
       ? JSON.parse(dbSupplier.express_restrictions)
       : (dbSupplier.express_restrictions as string[] | undefined),
@@ -29,18 +33,19 @@ function transformSupplier(dbSupplier: Record<string, unknown>) {
   };
 }
 
-// 获取所有活跃供应商
+// 获取所有活跃供应商（统一查询 shippers 表）
 export async function GET(request: NextRequest) {
   const authError = requirePermission(request, PERMISSIONS.SUPPLIERS_VIEW);
   if (authError) return authError;
 
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
-  const type = searchParams.get('type'); // warehouse | supplier
+  const type = searchParams.get('type'); // warehouse | supplier | jd | pdd | self | third_party
   const active = searchParams.get('active'); // 显式传 false 才返回 inactive
 
   try {
-    let query = client.from('suppliers').select('*');
+    // 统一查询 shippers 表
+    let query = client.from('shippers').select('*');
 
     // 默认只返回活跃供应商（除非显式传 active=false）
     if (active !== 'false') {
@@ -71,7 +76,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// 创建供应商
+// 创建供应商（统一写入 shippers 表）
 export async function POST(request: NextRequest) {
   const authError = requirePermission(request, PERMISSIONS.SUPPLIERS_CREATE);
   if (authError) return authError;
@@ -81,25 +86,32 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
+    // 统一写入 shippers 表
     const supplierData = {
       name: body.name,
       short_name: body.shortName,
-      type: body.type,
-      contact: body.contact,
-      send_type: body.sendType,
+      type: body.type || 'supplier',
+      contact_person: body.contactPerson,
+      contact_phone: body.contactPhone,
+      phone: body.contactPhone,
       province: body.province,
-      can_jd: body.canJd ?? true,
-      express_restrictions: body.expressRestrictions ? JSON.stringify(body.expressRestrictions) : null,
+      city: body.city,
+      address: body.address,
+      send_type: body.sendType || 'download',
+      can_jd: body.canJd ?? false,
+      can_pdd: body.canPdd ?? false,
+      jd_channel_id: body.jdChannelId,
+      pdd_shop_id: body.pddShopId,
+      express_restrictions: body.expressRestrictions ? JSON.stringify(body.expressRestrictions) : '[]',
       cost_factor: body.costFactor || 1.0,
       settlement_type: body.settlementType || 'monthly',
       is_active: true,
       remark: body.remark,
-      // code 由数据库迁移或 transformSupplier fallback 保证，此处可选传入
       ...(body.code ? { code: body.code } : {}),
     };
 
     const { data, error } = await client
-      .from('suppliers')
+      .from('shippers')
       .insert(supplierData)
       .select()
       .single();

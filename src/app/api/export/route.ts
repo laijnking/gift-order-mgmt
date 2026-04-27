@@ -240,17 +240,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: '请选择要派发的订单' }, { status: 400 });
     }
 
-    const [{ data: orders, error: ordersError }, { data: suppliers, error: suppliersError }] = await Promise.all([
+    const [{ data: orders, error: ordersError }, { data: shippers, error: shippersError }] = await Promise.all([
       client.from('orders').select('*').in('id', orderIds),
-      client.from('suppliers').select('*').eq('is_active', true),
+      client.from('shippers').select('*').eq('is_active', true),
     ]);
     if (ordersError) throw new Error(`查询订单失败: ${ordersError.message}`);
-    if (suppliersError) throw new Error(`查询供应商失败: ${suppliersError.message}`);
+    if (shippersError) throw new Error(`查询供应商失败: ${shippersError.message}`);
     if (!orders || orders.length === 0) {
       return NextResponse.json({ success: false, error: '未找到订单' }, { status: 404 });
     }
 
-    const supplierMap = new Map((suppliers || []).map((supplier) => [supplier.id, supplier as Record<string, unknown>]));
+    const supplierMap = new Map((shippers || []).map((supplier) => [supplier.id, supplier as Record<string, unknown>]));
     const batchNo = `DISPATCH-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Date.now().toString().slice(-5)}`;
     const rowsBySupplier: Record<string, Record<string, unknown>[]> = {};
     const errors: string[] = [];

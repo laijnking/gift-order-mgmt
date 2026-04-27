@@ -3,7 +3,7 @@ import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { PERMISSIONS } from '@/lib/permissions';
 
-// 数据库字段转前端格式
+// 数据库字段转前端格式（统一使用 shippers 表）
 function transformSupplier(dbSupplier: Record<string, unknown>) {
   return {
     id: dbSupplier.id,
@@ -11,13 +11,16 @@ function transformSupplier(dbSupplier: Record<string, unknown>) {
     name: dbSupplier.name,
     shortName: (dbSupplier.short_name || '') as string,
     type: dbSupplier.type as string,
-    contact: (dbSupplier.contact || '') as string,
-    contactPerson: (dbSupplier.contact_person || dbSupplier.contact || '') as string,
-    contactPhone: (dbSupplier.contact_phone || '') as string,
+    contactPerson: ((dbSupplier.contact_person as string) || (dbSupplier.contact as string) || '') as string,
+    contactPhone: (dbSupplier.contact_phone || (dbSupplier.phone as string) || '') as string,
     province: (dbSupplier.province || '') as string,
     city: (dbSupplier.city || '') as string,
+    address: (dbSupplier.address || '') as string,
     sendType: (dbSupplier.send_type || 'download') as string,
     canJd: dbSupplier.can_jd ?? true,
+    canPdd: dbSupplier.can_pdd ?? false,
+    jdChannelId: (dbSupplier.jd_channel_id || '') as string,
+    pddShopId: (dbSupplier.pdd_shop_id || '') as string,
     expressRestrictions: typeof dbSupplier.express_restrictions === 'string'
       ? JSON.parse(dbSupplier.express_restrictions)
       : (dbSupplier.express_restrictions as string[] | undefined),
@@ -30,7 +33,7 @@ function transformSupplier(dbSupplier: Record<string, unknown>) {
   };
 }
 
-// 获取单个供应商
+// 获取单个供应商（统一查询 shippers 表）
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -43,7 +46,7 @@ export async function GET(
   
   try {
     const { data, error } = await client
-      .from('suppliers')
+      .from('shippers')
       .select('*')
       .eq('id', id)
       .single();
@@ -69,7 +72,7 @@ export async function GET(
   }
 }
 
-// 更新供应商
+// 更新供应商（统一更新 shippers 表）
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -87,11 +90,18 @@ export async function PUT(
       name: body.name,
       short_name: body.shortName,
       type: body.type,
-      contact: body.contact,
-      send_type: body.sendType,
+      contact_person: body.contactPerson,
+      contact_phone: body.contactPhone,
+      phone: body.contactPhone,
       province: body.province,
+      city: body.city,
+      address: body.address,
+      send_type: body.sendType,
       can_jd: body.canJd,
-      express_restrictions: body.expressRestrictions ? JSON.stringify(body.expressRestrictions) : null,
+      can_pdd: body.canPdd,
+      jd_channel_id: body.jdChannelId,
+      pdd_shop_id: body.pddShopId,
+      express_restrictions: body.expressRestrictions ? JSON.stringify(body.expressRestrictions) : '[]',
       cost_factor: body.costFactor,
       settlement_type: body.settlementType || 'monthly',
       remark: body.remark,
@@ -99,7 +109,7 @@ export async function PUT(
     };
 
     const { data, error } = await client
-      .from('suppliers')
+      .from('shippers')
       .update(supplierData)
       .eq('id', id)
       .select()
@@ -134,7 +144,7 @@ export async function DELETE(
   
   try {
     const { error } = await client
-      .from('suppliers')
+      .from('shippers')
       .update({ is_active: false, updated_at: new Date().toISOString() })
       .eq('id', id);
     

@@ -5,7 +5,6 @@ import { recordOrderCostFromDispatch } from '@/lib/order-cost-history';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { parseTemplateFieldMappings, resolvePreferredTemplate, type TemplateRecord } from '@/lib/template-utils';
 import { requirePermission } from '@/lib/server-auth';
-import { ORDER_STATUS_PENDING } from '@/lib/order-status';
 import { PERMISSIONS } from '@/lib/permissions';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
@@ -126,7 +125,9 @@ async function dispatchPendingOrder(
   client: ReturnType<typeof getSupabaseClient>,
   order: Record<string, unknown>,
   supplier: Record<string, unknown>,
-  batchNo: string
+  batchNo: string,
+  supplierId?: string,
+  isSynthetic = false
 ) {
   const existingDispatch = await getExistingDispatchContext(client, String(order.id));
   if (existingDispatch.hasExistingSideEffects) {
@@ -163,7 +164,13 @@ async function dispatchPendingOrder(
 
   for (const item of items) {
     const quantity = toNumber(item.quantity, 1);
-    const stock = await findStockForItem(client, String(supplier.id), item);
+    // 虚拟供应商没有真实 supplier_id，跳过库存操作（虚拟供应商的订单通常已通过其他途径派发过）
+    const stockQueryId = isSynthetic
+      ? undefined
+      : (supplierId || (supplier?.id ? String(supplier.id) : undefined));
+    const stock = stockQueryId
+      ? await findStockForItem(client, stockQueryId, item)
+      : null;
     if (!stock) {
       throw new Error(`订单 ${order.order_no || order.id} 的商品「${itemText(item, 'product_name', 'productName', 'cu_product_name', 'cuProductName') || '未知商品'}」未找到供应商库存`);
     }
@@ -228,16 +235,19 @@ async function dispatchPendingOrder(
     });
   }
 
-  await client.from('dispatch_records').insert({
-    id: crypto.randomUUID(),
-    order_id: order.id,
-    supplier_id: supplier.id,
-    supplier_name: supplier.name,
-    batch_no: batchNo,
-    dispatch_at: new Date().toISOString(),
-    status: 'dispatched',
-    items: dispatchItems,
-  });
+    const stockSupplierId = isSynthetic ? null : (supplierId || (supplier?.id ? String(supplier.id) : null));
+    const stockSupplierName = String(supplier.name || '');
+
+    await client.from('dispatch_records').insert({
+      id: crypto.randomUUID(),
+      order_id: order.id,
+      supplier_id: stockSupplierId,
+      supplier_name: stockSupplierName,
+      batch_no: batchNo,
+      dispatch_at: new Date().toISOString(),
+      status: 'dispatched',
+      items: dispatchItems,
+    });
 
   await client
     .from('orders')
@@ -332,16 +342,20 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { supplierIds, templateId, exportedBy, dispatchMode, persistenceMode } = body;
+    const { supplierIds, templateId, exportedBy, dispatchMode, persistenceMode, mode } = body;
+    // mode: 'pending' = 待导出的首次导出（会派发 pending 订单）, 'reexport' = 已导出订单的二次导出（不派发）
     const exportMode: 'preview' | 'dispatch' = dispatchMode === 'preview' ? 'preview' : 'dispatch';
+    const isReexport = mode === 'reexport';
     const resolvedPersistenceMode: 'none' | 'full' =
       exportMode === 'preview' ? 'none' : persistenceMode === 'none' ? 'none' : 'full';
-    const executionMode: 'preview' | 'dispatch_only' | 'dispatch_with_persistence' =
+    const executionMode: 'preview' | 'dispatch_only' | 'dispatch_with_persistence' | 'reexport' | 'reexport_with_persistence' =
       exportMode === 'preview'
         ? 'preview'
-        : resolvedPersistenceMode === 'none'
-          ? 'dispatch_only'
-          : 'dispatch_with_persistence';
+        : isReexport
+          ? resolvedPersistenceMode === 'full' ? 'reexport_with_persistence' : 'reexport'
+          : resolvedPersistenceMode === 'none'
+            ? 'dispatch_only'
+            : 'dispatch_with_persistence';
 
     if (!Array.isArray(supplierIds) || supplierIds.length === 0) {
       return NextResponse.json({ success: false, error: '请选择至少一个供应商' }, { status: 400 });
@@ -377,17 +391,27 @@ export async function POST(request: NextRequest) {
     let persistedDetailCount = 0;
 
     for (const supplierId of supplierIds) {
-      const { data: supplier } = await client.from('suppliers').select('*').eq('id', supplierId).maybeSingle();
-      if (!supplier) {
+      // 判断是否为虚拟供应商（suppliers 表中不存在，从 pending 接口补充进来的）
+      const isSynthetic = String(supplierId).startsWith('synthetic-');
+      const syntheticName = isSynthetic ? String(supplierId).replace('synthetic-', '') : '';
+
+      // 虚拟供应商：从 orders 表按 supplier_name 查询；真实供应商：查 shippers 表（统一数据源）
+      const { data: supplier } = isSynthetic
+        ? { data: null }
+        : await client.from('shippers').select('*').eq('id', supplierId).maybeSingle();
+
+      if (!isSynthetic && !supplier) {
         errors.push(`供应商 ${supplierId} 不存在`);
         continue;
       }
+
+      const supplierName = isSynthetic ? syntheticName : String((supplier as Record<string, unknown>).name || '');
 
       let supplierTemplate = resolvedTemplate;
       let supplierTemplateId = resolvedTemplateId;
       let supplierTemplateName = templateName;
       let supplierTemplateSource: 'explicit' | 'target' | 'linked' | 'default' | 'first' = templateSource;
-      if (!supplierTemplate) {
+      if (!supplierTemplate && !isSynthetic) {
         const { template, source } = await resolvePreferredTemplate(client, { type: 'shipping', targetType: 'supplier', targetId: supplierId });
         if (template) {
           supplierTemplate = template;
@@ -400,35 +424,47 @@ export async function POST(request: NextRequest) {
       const supplierExportFieldMappings = Object.keys(supplierFieldMappings).length > 0 ? supplierFieldMappings : DEFAULT_SHIPPING_FIELD_MAPPINGS;
       const isSupplierTemplate = Boolean(supplierTemplate?.target_type === 'supplier' && supplierTemplate?.target_id === supplierId);
 
-      // 查询待发货订单：优先按 supplier_id 精确匹配，回退按 supplier_name 匹配
-      const { data: ordersById, error: ordersErrorById } = await client
-        .from('orders')
-        .select('*')
-        .eq('supplier_id', supplierId)
-        .in('status', ['pending', 'assigned']);
+      // 虚拟供应商：直接按 supplier_name 查询；真实供应商：优先按 supplier_id 精确匹配，回退按 supplier_name 匹配
+      let orders: Record<string, unknown>[] = [];
 
-      if (ordersErrorById) throw new Error(`查询订单失败: ${ordersErrorById.message}`);
+      if (isSynthetic) {
+        const { data, error } = await client
+          .from('orders')
+          .select('*')
+          .eq('supplier_name', supplierName)
+          .in('status', isReexport ? ['assigned'] : ['pending', 'assigned']);
+        if (error) throw new Error(`按名称查询订单失败: ${error.message}`);
+        orders = (data || []) as Record<string, unknown>[];
+      } else {
+        const { data: ordersById, error: ordersErrorById } = await client
+          .from('orders')
+          .select('*')
+          .eq('supplier_id', supplierId)
+          .in('status', isReexport ? ['assigned'] : ['pending', 'assigned']);
 
-      const { data: ordersByName, error: ordersErrorByName } = await client
-        .from('orders')
-        .select('*')
-        .is('supplier_id', null)
-        .eq('supplier_name', (supplier as Record<string, unknown>).name as string)
-        .in('status', ['pending', 'assigned']);
+        if (ordersErrorById) throw new Error(`查询订单失败: ${ordersErrorById.message}`);
 
-      if (ordersErrorByName) throw new Error(`按名称查询订单失败: ${ordersErrorByName.message}`);
+        const { data: ordersByName, error: ordersErrorByName } = await client
+          .from('orders')
+          .select('*')
+          .is('supplier_id', null)
+          .eq('supplier_name', supplierName)
+          .in('status', isReexport ? ['assigned'] : ['pending', 'assigned']);
 
-      // 合并去重
-      const orderMap = new Map<string, Record<string, unknown>>();
-      for (const o of (ordersById || []) as Record<string, unknown>[]) {
-        orderMap.set(o.id as string, o);
-      }
-      for (const o of (ordersByName || []) as Record<string, unknown>[]) {
-        if (!orderMap.has(o.id as string)) {
+        if (ordersErrorByName) throw new Error(`按名称查询订单失败: ${ordersErrorByName.message}`);
+
+        // 合并去重
+        const orderMap = new Map<string, Record<string, unknown>>();
+        for (const o of (ordersById || []) as Record<string, unknown>[]) {
           orderMap.set(o.id as string, o);
         }
+        for (const o of (ordersByName || []) as Record<string, unknown>[]) {
+          if (!orderMap.has(o.id as string)) {
+            orderMap.set(o.id as string, o);
+          }
+        }
+        orders = Array.from(orderMap.values());
       }
-      const orders = Array.from(orderMap.values());
       if (orders.length === 0) continue;
 
       const exportRows: Array<Record<string, unknown>> = [];
@@ -436,18 +472,24 @@ export async function POST(request: NextRequest) {
 
       for (const order of orders as Record<string, unknown>[]) {
         try {
-          const dispatchResult = exportMode === 'dispatch' && order.status === 'pending'
-            ? await dispatchPendingOrder(client, order, supplier as Record<string, unknown>, batchNo)
-            : undefined;
-          if (dispatchResult?.reusedExistingDispatch) {
-            reusedDispatchCount += 1;
-          } else if (dispatchResult) {
-            newDispatchCount += 1;
-          } else {
+          // 二次导出模式：不派发、不扣库存，只生成文件
+          if (isReexport) {
             assignedOnlyCount += 1;
+            exportRows.push(...rowsForOrder(order, supplierExportFieldMappings, String(order.assigned_batch || batchNo), undefined, isSupplierTemplate));
+          } else {
+            const dispatchResult = exportMode === 'dispatch' && order.status === 'pending'
+              ? await dispatchPendingOrder(client, order, supplier as Record<string, unknown>, batchNo, isSynthetic ? undefined : supplierId, isSynthetic)
+              : undefined;
+            if (dispatchResult?.reusedExistingDispatch) {
+              reusedDispatchCount += 1;
+            } else if (dispatchResult) {
+              newDispatchCount += 1;
+            } else {
+              assignedOnlyCount += 1;
+            }
+            const exportBatchNo = dispatchResult?.dispatchBatch || batchNo;
+            exportRows.push(...rowsForOrder(order, supplierExportFieldMappings, exportBatchNo, dispatchResult?.dispatchItems, isSupplierTemplate));
           }
-          const exportBatchNo = dispatchResult?.dispatchBatch || batchNo;
-          exportRows.push(...rowsForOrder(order, supplierExportFieldMappings, exportBatchNo, dispatchResult?.dispatchItems, isSupplierTemplate));
           allOrderIds.push(String(order.id));
           supplierSuccessCount += 1;
         } catch (error) {
@@ -457,7 +499,6 @@ export async function POST(request: NextRequest) {
 
       if (exportRows.length === 0) continue;
 
-      const supplierName = String(supplier.name || '未知供应商');
       const safeSupplierName = supplierName.replace(/[\\/:*?"<>|]/g, '_');
       const fileName = `${safeSupplierName}+发货通知单+${today}.xlsx`;
       const worksheet = XLSX.utils.json_to_sheet(exportRows);
@@ -583,7 +624,7 @@ export async function POST(request: NextRequest) {
     const { error: recordError } = await client.from('export_records').insert({
       id: recordId,
       export_type: 'shipping_notice',
-      business_type: 'dispatch',
+      business_type: isReexport ? 'reexport' : 'dispatch',
       supplier_id: supplierIds.length === 1 ? supplierIds[0] : null,
       order_ids: allOrderIds,
       template_id: resolvedTemplateId,
@@ -600,6 +641,7 @@ export async function POST(request: NextRequest) {
         batch_no: batchNo,
         supplier_ids: supplierIds,
         download_mode: 'regenerate',
+        is_reexport: isReexport,
         artifact: {
           relative_path: artifact.relativePath,
           file_name: artifact.fileName,

@@ -96,12 +96,12 @@ export async function GET(request: NextRequest) {
       newThisMonth: allCustomers.filter(c => c.created_at >= monthStart).length,
     };
 
-    // 4. 供应商统计
-    const { data: suppliers } = await supabase
-      .from('suppliers')
+    // 4. 供应商统计（统一查询 shippers 表）
+    const { data: shippers } = await supabase
+      .from('shippers')
       .select('*');
 
-    const allSuppliers = suppliers || [];
+    const allSuppliers = shippers || [];
     const supplierTypeStats: Record<string, number> = {};
     allSuppliers.forEach(s => {
       const type = s.type || 'other';

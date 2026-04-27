@@ -266,13 +266,13 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// 辅助函数：导入订单到历史成本库
+// 辅助函数：导入订单到历史成本库（统一查询 shippers 表）
 async function importOrders(client: ReturnType<typeof getSupabaseClient>, orders: Record<string, unknown>[]) {
   // 获取供应商和仓库信息
-  const { data: suppliers } = await client.from('suppliers').select('*');
+  const { data: shippers } = await client.from('shippers').select('*');
   const { data: warehouses } = await client.from('warehouses').select('*');
 
-  const supplierMap = new Map((suppliers || []).map((s: Record<string, unknown>) => [s.id, s]));
+  const supplierMap = new Map((shippers || []).map((s: Record<string, unknown>) => [s.id, s]));
   const warehouseMap = new Map((warehouses || []).map((w: Record<string, unknown>) => [w.id, w]));
 
   const historyRecords = [];

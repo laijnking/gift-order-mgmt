@@ -218,17 +218,18 @@ async function findCustomerIdByCode(client: ReturnType<typeof getSupabaseClient>
   return customersByName?.[0] ? { id: customersByName[0].id, name: customersByName[0].name } : null;
 }
 
-// 辅助函数：根据供应商名称查找供应商ID
+// 辅助函数：根据供应商名称查找供应商ID（统一查询 shippers 表）
 async function findSupplierIdByName(client: ReturnType<typeof getSupabaseClient>, name: string): Promise<{ id: string; name: string } | null> {
   if (!name) return null;
   
-  const { data: suppliers } = await client
-    .from('suppliers')
+  const { data: shippers } = await client
+    .from('shippers')
     .select('id, name')
+    .eq('is_active', true)
     .ilike('name', `%${name}%`)
     .limit(1);
   
-  return suppliers?.[0] ? { id: suppliers[0].id, name: suppliers[0].name } : null;
+  return shippers?.[0] ? { id: shippers[0].id, name: shippers[0].name } : null;
 }
 
 // 辅助函数：根据仓库名称查找仓库ID
@@ -286,14 +287,14 @@ async function buildRelatedMaps(client: ReturnType<typeof getSupabaseClient>, or
     });
   }
   
-  // 批量查询供应商
+  // 批量查询供应商（统一查询 shippers 表）
   const supplierMap: Record<string, { id: string; name: string }> = {};
   if (supplierIds.size > 0) {
-    const { data: suppliers } = await client
-      .from('suppliers')
+    const { data: shippers } = await client
+      .from('shippers')
       .select('id, name')
       .in('id', Array.from(supplierIds));
-    suppliers?.forEach(s => { supplierMap[s.id] = { id: s.id, name: s.name }; });
+    shippers?.forEach(s => { supplierMap[s.id] = { id: s.id, name: s.name }; });
   }
   
   // 批量查询仓库
