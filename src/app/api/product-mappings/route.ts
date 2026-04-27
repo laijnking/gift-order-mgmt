@@ -21,6 +21,7 @@ function transformMapping(dbMapping: Record<string, unknown>) {
     price: dbMapping.price,
     isActive: dbMapping.is_active,
     remark: dbMapping.remark,
+    mappingType: dbMapping.mapping_type,
     createdAt: dbMapping.created_at,
     updatedAt: dbMapping.updated_at,
   };
@@ -37,9 +38,14 @@ export async function GET(request: NextRequest) {
   const productCode = searchParams.get('productCode');
   const customerCode = searchParams.get('customerCode');
   const supplierId = searchParams.get('supplierId');
+  const mappingType = searchParams.get('mappingType');
 
   try {
     let query = client.from('product_mappings').select('*');
+
+    if (mappingType) {
+      query = query.eq('mapping_type', mappingType);
+    }
 
     if (search) {
       query = query.or(`product_code.ilike.%${search}%,product_name.ilike.%${search}%,customer_sku.ilike.%${search}%,customer_product_name.ilike.%${search}%`);
@@ -88,14 +94,55 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
+    // 确定映射类型
+    const mappingType = body.mappingType || (body.supplierId || body.supplierCode ? 'supplier' : 'customer');
+    
+    // 解析 customer_id：优先使用传入的 customerId（UUID格式），否则根据 customerCode 查找
+    let customerId = body.customerId || null;
+    if (!customerId && body.customerCode) {
+      const { data: customers } = await client
+        .from('customers')
+        .select('id')
+        .eq('code', body.customerCode)
+        .limit(1);
+      customerId = customers?.[0]?.id || null;
+    }
+    
+    // 解析 supplier_id：优先使用传入的 supplierId（UUID格式），否则根据编码查找
+    let supplierId = body.supplierId || null;
+    if (supplierId && !supplierId.includes('-')) {
+      const { data: shippers } = await client
+        .from('shippers')
+        .select('id')
+        .eq('code', supplierId)
+        .limit(1);
+      supplierId = shippers?.[0]?.id || null;
+    }
+    
+    // 校验：如果指定了客户编码但找不到客户，报错
+    if (body.customerCode && !customerId) {
+      return NextResponse.json({
+        success: false,
+        error: `客户编码 "${body.customerCode}" 不存在，请检查后重试`
+      }, { status: 400 });
+    }
+    
+    // 校验：如果指定了供应商编码但找不到供应商，报错
+    if ((body.supplierId || body.supplierCode) && !supplierId && mappingType === 'supplier') {
+      return NextResponse.json({
+        success: false,
+        error: `供应商编码 "${body.supplierId || body.supplierCode}" 不存在，请检查后重试`
+      }, { status: 400 });
+    }
+    
     const mappingData = {
       product_id: body.productId || null,
       product_code: body.productCode || '',
       product_name: body.productName || '',
-      customer_id: body.customerId || null,
+      customer_id: customerId,
       customer_code: body.customerCode || '',
       customer_name: body.customerName || '',
-      supplier_id: body.supplierId || null,
+      supplier_id: supplierId,
       supplier_name: body.supplierName || '',
       customer_sku: body.customerSku || '',
       customer_barcode: body.customerBarcode || '',
@@ -103,6 +150,7 @@ export async function POST(request: NextRequest) {
       price: body.price || null,
       is_active: body.isActive !== false,
       remark: body.remark || '',
+      mapping_type: mappingType,
     };
 
     const { data, error } = await client
@@ -144,22 +192,110 @@ export async function PUT(request: NextRequest) {
       }, { status: 400 });
     }
     
-    const insertData = mappings.map((m: Record<string, unknown>) => ({
-      product_id: m.productId || null,
-      product_code: m.productCode || '',
-      product_name: m.productName || '',
-      customer_id: m.customerId || null,
-      customer_code: m.customerCode || '',
-      customer_name: m.customerName || '',
-      supplier_id: m.supplierId || null,
-      supplier_name: m.supplierName || '',
-      customer_sku: m.customerSku || '',
-      customer_barcode: m.customerBarcode || '',
-      customer_product_name: m.customerProductName || '',
-      price: m.price || null,
-      is_active: m.isActive !== false,
-      remark: m.remark || '',
-    }));
+    // 收集需要查询的客户编码和发货方编码
+    const customerCodes = new Set<string>();
+    const shipperCodes = new Set<string>();
+    
+    mappings.forEach((m: Record<string, unknown>) => {
+      if (m.customerCode) customerCodes.add(m.customerCode as string);
+      if (m.supplierId && typeof m.supplierId === 'string' && !m.supplierId.includes('-')) {
+        shipperCodes.add(m.supplierId as string);
+      }
+    });
+    
+    // 批量查询客户ID映射
+    const customerIdMap: Record<string, string> = {};
+    if (customerCodes.size > 0) {
+      const { data: customers } = await client
+        .from('customers')
+        .select('id, code')
+        .in('code', Array.from(customerCodes));
+      customers?.forEach(c => {
+        customerIdMap[c.code] = c.id;
+      });
+    }
+    
+    // 批量查询发货方ID映射
+    const shipperIdMap: Record<string, string> = {};
+    if (shipperCodes.size > 0) {
+      const { data: shippers } = await client
+        .from('shippers')
+        .select('id, code')
+        .in('code', Array.from(shipperCodes));
+      shippers?.forEach(s => {
+        shipperIdMap[s.code] = s.id;
+      });
+    }
+    
+    // 校验：检查无效的客户编码
+    const invalidCustomerCodes: string[] = [];
+    mappings.forEach((m, i) => {
+      if (m.customerCode && !customerIdMap[m.customerCode as string]) {
+        invalidCustomerCodes.push(`"${m.customerCode}"`);
+      }
+    });
+    
+    // 校验：检查无效的供应商编码
+    const invalidShipperCodes: string[] = [];
+    mappings.forEach((m) => {
+      const supplierId = m.supplierId as string;
+      if (supplierId && !supplierId.includes('-') && !shipperIdMap[supplierId]) {
+        invalidShipperCodes.push(`"${supplierId}"`);
+      }
+    });
+    
+    // 如果有无效编码，返回错误
+    if (invalidCustomerCodes.length > 0) {
+      return NextResponse.json({ 
+        success: false, 
+        error: `以下客户编码不存在: ${invalidCustomerCodes.join(', ')}。请检查后重试。`,
+        invalidCustomerCodes
+      }, { status: 400 });
+    }
+    
+    if (invalidShipperCodes.length > 0) {
+      return NextResponse.json({ 
+        success: false, 
+        error: `以下供应商编码不存在: ${invalidShipperCodes.join(', ')}。请检查后重试。`,
+        invalidShipperCodes
+      }, { status: 400 });
+    }
+    
+    const insertData = mappings.map((m: Record<string, unknown>) => {
+      // 解析 customer_id
+      let customerId = m.customerId as string | null;
+      if (!customerId && m.customerCode) {
+        customerId = customerIdMap[m.customerCode as string] || null;
+      }
+      
+      // 解析 supplier_id
+      let supplierId = m.supplierId as string | null;
+      if (supplierId && !supplierId.includes('-')) {
+        supplierId = shipperIdMap[supplierId] || null;
+      }
+      
+      // 确定映射类型
+      const mappingType = (m as Record<string, unknown>).mappingType || 
+        (m.supplierId ? 'supplier' : 'customer');
+      
+      return {
+        product_id: m.productId || null,
+        product_code: m.productCode || '',
+        product_name: m.productName || '',
+        customer_id: customerId,
+        customer_code: m.customerCode || '',
+        customer_name: m.customerName || '',
+        supplier_id: supplierId,
+        supplier_name: m.supplierName || '',
+        customer_sku: m.customerSku || '',
+        customer_barcode: m.customerBarcode || '',
+        customer_product_name: m.customerProductName || '',
+        price: m.price || null,
+        is_active: m.isActive !== false,
+        remark: m.remark || '',
+        mapping_type: mappingType,
+      };
+    });
 
     const { data, error } = await client
       .from('product_mappings')

@@ -147,8 +147,24 @@ function parseOrExpression(expression: string): OrCondition {
     .map((part) => part.trim())
     .filter(Boolean)
     .map((part) => {
-      const [column, operator, ...rest] = part.split('.');
-      const value = rest.join('.');
+      const parts = part.split('.');
+      const column = parts[0];
+      let operator = parts[1];
+      let value = parts.slice(2).join('.');
+
+      // Handle compound operators like "not.is.null" → column IS NOT NULL
+      if (operator === 'not') {
+        operator = parts[2]; // "is" or "eq"
+        value = parts.slice(3).join('.');
+        switch (operator) {
+          case 'is':
+            return { column, operator: 'IS NOT' as const, value: value === 'null' ? null : value };
+          case 'eq':
+            return { column, operator: '<>' as const, value };
+          default:
+            throw new Error(`Unsupported NOT operator in .or(): ${operator}`);
+        }
+      }
 
       switch (operator) {
         case 'eq':

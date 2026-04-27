@@ -114,10 +114,10 @@ function autoDetectColumnMapping(headers: string[]): Record<string, string> {
 async function matchSystemProduct(
   client: ReturnType<typeof getSupabaseClient>,
   customerCode: string,
-  productName: string,
-  productSpec: string,
-  productCode: string,
-  barcode: string
+  productName: unknown,
+  productSpec: unknown,
+  productCode: unknown,
+  barcode: unknown
 ): Promise<{
   productId: string | null;
   productName: string | null;
@@ -139,6 +139,10 @@ async function matchSystemProduct(
     matchHint: null as string | null,
   };
 
+  // 确保参数都是字符串
+  const str = (v: unknown): string => (v == null ? '' : String(v));
+  const safeIncludes = (s1: string, s2: string): boolean => s1.includes(s2);
+
   // 1. 先查找客户商品映射。当前真实库按 customer_id 关联，不再查询旧字段 customer_code/source_id。
   let mappings: Record<string, unknown>[] = [];
   if (customerCode) {
@@ -158,35 +162,64 @@ async function matchSystemProduct(
     }
   }
 
-  // 按优先级匹配（精确匹配 > 包含匹配 > 模糊匹配）
   const matchOrder = [
-    { type: 'code', value: productCode, field: 'source_product_code' },
-    { type: 'spec', value: productSpec, field: 'source_product_spec' },
-    { type: 'barcode', value: barcode, field: 'source_product_barcode' },
-    { type: 'name', value: productName, field: 'source_product_name' },
+    { type: 'code', value: str(productCode), field: 'customer_sku' },
+    { type: 'barcode', value: str(barcode), field: 'customer_barcode' },
+    { type: 'spec', value: str(productSpec), field: 'customer_product_name' },
+    { type: 'name', value: str(productName), field: 'customer_product_name' },
   ];
 
   for (const match of matchOrder) {
     if (!match.value) continue;
 
     const mapping = mappings.find((m: Record<string, unknown>) => {
-      const fieldValue = m[match.field] as string;
+      const fieldValue = str(m[match.field]);
       if (!fieldValue) return false;
-      // 精确匹配或包含匹配
       return fieldValue === match.value ||
-             fieldValue.includes(match.value) ||
-             match.value.includes(fieldValue);
+             safeIncludes(fieldValue, match.value) ||
+             safeIncludes(match.value, fieldValue);
     });
 
     if (mapping) {
-      result.productId = mapping.system_product_id as string;
-      result.productName = mapping.system_product_name as string;
-      result.productSpec = mapping.system_product_spec as string;
-      result.productCode = mapping.system_product_code as string;
-      result.price = mapping.price as number;
-      result.matchType = 'mapping';
-      result.matchHint = `通过SKU映射匹配 (${match.type})`;
-      break;
+      const pmProductId = str(mapping.product_id);
+      const pmProductCode = str(mapping.product_code);
+
+      if (pmProductId) {
+        const { data: productsById } = await client
+          .from('products')
+          .select('*')
+          .eq('id', pmProductId)
+          .limit(1);
+        if (productsById && productsById.length > 0) {
+          const p = productsById[0] as Record<string, unknown>;
+          result.productId = str(p.id);
+          result.productName = str(p.name);
+          result.productSpec = str(p.spec);
+          result.productCode = str(p.code);
+          result.brand = str(p.brand);
+          result.price = Number(mapping.price) || null;
+        }
+      } else if (pmProductCode) {
+        const { data: productsByCode } = await client
+          .from('products')
+          .select('*')
+          .eq('code', pmProductCode)
+          .limit(1);
+        if (productsByCode && productsByCode.length > 0) {
+          const p = productsByCode[0] as Record<string, unknown>;
+          result.productId = str(p.id);
+          result.productName = str(p.name);
+          result.productSpec = str(p.spec);
+          result.productCode = pmProductCode;
+          result.brand = str(p.brand);
+          result.price = Number(mapping.price) || null;
+        }
+      }
+      if (result.productId) {
+        result.matchType = 'mapping';
+        result.matchHint = `通过SKU映射匹配 (${match.type})`;
+        break;
+      }
     }
   }
 
@@ -207,59 +240,55 @@ async function matchSystemProduct(
     let bestMatch: { product: Record<string, unknown>; score: number; matchType: string } | null = null;
 
     for (const product of products) {
-      const pName = (product.name as string) || '';
-      const pSpec = (product.spec as string) || '';
-      const pCode = (product.code as string) || '';
-      const pBarcode = (product.barcode as string) || '';
+      const pName = str(product.name);
+      const pSpec = str(product.spec);
+      const pCode = str(product.code);
+      const pBarcode = str(product.barcode);
 
       let score = 0;
       let matchType = '';
 
       // 1. 条码精确匹配（最高优先级）
-      if (barcode && pBarcode && (barcode === pBarcode || pBarcode.includes(barcode) || barcode.includes(pBarcode))) {
+      if (barcode && pBarcode && (str(barcode) === pBarcode || safeIncludes(pBarcode, str(barcode)) || safeIncludes(str(barcode), pBarcode))) {
         score = 100;
         matchType = 'barcode';
       }
       // 2. 商品编码精确匹配
-      else if (productCode && pCode && (productCode === pCode || pCode.includes(productCode) || productCode.includes(pCode))) {
+      else if (productCode && pCode && (str(productCode) === pCode || safeIncludes(pCode, str(productCode)) || safeIncludes(str(productCode), pCode))) {
         score = 95;
         matchType = 'code';
       }
       // 3. 规格型号精确匹配
-      else if (productSpec && pSpec && (productSpec === pSpec || pSpec.includes(productSpec) || productSpec.includes(pSpec))) {
+      else if (productSpec && pSpec && (str(productSpec) === pSpec || safeIncludes(pSpec, str(productSpec)) || safeIncludes(str(productSpec), pSpec))) {
         score = 90;
         matchType = 'spec';
       }
       // 4. 商品名称精确匹配
-      else if (productName && pName && (productName === pName)) {
+      else if (productName && pName && str(productName) === pName) {
         score = 85;
         matchType = 'name';
       }
       // 5. 商品名称包含匹配
-      else if (productName && pName && (pName.includes(productName) || productName.includes(pName))) {
+      else if (productName && pName && (safeIncludes(pName, str(productName)) || safeIncludes(str(productName), pName))) {
         score = 75;
         matchType = 'name';
       }
       // 6. 规格型号关键词匹配（提取规格中的关键部分）
-      else if (productSpec && pSpec) {
-        // 提取规格中的型号代码进行匹配
-        const specMatch = pSpec.includes(productSpec) || productSpec.includes(pSpec);
-        if (specMatch) {
-          score = 65;
-          matchType = 'spec';
-        }
+      else if (productSpec && pSpec && (safeIncludes(pSpec, str(productSpec)) || safeIncludes(str(productSpec), pSpec))) {
+        score = 65;
+        matchType = 'spec';
       }
       // 7. 商品编码部分匹配
-      else if (productCode && pCode && (pCode.includes(productCode) || productCode.includes(pCode))) {
+      else if (productCode && pCode && (safeIncludes(pCode, str(productCode)) || safeIncludes(str(productCode), pCode))) {
         score = 60;
         matchType = 'code';
       }
       // 8. 品牌+品类关键词匹配
       else if (productName && pName) {
         // 提取前4个字符作为关键词
-        const key1 = productName.slice(0, Math.min(4, productName.length));
+        const key1 = str(productName).slice(0, Math.min(4, str(productName).length));
         const key2 = pName.slice(0, Math.min(4, pName.length));
-        if (key1 && key2 && (pName.includes(key1) || productName.includes(key2))) {
+        if (key1 && key2 && (safeIncludes(pName, key1) || safeIncludes(str(productName), key2))) {
           score = 40;
           matchType = 'keyword';
         }
@@ -381,101 +410,117 @@ async function parseExcelData(
   const orders: Map<string, ParsedOrderBundleDraft> = new Map();
 
   for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
+    try {
+      const row = rows[i];
 
-    const customerOrderNo = getFieldValue(row, columnMapping, 'customer_order_no');
-    const orderNo = getFieldValue(row, columnMapping, 'order_no') || customerOrderNo || `AUTO-${Date.now()}-${i}`;
+      const customerOrderNo = getFieldValue(row, columnMapping, 'customer_order_no');
+      const orderNo = getFieldValue(row, columnMapping, 'order_no') || customerOrderNo || `AUTO-${Date.now()}-${i}`;
 
-    // 读取客户商品字段和系统商品字段，优先使用客户商品字段
-    const customerProductName = getFieldValue(row, columnMapping, 'customer_product_name');
-    const customerProductSpec = getFieldValue(row, columnMapping, 'customer_product_spec');
-    const customerProductCode = getFieldValue(row, columnMapping, 'customer_product_code');
-    const productName = getFieldValue(row, columnMapping, 'product_name');
-    const productSpec = getFieldValue(row, columnMapping, 'product_spec');
-    const productCode = getFieldValue(row, columnMapping, 'product_code');
-    const barcode = getFieldValue(row, columnMapping, 'barcode');
-    const quantity = parseInt(getFieldValue(row, columnMapping, 'quantity')) || 1;
-    const price = parseFloat(getFieldValue(row, columnMapping, 'price')) || null;
-    const receiverName = getFieldValue(row, columnMapping, 'receiver_name');
-    const receiverPhone = getFieldValue(row, columnMapping, 'receiver_phone');
-    const receiverAddress = getFieldValue(row, columnMapping, 'receiver_address');
-    const expressCompany = getFieldValue(row, columnMapping, 'express_company');
-    const trackingNo = getFieldValue(row, columnMapping, 'tracking_no');
-    const remark = getFieldValue(row, columnMapping, 'remark');
-    const billDate = getFieldValue(row, columnMapping, 'bill_date');
+      // 读取客户商品字段和系统商品字段，优先使用客户商品字段
+      const customerProductName = getFieldValue(row, columnMapping, 'customer_product_name');
+      const customerProductSpec = getFieldValue(row, columnMapping, 'customer_product_spec');
+      const customerProductCode = getFieldValue(row, columnMapping, 'customer_product_code');
+      const productName = getFieldValue(row, columnMapping, 'product_name');
+      const productSpec = getFieldValue(row, columnMapping, 'product_spec');
+      const productCode = getFieldValue(row, columnMapping, 'product_code');
+      const barcode = getFieldValue(row, columnMapping, 'barcode');
+      const quantity = parseInt(getFieldValue(row, columnMapping, 'quantity')) || 1;
+      const price = parseFloat(getFieldValue(row, columnMapping, 'price')) || null;
+      const receiverName = getFieldValue(row, columnMapping, 'receiver_name');
+      const receiverPhone = getFieldValue(row, columnMapping, 'receiver_phone');
+      const receiverAddress = getFieldValue(row, columnMapping, 'receiver_address');
+      const expressCompany = getFieldValue(row, columnMapping, 'express_company');
+      const trackingNo = getFieldValue(row, columnMapping, 'tracking_no');
+      const remark = getFieldValue(row, columnMapping, 'remark');
+      const billDate = getFieldValue(row, columnMapping, 'bill_date');
 
-    // 最终使用的客户商品信息：优先使用 customer_product_* 字段，若为空则降级到 product_*
-    const finalProductName = customerProductName || productName;
-    const finalProductSpec = customerProductSpec || productSpec;
-    const finalProductCode = customerProductCode || productCode;
+      // 最终使用的客户商品信息：优先使用 customer_product_* 字段，若为空则降级到 product_*
+      const finalProductName = customerProductName || productName;
+      const finalProductSpec = customerProductSpec || productSpec;
+      const finalProductCode = customerProductCode || productCode;
 
-    // 如果没有商品名称，跳过此行
-    if (!finalProductName) continue;
+      // 如果没有商品名称，跳过此行
+      if (!finalProductName || finalProductName.trim() === '') continue;
 
-    // 获取或创建订单
-    let order = orders.get(orderNo);
-    if (!order) {
-      const addressParts = extractAddressParts(receiverAddress);
-      order = {
-        id: `order_${Date.now()}_${orders.size}`,
-        orderNo,
-        customerOrderNo,
-        billDate,
-        receiverName,
-        receiverPhone,
-        receiverAddress,
-        province: addressParts.province,
-        city: addressParts.city,
-        district: addressParts.district,
-        items: [],
-        expressCompany,
-        trackingNo,
-        remark,
+      // 获取或创建订单
+      let order = orders.get(orderNo);
+      if (!order) {
+        try {
+          const addressParts = extractAddressParts(receiverAddress);
+          order = {
+            id: `order_${Date.now()}_${orders.size}`,
+            orderNo,
+            customerOrderNo,
+            billDate,
+            receiverName,
+            receiverPhone,
+            receiverAddress,
+            province: addressParts.province,
+            city: addressParts.city,
+            district: addressParts.district,
+            items: [],
+            expressCompany,
+            trackingNo,
+            remark,
+          };
+          orders.set(orderNo, order);
+        } catch (orderErr) {
+          console.error('【API】创建订单失败:', orderErr, {orderNo, receiverAddress});
+          continue;
+        }
+      }
+
+      // 匹配系统商品
+      let matchedProduct;
+      try {
+        matchedProduct = await matchSystemProduct(
+          client,
+          customerCode,
+          finalProductName,
+          finalProductSpec,
+          finalProductCode,
+          barcode
+        );
+      } catch (matchErr) {
+        console.error('【API】matchSystemProduct失败:', matchErr, {productName: finalProductName, spec: finalProductSpec, code: finalProductCode});
+        throw matchErr;
+      }
+
+      // 匹配供应商库存
+      const supplierMatches = await matchSupplierStocks(
+        client,
+        matchedProduct.productId,
+        matchedProduct.productSpec,
+        matchedProduct.productCode,
+        order.province
+      );
+
+      // 创建订单商品明细
+      const orderItem: ParsedOrderDraftItem = {
+        id: `item_${Date.now()}_${i}`,
+        customerProductName: finalProductName,
+        customerProductSpec: finalProductSpec,
+        customerProductCode: finalProductCode,
+        customerBarcode: barcode,
+        systemProductId: matchedProduct.productId,
+        systemProductName: matchedProduct.productName,
+        systemProductSpec: matchedProduct.productSpec,
+        systemProductCode: matchedProduct.productCode,
+        systemProductBrand: matchedProduct.brand,
+        systemProductPrice: matchedProduct.price,
+        matchType: matchedProduct.matchType,
+        matchHint: matchedProduct.matchHint,
+        supplierMatches,
+        quantity,
+        price: price || matchedProduct.price,
+        remark: '',
       };
-      orders.set(orderNo, order);
+
+      order.items.push(orderItem);
+    } catch (parseRowErr) {
+      console.error(`【API】第${i}行解析失败:`, parseRowErr);
+      continue;
     }
-
-    // 匹配系统商品
-    const matchedProduct = await matchSystemProduct(
-      client,
-      customerCode,
-      finalProductName,
-      finalProductSpec,
-      finalProductCode,
-      barcode
-    );
-
-    // 匹配供应商库存
-    const supplierMatches = await matchSupplierStocks(
-      client,
-      matchedProduct.productId,
-      matchedProduct.productSpec,
-      matchedProduct.productCode,
-      order.province
-    );
-
-    // 创建订单商品明细
-    const orderItem: ParsedOrderDraftItem = {
-      id: `item_${Date.now()}_${i}`,
-      customerProductName: finalProductName,
-      customerProductSpec: finalProductSpec,
-      customerProductCode: finalProductCode,
-      customerBarcode: barcode,
-      systemProductId: matchedProduct.productId,
-      systemProductName: matchedProduct.productName,
-      systemProductSpec: matchedProduct.productSpec,
-      systemProductCode: matchedProduct.productCode,
-      systemProductBrand: matchedProduct.brand,
-      systemProductPrice: matchedProduct.price,
-      matchType: matchedProduct.matchType,
-      matchHint: matchedProduct.matchHint,
-      supplierMatches,
-      quantity,
-      price: price || matchedProduct.price,
-      remark: '',
-    };
-
-    order.items.push(orderItem);
   }
 
   return Array.from(orders.values());
@@ -488,7 +533,22 @@ export async function POST(request: NextRequest) {
   
   try {
     const body = await request.json();
-    const { rows, columnMapping, customerCode, headers = [] } = body;
+    const { rows: rawRows, columnMapping, customerCode, headers = [] } = body;
+    
+    // 规范化 rows：如果前端传的是对象数组（{ "0": val, "1": val }），转换为真正的数组
+    const rows: (string | number | null)[][] = (rawRows || []).map((row: unknown) => {
+      if (Array.isArray(row)) return row;
+      if (row && typeof row === 'object') {
+        // 对象格式：{ "0": val, "1": val } -> [val, val]
+        const obj = row as Record<string, unknown>;
+        const maxIdx = Math.max(...Object.keys(obj).map(Number));
+        return Array.from({ length: maxIdx + 1 }, (_, i) => {
+          const v = obj[String(i)];
+          return v === null || v === undefined ? null : (typeof v === 'string' || typeof v === 'number' ? v : String(v));
+        });
+      }
+      return [];
+    });
     
     // 调试日志
     console.log('【API】接收请求:', {
@@ -505,12 +565,22 @@ export async function POST(request: NextRequest) {
     }
     
     // 如果没有提供列映射，自动检测
-    const mapping = columnMapping || autoDetectColumnMapping(Object.keys(rows[0] || {}));
+    // 优先使用传入的 headers 参数（包含真实表头文本），否则从 rows[0] 的索引重建
+    const excelHeaders: string[] = Array.isArray(headers) && headers.length > 0
+      ? headers.map((h: unknown) => String(h ?? ''))
+      : (rows[0] || []).map((_: unknown, idx: number) => String(idx));
+    const mapping = columnMapping || autoDetectColumnMapping(excelHeaders);
     console.log('【API】使用的映射:', mapping);
-    console.log('【API】Excel表头:', Object.keys(rows[0] || {}));
+    console.log('【API】Excel表头:', excelHeaders);
     
     // 解析数据
-    const orders = await parseExcelData(client, rows, mapping, customerCode || '');
+    let orders;
+    try {
+      orders = await parseExcelData(client, rows, mapping, customerCode || '');
+    } catch (parseErr) {
+      console.error('【API】parseExcelData内部错误:', parseErr);
+      throw parseErr;
+    }
     console.log('【API】解析结果:', { ordersCount: orders.length, itemsCount: orders.reduce((s, o) => s + o.items.length, 0) });
     
     // 如果解析结果为0，输出每行的调试信息

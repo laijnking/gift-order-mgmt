@@ -76,7 +76,7 @@
 ## 数据库表结构
 
 数据库通过 SQL 迁移脚本管理，位于 `supabase/migrations/` 目录。重要说明：
-- **执行顺序**：`001_schema.sql` → `004_migrate-prod-schema.sql` → `007_sync-all-tables.sql` → `008_api-schema-align.sql`
+- **执行顺序**：`001_schema.sql` → `004_migrate-prod-schema.sql` → `007_sync-all-tables.sql` → `008_api-schema-align.sql` → `015_fix_orders_supplier_id_type.sql`
 - **管理方式**：所有表通过 SQL 手动管理，不使用 ORM 迁移
 - **RLS**：所有表已启用行级安全策略（MVP 阶段为全开放策略）
 - **`product_mappings`**：使用 `VARCHAR(36)` 而非 `UUID` 作为主键（见 `001_fix_product_mappings.sql`）
@@ -521,6 +521,8 @@ src/
 - [x] 修复 `stocks` GET 响应缺少 `minStock`/`maxStock` 字段（写入 DB 但 enhanceStock 未读取）
 - [x] 清理 `suppliers` 和 `customers` transform 中的死代码（`contact`/`region` 旧字段回退读取）
 - [x] 清理 `schema.ts` 多处字段定义（`products.sku` → `products.code`、`dispatch_records` 补全 `warehouse_id`/`created_at`/`updated_at`、`return_receipts` 补全 `receipt_no`/`customer_id`/`updated_at`、`return_receipt_records` 补全 `product_id`/`quantity`/`price`）
+- [x] 修复 `product_mappings` 导入时 `customer_id`/`supplier_id` 为空的问题（后端根据编码自动查找 ID）
+- [x] 修复 `orders.supplier_id` 类型不匹配问题（`VARCHAR(36)` → `UUID`，关联 `shippers.id`）
 
 ### API-Schema 对齐说明
 - **原则**：以 API 代码为事实来源（source of truth），Schema 和数据库跟随 API 实际使用的字段名

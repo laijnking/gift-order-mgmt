@@ -213,8 +213,8 @@ export default function TemplatesPage() {
       if (data.success) {
         setTemplates(data.data || []);
       }
-    } catch {
-      console.error('获取模板失败:', error);
+    } catch (err) {
+      console.error('获取模板失败:', err);
     }
   };
 
@@ -225,8 +225,8 @@ export default function TemplatesPage() {
       if (data.success) {
         setCustomers(data.data || []);
       }
-    } catch {
-      console.error('获取客户失败:', error);
+    } catch (err) {
+      console.error('获取客户失败:', err);
     }
   };
 
@@ -237,8 +237,8 @@ export default function TemplatesPage() {
       if (data.success) {
         setSuppliers(data.data || []);
       }
-    } catch {
-      console.error('获取供应商失败:', error);
+    } catch (err) {
+      console.error('获取供应商失败:', err);
     }
   };
 
@@ -412,8 +412,8 @@ export default function TemplatesPage() {
       toast.success('模板导入成功');
       setImportDialogOpen(false);
       loadTemplates();
-    } catch {
-      console.error('导入模板失败:', error);
+    } catch (err) {
+      console.error('导入模板失败:', err);
       toast.error('模板文件解析失败');
     } finally {
       setImportingTemplate(false);

@@ -1,5 +1,8 @@
 export function normalizeExcelSheetRows(rows: Array<Array<string | number | boolean | null | undefined>>) {
-  return rows.map((row) => row.map((cell) => String(cell ?? '')));
+  return rows
+    .map((row) => row.map((cell) => String(cell ?? '').trim()))
+    // 过滤完全为空的行（避免 XLSX 残留的格式化工件行被当作数据行）
+    .filter((row) => row.some((cell) => cell.length > 0));
 }
 
 export function buildExcelPreviewRows(rows: string[][], limit = 20) {

@@ -428,8 +428,8 @@ export default function CustomersPage() {
       setImportDialogOpen(false);
       setImportingData([]);
       fetchCustomers();
-    } catch {
-      console.error('导入失败:', error);
+    } catch (err) {
+      console.error('导入失败:', err);
       toast.error('导入失败，请重试');
     } finally {
       setImporting(false);

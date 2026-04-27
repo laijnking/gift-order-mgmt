@@ -180,6 +180,7 @@ interface ProductMapping {
   price?: number;
   isActive?: boolean;
   remark?: string;
+  mappingType?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -272,15 +273,14 @@ export default function ProductMappingsPage() {
     isActive: true,
   });
 
-  // 加载数据
-  useEffect(() => {
-    loadData();
-  }, []);
-
   // 筛选数据
   useEffect(() => {
     let filtered = mappings;
 
+    // 按 mappingType 过滤 - 确保客户/供应商映射分开显示
+    filtered = filtered.filter(m => m.mappingType === activeTab);
+
+    // 按客户/供应商过滤
     if (activeTab === 'customer' && customerFilter !== 'all') {
       filtered = filtered.filter(m => m.customerCode === customerFilter);
     }
@@ -291,32 +291,23 @@ export default function ProductMappingsPage() {
 
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      if (activeTab === 'customer') {
-        filtered = filtered.filter(m =>
-          m.customerProductName?.toLowerCase().includes(term) ||
-          m.customerSku?.toLowerCase().includes(term) ||
-          m.productName?.toLowerCase().includes(term) ||
-          m.productCode?.toLowerCase().includes(term)
-        );
-      } else {
-        filtered = filtered.filter(m =>
-          m.customerProductName?.toLowerCase().includes(term) ||
-          m.customerSku?.toLowerCase().includes(term) ||
-          m.productName?.toLowerCase().includes(term) ||
-          m.productCode?.toLowerCase().includes(term)
-        );
-      }
+      filtered = filtered.filter(m =>
+        m.customerProductName?.toLowerCase().includes(term) ||
+        m.customerSku?.toLowerCase().includes(term) ||
+        m.productName?.toLowerCase().includes(term) ||
+        m.productCode?.toLowerCase().includes(term)
+      );
     }
 
     setFilteredMappings(filtered);
   }, [mappings, searchTerm, customerFilter, supplierFilter, activeTab]);
 
-  const loadData = async () => {
+  const loadData = async (mappingType?: string) => {
     setLoading(true);
     try {
       const headers = buildUserInfoHeaders();
       const [mappingsRes, customersRes, suppliersRes, productsRes] = await Promise.all([
-        fetch('/api/product-mappings', { headers }),
+        fetch(`/api/product-mappings${mappingType ? `?mappingType=${mappingType}` : ''}`, { headers }),
         fetch('/api/customers?isActive=false', { headers }),
         fetch('/api/suppliers?active=true', { headers }),
         fetch('/api/products', { headers }),
@@ -347,6 +338,11 @@ export default function ProductMappingsPage() {
     }
   };
 
+  // Tab 切换时重新加载数据
+  useEffect(() => {
+    loadData(activeTab);
+  }, [activeTab]);
+
   // 获取当前Tab的过滤值
   const getPartnerFilter = activeTab === 'customer' ? customerFilter : supplierFilter;
   const setPartnerFilter = activeTab === 'customer' ? setCustomerFilter : setSupplierFilter;
@@ -375,6 +371,7 @@ export default function ProductMappingsPage() {
       const mappingData: Record<string, unknown> = {
         productCode: formData.productCode,
         isActive: formData.isActive,
+        mappingType: activeTab,
       };
 
       if (activeTab === 'customer') {
@@ -406,7 +403,7 @@ export default function ProductMappingsPage() {
         toast.success(editingMapping ? '更新成功' : '创建成功');
         setIsDialogOpen(false);
         resetForm();
-        loadData();
+        loadData(activeTab);
       } else {
         toast.error(data.error || '操作失败');
       }
@@ -456,11 +453,11 @@ export default function ProductMappingsPage() {
       const data = await res.json();
       if (data.success) {
         toast.success('删除成功');
-        loadData();
+        loadData(activeTab);
       } else {
         toast.error(data.error || '删除失败');
       }
-    } catch {
+    } catch (err) {
       console.error('删除失败:', err);
       toast.error('删除失败');
     }
@@ -484,9 +481,9 @@ export default function ProductMappingsPage() {
       const data = await res.json();
       if (data.success) {
         toast.success('状态更新成功');
-        loadData();
+        loadData(activeTab);
       }
-    } catch {
+    } catch (err) {
       console.error('更新失败:', err);
       toast.error('更新失败');
     }
@@ -575,11 +572,11 @@ export default function ProductMappingsPage() {
         setImportText('');
         setSelectedCustomer('');
         setSelectedSupplier('');
-        loadData();
+        loadData(activeTab);
       } else {
         toast.error(data.error || '导入失败');
       }
-    } catch {
+    } catch (err) {
       console.error('导入失败:', err);
       toast.error('导入失败');
     }
@@ -822,6 +819,17 @@ export default function ProductMappingsPage() {
             }
             partnerSelectedCode = partnerIdCode;
           }
+          // 客户模式下，必须有客户编码
+          if (!partnerIdCode && !partnerSelectedCode) {
+            errors.push(`第 ${i + 2} 行：缺少客户编码，请选择客户或确保Excel包含客户名称列`);
+            continue;
+          }
+        } else {
+          // 供应商模式下，必须有供应商
+          if (!partnerSelectedCode) {
+            errors.push(`第 ${i + 2} 行：缺少供应商信息，请选择供应商`);
+            continue;
+          }
         }
         
         mappings.push({
@@ -831,6 +839,7 @@ export default function ProductMappingsPage() {
           productCode: productCode || '',
           price: price,
           isActive: true,
+          mappingType: activeTab,
           ...(activeTab === 'customer' 
             ? { 
                 customerCode: partnerIdCode || partnerSelectedCode || '',
@@ -889,7 +898,7 @@ export default function ProductMappingsPage() {
       setExcelImportData([]);
       setSelectedCustomer('');
       setSelectedSupplier('');
-      loadData();
+      loadData(activeTab);
     } catch {
       toast.error('导入失败');
     } finally {
