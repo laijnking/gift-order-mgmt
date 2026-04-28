@@ -101,7 +101,7 @@ interface ImportedReceiptRow {
   ['客户订单号']?: string;
   ['订单号']?: string;
   ['单据编号']?: string;
-  ['供应商单据号']?: string;
+  ['发货方单据号']?: string;
   ['快递公司']?: string;
   ['快递单号']?: string;
   ['物流单号']?: string;
@@ -154,7 +154,7 @@ export default function ReturnReceiptPage() {
         setSuppliers(data.data || []);
       }
     } catch (error) {
-      console.error('加载供应商失败:', error);
+      console.error('加载发货方失败:', error);
     }
   }, [authHeaders]);
 
@@ -173,7 +173,7 @@ export default function ReturnReceiptPage() {
     }
   }, [authHeaders]);
 
-  // 加载供应商列表
+  // 加载发货方列表
   useEffect(() => {
     loadSuppliers();
     loadRecords();
@@ -182,7 +182,7 @@ export default function ReturnReceiptPage() {
   // 文件上传处理
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (!selectedSupplier) {
-      toast.error('请先选择供应商');
+      toast.error('请先选择发货方');
       return;
     }
 
@@ -205,7 +205,7 @@ export default function ReturnReceiptPage() {
       // 提取回单数据 - 增强支持更多字段
       const receipts = jsonData.map((row) => ({
         customerOrderNo: row['客户订单号'] || row['订单号'] || row.customerOrderNo || row.orderNo || row['单据编号'] || '',
-        supplierOrderNo: row['供应商单据号'] || row.supplierOrderNo || '',
+        supplierOrderNo: row['发货方单据号'] || row.supplierOrderNo || '',
         expressCompany: row['快递公司'] || row.expressCompany || '',
         trackingNo: row['快递单号'] || row.trackingNo || row['物流单号'] || '',
         shipDate: row['发货日期'] || row.shipDate || row['日期'] || null,
@@ -397,12 +397,12 @@ export default function ReturnReceiptPage() {
     
     try {
       // 加载待匹配订单列表
-      const response = await fetch(`/api/orders?status=assigned&supplierId=${receipt.supplierId || ''}`, { headers: authHeaders() });
+      const response = await fetch(`/api/orders?status=assigned,notified&supplierId=${receipt.supplierId || ''}`, { headers: authHeaders() });
       const data = await response.json();
       
       if (data.success) {
         const availableOrders = data.data.filter((o: Order) => 
-          o.status === 'assigned' && !receipts.some(r => r.orderId === o.id && r.id !== receipt.id)
+          (o.status === 'assigned' || o.status === 'notified') && !receipts.some(r => r.orderId === o.id && r.id !== receipt.id)
         );
 
         const sortedOrders = [...availableOrders].sort((a: Order, b: Order) => {
@@ -504,7 +504,7 @@ export default function ReturnReceiptPage() {
           </div>
           <div className="min-w-0">
             <h1 className="text-2xl font-bold">回单导入</h1>
-            <p className="text-sm text-muted-foreground">导入供应商回传快递单号，自动匹配订单</p>
+            <p className="text-sm text-muted-foreground">导入发货方回传快递单号，自动匹配订单</p>
           </div>
         </div>
         <Button variant="outline" onClick={loadRecords} disabled={loading} className="w-full sm:w-auto">
@@ -540,15 +540,15 @@ export default function ReturnReceiptPage() {
               <CardDescription>上传包含快递信息的Excel文件</CardDescription>
             </CardHeader>
             <CardContent>
-              {/* 供应商选择 - 必须先选择 */}
+              {/* 发货方选择 - 必须先选择 */}
               <div className="mb-4">
-                <label className="text-sm font-medium mb-2 block">选择供应商</label>
+                <label className="text-sm font-medium mb-2 block">选择发货方</label>
                 <select
                   value={selectedSupplier}
                   onChange={(e) => setSelectedSupplier(e.target.value)}
                   className="w-full h-10 px-3 border rounded-md bg-background text-sm"
                 >
-                  <option value="">请先选择供应商</option>
+                  <option value="">请先选择发货方</option>
                   {suppliers.map((s) => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
@@ -577,7 +577,7 @@ export default function ReturnReceiptPage() {
                     支持 .xlsx, .xls 格式
                   </p>
                   {!selectedSupplier && (
-                    <p className="text-xs text-orange-500 mt-2">请先选择供应商</p>
+                    <p className="text-xs text-orange-500 mt-2">请先选择发货方</p>
                   )}
                 </div>
               ) : (
@@ -922,7 +922,7 @@ export default function ReturnReceiptPage() {
                     <TableHead className="w-[50px]"></TableHead>
                     <TableHead>订单号</TableHead>
                     <TableHead>客户订单号</TableHead>
-                    <TableHead>供应商</TableHead>
+                    <TableHead>发货方</TableHead>
                     <TableHead>状态</TableHead>
                   </TableRow>
                 </TableHeader>

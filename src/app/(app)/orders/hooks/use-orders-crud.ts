@@ -161,7 +161,7 @@ export function useOrdersCrud({
     try {
       const LOCKED_STATUSES = ['returned', 'feedbacked', 'completed', 'cancelled'];
       const updateData: Record<string, unknown> = {
-        customerCode: editForm.customerCode || 'UNKNOWN',
+        customer_code: editForm.customerCode || 'UNKNOWN',
         items: [{
           product_name: editForm.productName || '未指定商品',
           product_code: editForm.productCode || '',
@@ -169,20 +169,18 @@ export function useOrdersCrud({
           product_brand: editForm.productBrand || '',
           quantity: editForm.quantity || 1,
         }],
-        receiver: {
-          name: editForm.receiverName,
-          phone: editForm.receiverPhone,
-          address: editForm.receiverAddress,
-          province: editForm.receiverProvince || '',
-        },
-        expressRequirement: editForm.expressRequirement || '',
+        receiver_name: editForm.receiverName,
+        receiver_phone: editForm.receiverPhone,
+        receiver_address: editForm.receiverAddress,
+        province: editForm.receiverProvince || '',
+        express_requirement: editForm.expressRequirement || '',
         remark: editForm.remark || '',
       };
       if (!LOCKED_STATUSES.includes(editForm.status)) {
-        if (editForm.supplierId) { updateData.supplierId = editForm.supplierId; updateData.supplierName = editForm.supplierName; }
+        if (editForm.supplierId) { updateData.supplier_id = editForm.supplierId; updateData.supplier_name = editForm.supplierName; }
         if (editForm.status) updateData.status = editForm.status;
-        if (editForm.expressCompany) updateData.expressCompany = editForm.expressCompany;
-        if (editForm.trackingNo) updateData.trackingNo = editForm.trackingNo;
+        if (editForm.expressCompany) updateData.express_company = editForm.expressCompany;
+        if (editForm.trackingNo) updateData.tracking_no = editForm.trackingNo;
       }
       const res = await fetch(`/api/orders?id=${editForm.id}`, {
         method: 'PATCH',
@@ -237,7 +235,7 @@ export function useOrdersCrud({
   // Status helpers
   const getDeleteDisabledReason = (order: Order): string | null => {
     const s = order.status;
-    if (s === 'assigned') return '订单已派发供应商，无法删除';
+    if (s === 'assigned') return '订单已派发发货方，无法删除';
     if (s === 'partial_returned') return '订单正在回单处理中，无法删除';
     if (s === 'returned') return '订单已回单，需先完成客户反馈/财务处理，无法删除';
     if (s === 'feedbacked') return '订单已反馈客户，等待导出金蝶，无法删除';

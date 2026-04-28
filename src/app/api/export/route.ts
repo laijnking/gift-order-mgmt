@@ -132,7 +132,7 @@ async function dispatchOneOrder(
     const quantity = toNumber(item.quantity, 1);
     const stock = await findStockForDispatch(client, supplier.id as string, item);
     if (!stock) {
-      throw new Error(`订单 ${order.order_no || order.id} 的商品「${item.product_name || item.productName || item.product_code || item.productCode || '未知商品'}」未找到供应商库存`);
+      throw new Error(`订单 ${order.order_no || order.id} 的商品「${item.product_name || item.productName || item.product_code || item.productCode || '未知商品'}」未找到发货方库存`);
     }
 
     const beforeQuantity = toNumber(stock.quantity);
@@ -245,7 +245,7 @@ export async function POST(request: NextRequest) {
       client.from('shippers').select('*').eq('is_active', true),
     ]);
     if (ordersError) throw new Error(`查询订单失败: ${ordersError.message}`);
-    if (shippersError) throw new Error(`查询供应商失败: ${shippersError.message}`);
+    if (shippersError) throw new Error(`查询发货方失败: ${shippersError.message}`);
     if (!orders || orders.length === 0) {
       return NextResponse.json({ success: false, error: '未找到订单' }, { status: 404 });
     }
@@ -259,18 +259,18 @@ export async function POST(request: NextRequest) {
     for (const order of orders as Record<string, unknown>[]) {
       const supplierId = requestedSupplierId || order.supplier_id;
       if (!supplierId) {
-        errors.push(`订单 ${order.order_no || order.id} 未选择供应商`);
+        errors.push(`订单 ${order.order_no || order.id} 未选择发货方`);
         continue;
       }
       const supplier = supplierMap.get(supplierId);
       if (!supplier) {
-        errors.push(`订单 ${order.order_no || order.id} 的供应商不存在或未启用`);
+        errors.push(`订单 ${order.order_no || order.id} 的发货方不存在或未启用`);
         continue;
       }
 
       try {
         const dispatchItems = await dispatchOneOrder(client, order, supplier, batchNo);
-        const supplierName = String(supplier.name || '未知供应商');
+        const supplierName = String(supplier.name || '未知发货方');
         if (!rowsBySupplier[supplierName]) rowsBySupplier[supplierName] = [];
 
         for (const item of dispatchItems) {

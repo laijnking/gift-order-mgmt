@@ -10,7 +10,7 @@ export const FILTERABLE_FIELDS = [
   { key: 'productName', label: '商品名称/型号', placeholder: '输入商品名称或型号' },
   { key: 'customerInfo', label: '客户信息', placeholder: '输入客户名称或编码' },
   { key: 'phone', label: '电话号码', placeholder: '输入电话号码' },
-  { key: 'supplierName', label: '供应商', placeholder: '输入供应商名称' },
+  { key: 'supplierName', label: '发货方', placeholder: '输入发货方名称' },
   { key: 'salesperson', label: '业务员', placeholder: '输入业务员姓名' },
   { key: 'operator', label: '跟单员', placeholder: '输入跟单员姓名' },
   { key: 'receiverName', label: '收货人', placeholder: '输入收货人姓名' },

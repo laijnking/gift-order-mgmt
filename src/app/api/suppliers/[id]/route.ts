@@ -33,7 +33,7 @@ function transformSupplier(dbSupplier: Record<string, unknown>) {
   };
 }
 
-// 获取单个供应商（统一查询 shippers 表）
+// 获取单个发货方（统一查询 shippers 表）
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -51,11 +51,11 @@ export async function GET(
       .eq('id', id)
       .single();
     
-    if (error) throw new Error(`查询供应商失败: ${error.message}`);
+    if (error) throw new Error(`查询发货方失败: ${error.message}`);
     if (!data) {
       return NextResponse.json({ 
         success: false, 
-        error: '供应商不存在' 
+        error: '发货方不存在' 
       }, { status: 404 });
     }
 
@@ -64,7 +64,7 @@ export async function GET(
       data: transformSupplier(data as Record<string, unknown>),
     });
   } catch (error) {
-    console.error('获取供应商失败:', error);
+    console.error('获取发货方失败:', error);
     return NextResponse.json({ 
       success: false, 
       error: error instanceof Error ? error.message : '未知错误' 
@@ -72,7 +72,7 @@ export async function GET(
   }
 }
 
-// 更新供应商（统一更新 shippers 表）
+// 更新发货方（统一更新 shippers 表）
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -115,15 +115,15 @@ export async function PUT(
       .select()
       .single();
     
-    if (error) throw new Error(`更新供应商失败: ${error.message}`);
+    if (error) throw new Error(`更新发货方失败: ${error.message}`);
 
     return NextResponse.json({
       success: true,
       data: transformSupplier(data as Record<string, unknown>),
-      message: '供应商更新成功'
+      message: '发货方更新成功'
     });
   } catch (error) {
-    console.error('更新供应商失败:', error);
+    console.error('更新发货方失败:', error);
     return NextResponse.json({ 
       success: false, 
       error: error instanceof Error ? error.message : '未知错误' 
@@ -131,7 +131,7 @@ export async function PUT(
   }
 }
 
-// 删除供应商（软删除）
+// 删除发货方（软删除）
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -148,14 +148,14 @@ export async function DELETE(
       .update({ is_active: false, updated_at: new Date().toISOString() })
       .eq('id', id);
     
-    if (error) throw new Error(`删除供应商失败: ${error.message}`);
+    if (error) throw new Error(`删除发货方失败: ${error.message}`);
 
     return NextResponse.json({
       success: true,
-      message: '供应商删除成功'
+      message: '发货方删除成功'
     });
   } catch (error) {
-    console.error('删除供应商失败:', error);
+    console.error('删除发货方失败:', error);
     return NextResponse.json({ 
       success: false, 
       error: error instanceof Error ? error.message : '未知错误' 

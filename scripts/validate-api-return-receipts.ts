@@ -106,7 +106,7 @@ async function queryOne<T extends JsonObject>(pool: Pool, sql: string, params: u
 async function insertRecord(pool: Pool, options: SeedRecordOptions = {}) {
   const id = randomUUID();
   const supplierId = options.supplierId ?? randomUUID();
-  const supplierName = options.supplierName ?? `供应商-${RUN_ID}`;
+  const supplierName = options.supplierName ?? `发货方-${RUN_ID}`;
 
   await pool.query(
     `
@@ -144,7 +144,7 @@ async function insertRecord(pool: Pool, options: SeedRecordOptions = {}) {
 async function insertOrder(pool: Pool, options: SeedOrderOptions = {}) {
   const id = randomUUID();
   const supplierId = options.supplierId ?? randomUUID();
-  const supplierName = options.supplierName ?? `供应商-${RUN_ID}`;
+  const supplierName = options.supplierName ?? `发货方-${RUN_ID}`;
   const orderNo = options.orderNo ?? `ORDER-${RUN_ID}-${id.slice(0, 8)}`;
 
   await pool.query(
@@ -350,7 +350,7 @@ const tests: TestCase[] = [
     name: '[id] PATCH resolves conflict receipts and updates order logistics',
     async run({ pool }) {
       const supplierId = randomUUID();
-      const supplierName = `供应商-${RUN_ID}-RESOLVE`;
+      const supplierName = `发货方-${RUN_ID}-RESOLVE`;
       const record = await insertRecord(pool, {
         supplierId,
         supplierName,
@@ -502,7 +502,7 @@ const tests: TestCase[] = [
     name: 'match marks receipt as conflict when multiple orders match',
     async run({ pool }) {
       const supplierId = randomUUID();
-      const supplierName = `供应商-${RUN_ID}-CONFLICT`;
+      const supplierName = `发货方-${RUN_ID}-CONFLICT`;
       const record = await insertRecord(pool, {
         supplierId,
         supplierName,

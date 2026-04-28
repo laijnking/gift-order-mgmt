@@ -255,9 +255,9 @@ export default function HomePage() {
       ['活跃客户', data.customers.active],
       ['本月新增', data.customers.newThisMonth],
       [],
-      ['供应商统计'],
-      ['总供应商数', data.suppliers.total],
-      ['活跃供应商', data.suppliers.active],
+      ['发货方统计'],
+      ['总发货方数', data.suppliers.total],
+      ['活跃发货方', data.suppliers.active],
       [],
       [],
       ['热门商品 TOP5'],
@@ -402,14 +402,14 @@ export default function HomePage() {
           </div>
         </Link>
 
-        {/* 供应商总数 */}
+        {/* 发货方总数 */}
         <Link href="/suppliers-manage" className="group block">
           <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-violet-500 to-violet-400 p-6 text-white shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.02] cursor-pointer">
             <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
             <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-4">
-                <span className="text-sm font-medium text-white/80">供应商总数</span>
+                <span className="text-sm font-medium text-white/80">发货方总数</span>
                 <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
                   <Building2 className="h-5 w-5" />
                 </div>

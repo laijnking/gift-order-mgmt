@@ -4,7 +4,7 @@
  * 模拟真实业务场景，覆盖订单完整生命周期：
  *   1. 订单录入（/api/orders POST — JSON格式模拟 AI 解析结果）
  *   2. 订单列表查询（GET /api/orders 含状态/客户筛选）
- *   3. 订单派发（PATCH /api/orders — 设置供应商，转为 assigned）
+ *   3. 订单派发（PATCH /api/orders — 设置发货方，转为 assigned）
  *   4. 待发货统计（/api/shipping-exports/pending）
  *   5. 批量导出发货通知（/api/shipping-exports/batch）
  *   6. 回单导入（/api/return-receipts）
@@ -137,7 +137,7 @@ async function main() {
   console.log('');
 
   // ================================================================
-  // 步骤 1: 准备测试数据 — 查询客户和供应商
+  // 步骤 1: 准备测试数据 — 查询客户和发货方
   // ================================================================
   console.log('[步骤1] 准备测试数据...');
 
@@ -166,9 +166,9 @@ async function main() {
     if (data?.success && Array.isArray(data.data) && data.data.length > 0) {
       supplierId = String((data.data[0] as Record<string, unknown>).id || '');
       const supplierName = String((data.data[0] as Record<string, unknown>).name || '');
-      pass('step1:supplier', `使用供应商: ${supplierName} (${supplierId})`);
+      pass('step1:supplier', `使用发货方: ${supplierName} (${supplierId})`);
     } else {
-      fail('step1:supplier', '无法获取供应商数据');
+      fail('step1:supplier', '无法获取发货方数据');
     }
   }
 
@@ -216,7 +216,7 @@ async function main() {
     salespersonName: '销售甲',
     operatorName: '跟单乙',
     supplierId: supplierId || undefined,
-    supplierName: supplierId ? '测试供应商' : undefined,
+    supplierName: supplierId ? '测试发货方' : undefined,
     warehouseId: warehouseId || undefined,
     warehouse: warehouseId ? '测试仓库' : undefined,
     items: testItems,
@@ -314,7 +314,7 @@ async function main() {
             id: orderId,
             status: 'assigned',
             supplierId: supplierId || undefined,
-            supplierName: supplierId ? '测试供应商' : undefined,
+            supplierName: supplierId ? '测试发货方' : undefined,
             warehouseId: warehouseId || undefined,
             warehouse: warehouseId ? '测试仓库' : undefined,
           }),
@@ -389,7 +389,7 @@ async function main() {
       fail('step6:batch-export', `status=${status}, msg=${data?.error}`);
     }
   } else {
-    // 无供应商时跳过导出测试
+    // 无发货方时跳过导出测试
     const { status, data } = await fetchJson<ApiEnvelope<Record<string, unknown>>>(
       `${BASE_URL}/api/shipping-exports/batch`,
       {
@@ -398,7 +398,7 @@ async function main() {
         body: JSON.stringify({ supplierIds: [], templateId: null }),
       }
     );
-    if (status === 200) pass('step6:batch-export', '批量导出 API 正常（无供应商数据）');
+    if (status === 200) pass('step6:batch-export', '批量导出 API 正常（无发货方数据）');
     else fail('step6:batch-export', `status=${status}`);
   }
 
@@ -411,7 +411,7 @@ async function main() {
   if (testOrderIds.length > 0 && supplierId) {
     const receiptPayload = {
       supplierId,
-      supplierName: '测试供应商',
+      supplierName: '测试发货方',
       receipts: testOrderIds.slice(0, 2).map((orderId, idx) => ({
         customerOrderNo: `ORD-${Date.now()}-${idx}`,
         supplierOrderNo: `SUP-${Date.now()}-${idx}`,
@@ -446,9 +446,9 @@ async function main() {
       fail('step7:return-history', `status=${hStatus}`);
     }
   } else {
-    // 无供应商时跳过回单测试
-    pass('step7:return-receipt', '跳过 (无供应商数据)');
-    pass('step7:return-history', '跳过 (无供应商数据)');
+    // 无发货方时跳过回单测试
+    pass('step7:return-receipt', '跳过 (无发货方数据)');
+    pass('step7:return-history', '跳过 (无发货方数据)');
   }
 
   // ================================================================

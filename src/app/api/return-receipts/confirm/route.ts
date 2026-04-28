@@ -66,8 +66,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 扣减供应商库存（简化版）
-    // 实际实现需要根据订单商品查询供应商SKU映射，然后扣减对应库存
+    // 扣减发货方库存（简化版）
+    // 实际实现需要根据订单商品查询发货方SKU映射，然后扣减对应库存
     for (const orderId of updatedOrderIds) {
       const { data: order } = await client
         .from('orders')
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
 
       if (order?.supplier_id) {
         // 简化：记录库存变更日志
-        console.log(`订单 ${orderId} 发货，供应商 ${order.supplier_id} 库存扣减`);
+        console.log(`订单 ${orderId} 发货，发货方 ${order.supplier_id} 库存扣减`);
       }
     }
 

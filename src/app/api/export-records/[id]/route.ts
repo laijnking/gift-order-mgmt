@@ -135,7 +135,7 @@ export async function GET(
       details = record.metadata.details;
     }
 
-    // 获取供应商/客户信息（统一查询 shippers 表）
+    // 获取发货方/客户信息（统一查询 shippers 表）
     let entityName = '';
     if (record.supplier_id) {
       const { data: supplier } = await client
@@ -208,7 +208,7 @@ export async function POST(
             : [];
 
       if (supplierIds.length === 0) {
-        return NextResponse.json({ success: false, error: '导出记录缺少供应商信息，无法重新生成' }, { status: 400 });
+        return NextResponse.json({ success: false, error: '导出记录缺少发货方信息，无法重新生成' }, { status: 400 });
       }
 
       const response = await fetch(`${origin}/api/shipping-exports/batch`, {

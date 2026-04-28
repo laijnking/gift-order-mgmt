@@ -1,11 +1,11 @@
 import { readdir, readFile } from 'fs/promises';
 import path from 'path';
-import { getColumnMappingDiagnostics } from '../src/lib/column-mapping-diagnostics';
 import {
   buildHeaderFingerprint,
   buildTemplateSignature,
   normalizeHeaders,
-} from '../src/lib/column-mapping-metadata';
+  getColumnMappingDiagnostics,
+} from '../src/lib/column-mapping-rules';
 
 interface OrderParseFixture {
   name: string;

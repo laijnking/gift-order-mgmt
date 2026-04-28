@@ -70,7 +70,7 @@ type AgentTestMode = 'real' | 'mock';
 const AGENT_TYPES = [
   { value: 'order_parser', label: '订单解析' },
   { value: 'price_query', label: '价格查询' },
-  { value: 'supplier_match', label: '供应商匹配' },
+  { value: 'supplier_match', label: '发货方匹配' },
   { value: 'text_classifier', label: '文本分类' },
   { value: 'custom', label: '自定义' },
 ];

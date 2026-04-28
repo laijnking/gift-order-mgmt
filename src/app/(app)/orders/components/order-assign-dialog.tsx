@@ -82,19 +82,19 @@ export function OrderAssignDialog({
       if (manualSelectSupplierId && !manualSelectSupplierName) {
         const supplier = suppliers.find(s => s.id === manualSelectSupplierId);
         setSelectedSuppliers(prev => ({ ...prev, [manualSelectOrderId]: supplierId }));
-        toast.success(`已选择供应商：${supplier?.name || manualSelectSupplierId}`);
+        toast.success(`已选择发货方：${supplier?.name || manualSelectSupplierId}`);
       } else if (manualSelectSupplierName && !manualSelectSupplierId) {
         const supplier = suppliers.find(s => s.name === manualSelectSupplierName);
         supplierId = supplier?.id || 'manual_' + Date.now();
         setSelectedSuppliers(prev => ({ ...prev, [manualSelectOrderId]: supplierId }));
-        toast.success(`已选择供应商：${manualSelectSupplierName}`);
+        toast.success(`已选择发货方：${manualSelectSupplierName}`);
       }
       setManualSelectOpen(false);
       setManualSelectOrderId(null);
       setManualSelectSupplierId('');
       setManualSelectSupplierName('');
     } else {
-      toast.error('请选择或输入供应商');
+      toast.error('请选择或输入发货方');
     }
   };
 
@@ -114,8 +114,8 @@ export function OrderAssignDialog({
             </DialogTitle>
             <DialogDescription>
               {assigningOrderId
-                ? '选择有库存的供应商，显示商品、库存和历史成本'
-                : `将 ${selectedOrders.size} 条订单派发给供应商`}
+                ? '选择有库存的发货方，显示商品、库存和历史成本'
+                : `将 ${selectedOrders.size} 条订单派发给发货方`}
             </DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-hidden flex flex-col gap-4 py-4">
@@ -130,7 +130,7 @@ export function OrderAssignDialog({
                 {isMatching ? (
                   <><Loader2 className="w-4 h-4 mr-2 animate-spin" />匹配中...</>
                 ) : (
-                  <><Sparkles className="w-4 h-4 mr-2" />智能匹配供应商</>
+                  <><Sparkles className="w-4 h-4 mr-2" />智能匹配发货方</>
                 )}
               </Button>
             </div>
@@ -169,7 +169,7 @@ export function OrderAssignDialog({
                                 <div className="flex items-center gap-2">
                                   <AlertTriangle className="h-4 w-4 text-yellow-600" />
                                   <span className="font-medium">无库存或新商品：</span>
-                                  <span>{result.newProductHint || '当前商品在所有供应商均无库存'}</span>
+                                  <span>{result.newProductHint || '当前商品在所有发货方均无库存'}</span>
                                 </div>
                                 <Button
                                   variant="outline"
@@ -178,7 +178,7 @@ export function OrderAssignDialog({
                                   onClick={() => openManualSelect(orderId)}
                                 >
                                   <Plus className="w-4 h-4 mr-1" />
-                                  手动选择供应商
+                                  手动选择发货方
                                 </Button>
                               </div>
                             </div>
@@ -187,7 +187,7 @@ export function OrderAssignDialog({
                             <TableHeader>
                               <TableRow className="bg-muted/30">
                                 <TableHead className="w-12">选择</TableHead>
-                                <TableHead>供应商</TableHead>
+                                <TableHead>发货方</TableHead>
                                 <TableHead>省份匹配</TableHead>
                                 <TableHead>商品编码</TableHead>
                                 <TableHead>商品名称</TableHead>
@@ -261,10 +261,10 @@ export function OrderAssignDialog({
                         </div>
                       ) : (
                         <div className="p-8 text-center">
-                          <p className="text-muted-foreground mb-4">加载供应商列表失败或无可用供应商</p>
+                          <p className="text-muted-foreground mb-4">加载发货方列表失败或无可用发货方</p>
                           <Button variant="outline" onClick={() => openManualSelect(orderId)}>
                             <Plus className="w-4 h-4 mr-2" />
-                            手动选择供应商
+                            手动选择发货方
                           </Button>
                         </div>
                       )}
@@ -279,9 +279,9 @@ export function OrderAssignDialog({
               <div className="flex gap-2 pt-2 border-t">
                 <div className="flex-1 text-sm text-muted-foreground">
                   {assigningOrderId ? (
-                    <>已选择供应商：{suppliers.find(s => s.id === selectedSupplierId)?.name || '未选择'}</>
+                    <>已选择发货方：{suppliers.find(s => s.id === selectedSupplierId)?.name || '未选择'}</>
                   ) : (
-                    <>已为 {Object.keys(selectedSuppliers).length} 条订单选择供应商</>
+                    <>已为 {Object.keys(selectedSuppliers).length} 条订单选择发货方</>
                   )}
                 </div>
                 <Button
@@ -301,12 +301,12 @@ export function OrderAssignDialog({
       <Dialog open={manualSelectOpen} onOpenChange={setManualSelectOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>手动选择供应商</DialogTitle>
-            <DialogDescription>从所有供应商中选择，或直接输入供应商名称</DialogDescription>
+            <DialogTitle>手动选择发货方</DialogTitle>
+            <DialogDescription>从所有发货方中选择，或直接输入发货方名称</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="supplier-select">选择供应商</Label>
+              <Label htmlFor="supplier-select">选择发货方</Label>
               <select
                 id="supplier-select"
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
@@ -317,7 +317,7 @@ export function OrderAssignDialog({
                   setManualSelectSupplierName(supplier?.name || '');
                 }}
               >
-                <option value="">请选择供应商</option>
+                <option value="">请选择发货方</option>
                 {suppliers.map(s => (
                   <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
@@ -332,14 +332,14 @@ export function OrderAssignDialog({
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="supplier-name">输入供应商名称</Label>
+              <Label htmlFor="supplier-name">输入发货方名称</Label>
               <Input
                 id="supplier-name"
-                placeholder="输入供应商名称"
+                placeholder="输入发货方名称"
                 value={manualSelectSupplierName}
                 onChange={(e) => setManualSelectSupplierName(e.target.value)}
               />
-              <p className="text-xs text-muted-foreground">直接输入供应商名称（如果供应商不在下拉列表中）</p>
+              <p className="text-xs text-muted-foreground">直接输入发货方名称（如果发货方不在下拉列表中）</p>
             </div>
           </div>
           <DialogFooter>

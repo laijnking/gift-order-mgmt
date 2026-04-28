@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
-import { getColumnMappingDiagnostics } from '@/lib/column-mapping-diagnostics';
+import { extractAddressParts, getColumnMappingDiagnostics } from '@/lib/column-mapping-rules';
 import { requirePermission } from '@/lib/server-auth';
 import { PERMISSIONS } from '@/lib/permissions';
 import type {
@@ -15,7 +15,7 @@ const CHINESE_COLUMN_MAPPING: Record<string, string[]> = {
   customer_order_no: ['客户单据编号', '序号', '客户订单号', '订单号','客户订单号','商户订单号', '来源订单', '订单编号'],
   bill_date: ['单据日期', '订单日期', '订单创建日期', '创建日期', '下单时间'],
   bill_no: ['单据编号'],
-  supplier_order_no: ['供应商单据号', '供应商订单号'],
+  supplier_order_no: ['发货方单据号', '发货方订单号'],
   customer_code: ['客户代码', '客户编码'],
   customer_name: ['客户名称', '客户姓名'],
   // 客户商品信息（使用 customer_product_* 作为内部字段名）
@@ -41,22 +41,6 @@ const CHINESE_COLUMN_MAPPING: Record<string, string[]> = {
   income_name: ['收入名称'],
   income_amount: ['应收金额', '收入金额'],
 };
-
-// 从地址中提取省市区
-function extractAddressParts(address: string): { province: string; city: string; district: string } {
-  const result = { province: '', city: '', district: '' };
-  if (!address) return result;
-  
-  // 匹配省/市/区
-  const match = address.match(/^([^省市区]+省)?([^省市区]+市)?([^省市区]+区)?/);
-  if (match) {
-    result.province = match[1]?.replace('省', '') || '';
-    result.city = match[2]?.replace('市', '') || '';
-    result.district = match[3]?.replace('区', '') || '';
-  }
-  
-  return result;
-}
 
 // 自动检测Excel列名并生成映射（优先匹配最长名称）
 function autoDetectColumnMapping(headers: string[]): Record<string, string> {
@@ -316,7 +300,7 @@ async function matchSystemProduct(
   return result;
 }
 
-// 匹配供应商库存
+// 匹配发货方库存
 async function matchSupplierStocks(
   client: ReturnType<typeof getSupabaseClient>,
   productId: string | null,
@@ -373,7 +357,7 @@ async function matchSupplierStocks(
       return (b.stockQuantity + bLowStock + bProvince) - (a.stockQuantity + aLowStock + aProvince);
     });
   
-  return sortedStocks.slice(0, 5); // 最多返回5个供应商
+  return sortedStocks.slice(0, 5); // 最多返回5个发货方
 }
 
 // 字段别名映射（前端字段名 -> 后端内部字段名）
@@ -486,7 +470,7 @@ async function parseExcelData(
         throw matchErr;
       }
 
-      // 匹配供应商库存
+      // 匹配发货方库存
       const supplierMatches = await matchSupplierStocks(
         client,
         matchedProduct.productId,

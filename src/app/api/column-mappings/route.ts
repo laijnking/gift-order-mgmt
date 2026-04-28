@@ -5,7 +5,7 @@ import {
   buildTemplateSignature,
   normalizeHeaders,
   supportsColumnMappingMetadata,
-} from '@/lib/column-mapping-metadata';
+} from '@/lib/column-mapping-rules';
 import { requirePermission } from '@/lib/server-auth';
 import { PERMISSIONS } from '@/lib/permissions';
 

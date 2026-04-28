@@ -6,7 +6,7 @@
 --   以及 product_mappings 表的字段结构。
 --
 -- 背景说明（仅供理解，不要在代码中依赖此注释）：
---   系统经历过一次档案合并，历史上存在独立的"供应商档案"和"发货方档案"。
+--   系统经历过一次档案合并，历史上存在独立的"发货方档案"。
 --   后来合并为一个档案系统，通过 type 字段区分类型（supplier/jd/self/third_party）。
 --   当前实现中，两个表都存在但承担不同角色：
 --     - suppliers: 原始表，API层使用，目前业务数据通过此表关联
@@ -21,12 +21,12 @@
 -- ----------------------------------------------------------
 -- 字段说明（已与数据库同步）：
 
-COMMENT ON TABLE suppliers IS '供应商档案表（业务层实际使用）。通过 type 字段区分类型：supplier/jd/self/third_party。';
+COMMENT ON TABLE suppliers IS '发货方档案表（业务层实际使用）。通过 type 字段区分类型：supplier/jd/self/third_party。';
 COMMENT ON COLUMN suppliers.id IS '主键UUID';
-COMMENT ON COLUMN suppliers.code IS '供应商编码';
-COMMENT ON COLUMN suppliers.name IS '供应商名称';
+COMMENT ON COLUMN suppliers.code IS '发货方编码';
+COMMENT ON COLUMN suppliers.name IS '发货方名称';
 COMMENT ON COLUMN suppliers.short_name IS '简称';
-COMMENT ON COLUMN suppliers.type IS '类型：supplier(供应商)/jd(京东)/self(自有仓)/third_party(第三方仓)';
+COMMENT ON COLUMN suppliers.type IS '类型：supplier(发货方)/jd(京东)/self(自有仓)/third_party(第三方仓)';
 COMMENT ON COLUMN suppliers.contact IS '联系人姓名';
 COMMENT ON COLUMN suppliers.contact_person IS '联系人姓名（与contact同义，优先使用此字段）';
 COMMENT ON COLUMN suppliers.contact_phone IS '联系电话';
@@ -68,8 +68,8 @@ COMMENT ON COLUMN shippers.is_active IS '是否启用';
 -- ----------------------------------------------------------
 
 COMMENT ON TABLE stocks IS '库存档案表';
-COMMENT ON COLUMN stocks.supplier_id IS '关联 suppliers.id（供应商/发货方档案ID）';
-COMMENT ON COLUMN stocks.supplier_name IS '供应商/发货方名称（冗余存储，便于展示）';
+COMMENT ON COLUMN stocks.supplier_id IS '关联 suppliers.id（发货方档案ID）';
+COMMENT ON COLUMN stocks.supplier_name IS '发货方名称（冗余存储，便于展示）';
 COMMENT ON COLUMN stocks.warehouse_id IS '关联 warehouses.id（仓库ID，可为空）';
 COMMENT ON COLUMN stocks.warehouse_name IS '仓库名称（冗余存储）';
 COMMENT ON COLUMN stocks.quantity IS '当前库存数量';
@@ -84,7 +84,7 @@ COMMENT ON COLUMN stocks.status IS '状态：active/inactive';
 -- 4. product_mappings 表（商品映射档案）
 -- ----------------------------------------------------------
 
-COMMENT ON TABLE product_mappings IS '商品映射档案表，支持客户映射和供应商映射。mapping_type 字段区分类型。';
+COMMENT ON TABLE product_mappings IS '商品映射档案表，支持客户映射和发货方映射。mapping_type 字段区分类型。';
 COMMENT ON COLUMN product_mappings.product_id IS '关联 products.id（系统商品ID）';
 COMMENT ON COLUMN product_mappings.product_code IS '系统商品编码';
 COMMENT ON COLUMN product_mappings.product_name IS '系统商品名称';
@@ -92,12 +92,12 @@ COMMENT ON COLUMN product_mappings.customer_id IS '关联 customers.id（仅 map
 COMMENT ON COLUMN product_mappings.customer_code IS '客户编码';
 COMMENT ON COLUMN product_mappings.customer_name IS '客户名称';
 COMMENT ON COLUMN product_mappings.supplier_id IS '关联 suppliers.id（仅 mapping_type=supplier 时有效）';
-COMMENT ON COLUMN product_mappings.supplier_name IS '供应商名称';
-COMMENT ON COLUMN product_mappings.customer_sku IS '客户/供应商商品SKU编码';
-COMMENT ON COLUMN product_mappings.customer_barcode IS '客户/供应商商品条码';
-COMMENT ON COLUMN product_mappings.customer_product_name IS '客户/供应商商品名称（品名）';
-COMMENT ON COLUMN product_mappings.price IS '客户/供应商采购价格';
-COMMENT ON COLUMN product_mappings.mapping_type IS '映射类型：customer（客户商品映射）/supplier（供应商商品映射）';
+COMMENT ON COLUMN product_mappings.supplier_name IS '发货方名称';
+COMMENT ON COLUMN product_mappings.customer_sku IS '客户/发货方商品SKU编码';
+COMMENT ON COLUMN product_mappings.customer_barcode IS '客户/发货方商品条码';
+COMMENT ON COLUMN product_mappings.customer_product_name IS '客户/发货方商品名称（品名）';
+COMMENT ON COLUMN product_mappings.price IS '客户/发货方采购价格';
+COMMENT ON COLUMN product_mappings.mapping_type IS '映射类型：customer（客户商品映射）/supplier（发货方商品映射）';
 COMMENT ON COLUMN product_mappings.is_active IS '是否启用（默认 true）';
 
 -- ----------------------------------------------------------
@@ -107,6 +107,6 @@ COMMENT ON COLUMN product_mappings.is_active IS '是否启用（默认 true）';
 -- 两者通过 code 字段可以建立对应关系（理想情况下 code 应唯一）。
 --
 -- 当前业务规则：
---   - 库存导入时，从 shippers 表查找供应商（已修复）
---   - 订单相关API，从 suppliers 表查找供应商
+--   - 库存导入时，从 shippers 表查找发货方（已修复）
+--   - 订单相关API，从 suppliers 表查找发货方
 --   - 建议：后续统一使用一个表，避免数据不一致

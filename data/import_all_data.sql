@@ -1,4 +1,4 @@
--- 导入供应商档案
+-- 导入发货方档案
 INSERT INTO suppliers (id, name, short_name, type, contact, send_type, province, can_jd, express_restrictions, cost_factor, is_active, created_at, updated_at)
 VALUES ('44a93007-a844-4165-8635-4385a88feb87', '广州超品汇', '', '聚水潭', '', '一件代发', '', false, '[]', 1, true, NOW(), NOW())
 ON CONFLICT (name) DO UPDATE SET 

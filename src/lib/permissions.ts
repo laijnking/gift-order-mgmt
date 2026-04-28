@@ -10,7 +10,7 @@
  * 权限分组（与 roles.ts 的角色分组对齐）：
  * - 订单相关：orders:*
  * - 商品相关：products:*
- * - 供应商/仓库/物流相关：suppliers:*
+ * - 发货方/仓库/物流相关：suppliers:*
  * - 库存相关：stocks:*
  * - 用户相关：users:*
  * - 设置相关：settings:*
@@ -36,7 +36,7 @@ export const PERMISSIONS = {
   PRODUCTS_EDIT: 'products:edit',
   PRODUCTS_DELETE: 'products:delete',
   PRODUCTS_CREATE: 'products:create',
-  // 供应商 / 仓库 / 物流商
+  // 发货方 / 仓库 / 物流商
   SUPPLIERS_VIEW: 'suppliers:view',
   SUPPLIERS_EDIT: 'suppliers:edit',
   SUPPLIERS_DELETE: 'suppliers:delete',

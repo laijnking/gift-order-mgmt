@@ -654,7 +654,7 @@ export default function ExportRecordsPage() {
                     {selectedRecord ? getRecordEntityCount(selectedRecord, details) : 0}
                   </div>
                   <div className="text-sm text-blue-600">
-                    {selectedRecord?.export_type === 'customer_feedback' ? '涉及客户数' : '涉及供应商数'}
+                    {selectedRecord?.export_type === 'customer_feedback' ? '涉及客户数' : '涉及发货方数'}
                   </div>
                 </div>
                 <div className="p-4 bg-green-50 rounded-lg">
@@ -713,7 +713,7 @@ export default function ExportRecordsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>供应商/客户</TableHead>
+                      <TableHead>发货方/客户</TableHead>
                       <TableHead className="text-right">订单数</TableHead>
                       <TableHead className="text-right">已发货</TableHead>
                       <TableHead className="text-right">待回单</TableHead>

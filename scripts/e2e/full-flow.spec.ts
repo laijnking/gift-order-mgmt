@@ -2,7 +2,7 @@
  * Phase 3: Playwright E2E 全流程测试
  *
  * 通过 Playwright 自动化浏览器测试，验证关键业务页面的 UI 交互。
- * 覆盖 8 个核心场景：客户管理、供应商管理、商品管理、库存管理、
+ * 覆盖 8 个核心场景：客户管理、发货方管理、商品管理、库存管理、
  * 订单列表、订单录入、发货导出、角色权限配置。
  *
  * 运行方式: npx playwright test scripts/e2e/full-flow.spec.ts
@@ -83,13 +83,13 @@ test.describe('礼品订单管理系统 - 全流程 E2E 测试', () => {
   });
 
   // ---------------------------------------------------------------
-  // 场景 2: 供应商档案管理
+  // 场景 2: 发货方档案管理
   // ---------------------------------------------------------------
-  test('供应商管理 - 页面加载', async ({ page }) => {
+  test('发货方管理 - 页面加载', async ({ page }) => {
     await login(page);
-    await navigateAndCheck(page, '供应商管理', '/suppliers-manage', async (p) => {
+    await navigateAndCheck(page, '发货方管理', '/suppliers-manage', async (p) => {
       await p.waitForTimeout(2000);
-      return 'PASS 供应商页面已加载';
+      return 'PASS 发货方页面已加载';
     });
   });
 

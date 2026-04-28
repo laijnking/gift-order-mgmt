@@ -60,17 +60,17 @@ export function calculateOrderAlerts(orders: Order[]): OrderAlertSummary[] {
     const createdAt = new Date(o.createdAt);
     return createdAt < today16 && now >= today16;
   });
-  alerts.push({ type: 'pending_to_assign', label: '待发货超时', description: '当天16:00前未通知供应商发货', count: pendingToAssign.length, orders: pendingToAssign });
+  alerts.push({ type: 'pending_to_assign', label: '待发货超时', description: '当天16:00前未通知发货方发货', count: pendingToAssign.length, orders: pendingToAssign });
 
   const assignedToShip = orders.filter(o => {
-    if (o.status !== 'assigned') return false;
+    if (o.status !== 'notified') return false;
     const assignedAt = o.assignedAt ? new Date(o.assignedAt) : new Date(o.createdAt);
     return (now.getTime() - assignedAt.getTime()) / (1000 * 60 * 60) > 24;
   });
-  alerts.push({ type: 'assigned_to_ship', label: '发货通知超时', description: '已派发超过24小时未导出发货单', count: assignedToShip.length, orders: assignedToShip });
+  alerts.push({ type: 'assigned_to_ship', label: '发货通知超时', description: '已导出发货通知超过24小时未收到回单', count: assignedToShip.length, orders: assignedToShip });
 
   const assignedToReturned = orders.filter(o => {
-    if (o.status !== 'assigned') return false;
+    if (o.status !== 'notified') return false;
     const createdAt = new Date(o.createdAt);
     return createdAt < tomorrow10 && now >= tomorrow10;
   });
@@ -134,7 +134,7 @@ export function OrderWarningsPanel({
               onClick={() => {
                 onStatusFilter(
                   alert.type === 'pending_to_assign' ? 'pending' :
-                  alert.type === 'assigned_to_ship' || alert.type === 'assigned_to_returned' ? 'assigned' : ''
+                  alert.type === 'assigned_to_ship' || alert.type === 'assigned_to_returned' ? 'notified' : ''
                 );
               }}
             >

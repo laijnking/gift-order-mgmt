@@ -1,4 +1,4 @@
-import type { getSupabaseClient } from '@/storage/database/supabase-client';
+import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 type DbClient = ReturnType<typeof getSupabaseClient>;
 type Row = Record<string, unknown>;

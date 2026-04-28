@@ -226,7 +226,7 @@ export default function OrdersPage() {
           setSelectedSupplierId(((data.data[0] as Record<string, unknown>).recommendedSupplier as { id: string }).id);
         }
         if (data.data.some((item: Record<string, unknown>) => (item as Record<string, unknown>).newProductHint)) {
-          toast.warning('存在新商品（无库存），请手动选择供应商');
+          toast.warning('存在新商品（无库存），请手动选择发货方');
         } else if (data.data.some((item: Record<string, unknown>) => (item as Record<string, unknown>).warning)) {
           toast.warning('部分订单存在尾货预警，请注意查看');
         }
@@ -243,7 +243,7 @@ export default function OrdersPage() {
   // --- Batch assign ---
   const handleBatchAssignFromMatch_ = useCallback(async () => {
     if (Object.keys(selectedSuppliers).length === 0) {
-      toast.error('请为订单选择供应商');
+      toast.error('请为订单选择发货方');
       return;
     }
     try {
@@ -252,13 +252,13 @@ export default function OrdersPage() {
         return fetch('/api/orders', {
           method: 'PATCH',
           headers: session.authHeaders(),
-          body: JSON.stringify({ id: orderId, supplierId, supplierName: supplier?.name || '', status: 'pending' }),
+          body: JSON.stringify({ id: orderId, supplierId, supplier_name: supplier?.name || '', status: 'pending' }),
         });
       });
       const results = await Promise.all(promises);
       const dataArr = await Promise.all(results.map(r => r.json()));
       const successCount = dataArr.filter(d => d.success).length;
-      toast.success(`成功分配供应商，共 ${successCount} 条订单待派发`);
+      toast.success(`成功分配发货方，共 ${successCount} 条订单待派发`);
       setMatchResults({});
       setSelectedSuppliers({});
       setAssignDialogOpen(false);
@@ -284,12 +284,12 @@ export default function OrdersPage() {
             const res = await fetch('/api/orders', {
               method: 'PATCH',
               headers: session.authHeaders(),
-              body: JSON.stringify({
-                id: orderId,
-                trackingNo: trackingNo || '',
-                expressCompany: expressCompany || returnExpressCompany || '',
-                status: ORDER_STATUS_RETURNED,
-              }),
+                body: JSON.stringify({
+                  id: orderId,
+                  tracking_no: trackingNo || '',
+                  express_company: expressCompany || returnExpressCompany || '',
+                  status: ORDER_STATUS_RETURNED,
+                }),
             });
             const data = await res.json();
             if (data.success) matched++;
@@ -311,7 +311,7 @@ export default function OrdersPage() {
     const hasAssigned = selectedOrders.size > 0
       ? Array.from(selectedOrders).some(o => o.status === ORDER_STATUS_ASSIGNED)
       : filteredOrders.some(o => o.status === ORDER_STATUS_ASSIGNED);
-    if (!hasAssigned) { toast.error('请先选择已派发给供应商的订单'); return; }
+    if (!hasAssigned) { toast.error('请先选择已派发给发货方的订单'); return; }
     toast.info('正在打开发货通知单页面...');
     window.open('/shipping-export', '_blank');
   };
@@ -326,7 +326,7 @@ export default function OrdersPage() {
     const lines = targetOrders.map(
       o => `${o.sysOrderNo || o.orderNo}\t${o.receiver.name}\t${o.receiver.phone}\t${o.receiver.address}\t${o.supplierName || '-'}\t${o.trackingNo || '-'}\t${o.expressCompany || '-'}`
     );
-    const text = `系统单号\t收货人\t电话\t地址\t供应商\t快递单号\t快递公司\n${lines.join('\n')}`;
+    const text = `系统单号\t收货人\t电话\t地址\t发货方\t快递单号\t快递公司\n${lines.join('\n')}`;
     navigator.clipboard.writeText(text);
     try {
       const promises = targetOrders.map(order =>
@@ -354,7 +354,7 @@ export default function OrdersPage() {
       : filteredOrders.filter(o => o.status === ORDER_STATUS_FEEDBACKED).map(o => o.id);
     if (targetIds.length === 0) { toast.error('没有可导出金蝶的订单（需已反馈状态）'); return; }
     const targetOrders = orders.filter(o => targetIds.includes(o.id) && o.status === ORDER_STATUS_FEEDBACKED);
-    const header = '系统单号\t客户单号\t客户\t收货人\t电话\t地址\t商品\t数量\t供应商\t快递公司\t快递单号\t业务员\t跟单员\t派发批次';
+    const header = '系统单号\t客户单号\t客户\t收货人\t电话\t地址\t商品\t数量\t发货方\t快递公司\t快递单号\t业务员\t跟单员\t派发批次';
     const rows = targetOrders.map(o => [
       o.sysOrderNo || '', o.orderNo || '', o.customerName || '',
       o.receiver.name || '', o.receiver.phone || '', o.receiver.address || '',
@@ -390,7 +390,7 @@ export default function OrdersPage() {
     const orderIds = selectedOrders.size > 0 ? Array.from(selectedOrders).map(o => o.id) : [];
     const targetOrders = orderIds.length > 0 ? filteredOrders.filter(o => orderIds.includes(o.id)) : filteredOrders;
     if (targetOrders.length === 0) { toast.error('没有可导出的订单'); return; }
-    const header = '系统单号\t客户单号\t客户\t收货人\t电话\t地址\t商品\t数量\t单价\t业务员\t跟单员\t状态\t供应商\t快递公司\t快递单号\t创建时间';
+    const header = '系统单号\t客户单号\t客户\t收货人\t电话\t地址\t商品\t数量\t单价\t业务员\t跟单员\t状态\t发货方\t快递公司\t快递单号\t创建时间';
     const rows = targetOrders.map(o => [
       o.sysOrderNo || '', o.orderNo, o.customerName || '', o.receiver.name,
       o.receiver.phone, o.receiver.address,
@@ -421,8 +421,8 @@ export default function OrdersPage() {
 
   const getEditableFieldsHint = (order: Order): string => {
     if (order.status === ORDER_STATUS_PENDING) return '可编辑所有信息';
-    if (order.status === ORDER_STATUS_ASSIGNED) return '可编辑：供应商、状态、物流信息、收货信息';
-    if (order.status === 'partial_returned') return '可编辑：供应商、状态、物流信息、收货信息';
+    if (order.status === ORDER_STATUS_ASSIGNED) return '可编辑：发货方、状态、物流信息、收货信息';
+    if (order.status === 'partial_returned') return '可编辑：发货方、状态、物流信息、收货信息';
     if (order.status === ORDER_STATUS_RETURNED) return '仅可编辑收货信息';
     if (order.status === ORDER_STATUS_FEEDBACKED) return '仅可编辑收货信息';
     if (order.status === ORDER_STATUS_CANCELLED) return '可编辑所有信息';
@@ -509,7 +509,7 @@ export default function OrdersPage() {
                     ['productCode', '商品编码'],
                     ['salesperson', '业务员'],
                     ['operator', '跟单员'],
-                    ['supplier', '供应商'],
+                    ['supplier', '发货方'],
                     ['createdAt', '创建时间'],
                   ] as [keyof typeof visibleColumns, string][]).map(([key, label]) => (
                     <label key={key} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/60 cursor-pointer text-sm">
@@ -726,7 +726,7 @@ export default function OrdersPage() {
                   {visibleColumns.salesperson && <TableHead>业务员</TableHead>}
                   {visibleColumns.operator && <TableHead>跟单员</TableHead>}
                   <TableHead>状态</TableHead>
-                  {visibleColumns.supplier && <TableHead>供应商</TableHead>}
+                  {visibleColumns.supplier && <TableHead>发货方</TableHead>}
                   {visibleColumns.createdAt && <TableHead>创建时间</TableHead>}
                   <TableHead className="text-right">操作</TableHead>
                 </TableRow>
@@ -852,7 +852,7 @@ export default function OrdersPage() {
                             </Button>
                           )}
                           {order.status === ORDER_STATUS_PENDING && (
-                            <Button variant="ghost" size="sm" onClick={() => openAssignDialog(order.id)} title="派发供应商">
+                            <Button variant="ghost" size="sm" onClick={() => openAssignDialog(order.id)} title="派发发货方">
                               <Send className="w-4 h-4" />
                             </Button>
                           )}

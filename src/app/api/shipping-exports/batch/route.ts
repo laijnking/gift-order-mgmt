@@ -85,6 +85,26 @@ async function findStockForItem(
   return ((stocks || []) as Record<string, unknown>[]).find((stock) => stockMatchesItem(stock, item)) || null;
 }
 
+async function findSupplierProductMapping(
+  client: ReturnType<typeof getSupabaseClient>,
+  supplierId: string,
+  productId: string
+): Promise<{ supplierProductCode?: string; supplierProductName?: string; supplierProductSpec?: string } | null> {
+  if (!supplierId || !productId) return null;
+  const { data } = await client
+    .from('product_mappings')
+    .select('supplier_product_code, supplier_product_name, supplier_product_spec')
+    .eq('supplier_id', supplierId)
+    .eq('product_id', productId)
+    .maybeSingle();
+
+  return data ? {
+    supplierProductCode: (data as Record<string, unknown>).supplier_product_code as string || undefined,
+    supplierProductName: (data as Record<string, unknown>).supplier_product_name as string || undefined,
+    supplierProductSpec: (data as Record<string, unknown>).supplier_product_spec as string || undefined,
+  } : null;
+}
+
 async function getExistingDispatchContext(
   client: ReturnType<typeof getSupabaseClient>,
   orderId: string
@@ -127,7 +147,8 @@ async function dispatchPendingOrder(
   supplier: Record<string, unknown>,
   batchNo: string,
   supplierId?: string,
-  isSynthetic = false
+  isSynthetic = false,
+  targetStatus: 'assigned' | 'notified' = 'notified'
 ) {
   const existingDispatch = await getExistingDispatchContext(client, String(order.id));
   if (existingDispatch.hasExistingSideEffects) {
@@ -141,10 +162,14 @@ async function dispatchPendingOrder(
       warehouseName: itemText(item, 'warehouseName', 'warehouse_name'),
     }));
 
+    const currentStatus = String(order.status || 'pending');
+    const targetStatus = (currentStatus === 'pending' || currentStatus === 'assigned' || currentStatus === 'notified')
+      ? 'notified'
+      : currentStatus;
     await client
       .from('orders')
       .update({
-        status: 'assigned',
+        status: targetStatus,
         assigned_batch: String(order.assigned_batch || reusedBatchNo),
         assigned_at: order.assigned_at || existingDispatch.latestDispatch?.dispatch_at || new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -155,6 +180,7 @@ async function dispatchPendingOrder(
       dispatchItems: existingItems,
       dispatchBatch: String(order.assigned_batch || reusedBatchNo),
       reusedExistingDispatch: true,
+      wasActuallyDispatched: false,
     };
   }
 
@@ -164,7 +190,7 @@ async function dispatchPendingOrder(
 
   for (const item of items) {
     const quantity = toNumber(item.quantity, 1);
-    // 虚拟供应商没有真实 supplier_id，跳过库存操作（虚拟供应商的订单通常已通过其他途径派发过）
+    // 虚拟发货方没有真实 supplier_id，跳过库存操作（虚拟发货方的订单通常已通过其他途径派发过）
     const stockQueryId = isSynthetic
       ? undefined
       : (supplierId || (supplier?.id ? String(supplier.id) : undefined));
@@ -172,7 +198,7 @@ async function dispatchPendingOrder(
       ? await findStockForItem(client, stockQueryId, item)
       : null;
     if (!stock) {
-      throw new Error(`订单 ${order.order_no || order.id} 的商品「${itemText(item, 'product_name', 'productName', 'cu_product_name', 'cuProductName') || '未知商品'}」未找到供应商库存`);
+      throw new Error(`订单 ${order.order_no || order.id} 的商品「${itemText(item, 'product_name', 'productName', 'cu_product_name', 'cuProductName') || '未知商品'}」未找到发货方库存`);
     }
 
     const beforeQuantity = toNumber(stock.quantity);
@@ -220,11 +246,16 @@ async function dispatchPendingOrder(
       batchNo,
     });
 
+    // 派发时获取发货方商品映射信息
+    const supplierMapping = stockQueryId && stock.product_id
+      ? await findSupplierProductMapping(client, stockQueryId, String(stock.product_id))
+      : null;
+
     dispatchItems.push({
-      // 供应商商品编码（来自订单/SKU映射，供应商发货时使用）
-      supplierProductCode: itemText(item, 'cu_product_code', 'cuProductCode') || stock.product_code,
-      supplierProductName: itemText(item, 'cu_product_name', 'cuProductName') || stock.product_name,
-      supplierProductSpec: itemText(item, 'cu_product_spec', 'cuProductSpec') || String(stock.supplier_product_spec || ''),
+      // 发货方商品编码：优先取 product_mappings.supplier_product_code，没有则用系统商品编码
+      supplierProductCode: supplierMapping?.supplierProductCode || stock.product_code,
+      supplierProductName: supplierMapping?.supplierProductName || stock.product_name,
+      supplierProductSpec: supplierMapping?.supplierProductSpec || String(stock.supplier_product_spec || ''),
       // 系统商品编码（用于内部成本核算）
       productCode: stock.product_code,
       productName: stock.product_name,
@@ -249,20 +280,21 @@ async function dispatchPendingOrder(
       items: dispatchItems,
     });
 
-  await client
-    .from('orders')
-    .update({
-      status: 'assigned',
-      assigned_batch: batchNo,
-      assigned_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', order.id);
+    await client
+      .from('orders')
+      .update({
+        status: targetStatus,
+        assigned_batch: batchNo,
+        assigned_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', order.id);
 
   return {
     dispatchItems,
     dispatchBatch: batchNo,
     reusedExistingDispatch: false,
+    wasActuallyDispatched: true,
   };
 }
 
@@ -276,7 +308,7 @@ function rowsForOrder(
   const items = dispatchItems && dispatchItems.length > 0
     ? dispatchItems
     : parseItems(order.items).map((item) => ({
-      // 供应商专属模板优先取供应商商品信息；通用模板优先取系统商品信息
+      // 发货方专属模板优先取发货方商品信息；通用模板优先取系统商品信息
       productCode: isSupplierTemplate
         ? itemText(item, 'cu_product_code', 'cuProductCode') || itemText(item, 'product_code', 'productCode')
         : itemText(item, 'product_code', 'productCode') || itemText(item, 'cu_product_code', 'cuProductCode'),
@@ -292,7 +324,7 @@ function rowsForOrder(
     }));
 
   return items.map((item) => {
-    // dispatchItems 已有供应商商品字段（派发时已优先保留 cu_product_*），直接用
+    // dispatchItems 已有发货方商品字段（派发时已优先保留 cu_product_*），直接用
     const supplierProductCode = (item as Record<string, unknown>).supplierProductCode as string || '';
     const supplierProductName = (item as Record<string, unknown>).supplierProductName as string || '';
     const supplierProductSpec = (item as Record<string, unknown>).supplierProductSpec as string || '';
@@ -302,7 +334,7 @@ function rowsForOrder(
       orderNo: order.order_no || '',
       matchCode: order.match_code || '',
       dispatchBatch: batchNo || order.assigned_batch || '',
-      // 供应商模板优先用供应商编码，系统模板用系统编码，都没有则互相兜底
+      // 发货方模板优先用发货方编码，系统模板用系统编码，都没有则互相兜底
       productCode: isSupplierTemplate
         ? (supplierProductCode || (item.productCode as string) || '')
         : ((item.productCode as string) || supplierProductCode || ''),
@@ -325,6 +357,7 @@ function rowsForOrder(
       supplierName: order.supplier_name || '',
       expressCompany: order.express_company || '',
       trackingNo: order.tracking_no || '',
+      expressFee: order.express_fee || '',
       remark: order.remark || '',
     };
 
@@ -358,10 +391,10 @@ export async function POST(request: NextRequest) {
             : 'dispatch_with_persistence';
 
     if (!Array.isArray(supplierIds) || supplierIds.length === 0) {
-      return NextResponse.json({ success: false, error: '请选择至少一个供应商' }, { status: 400 });
+      return NextResponse.json({ success: false, error: '请选择至少一个发货方' }, { status: 400 });
     }
 
-    let resolvedTemplateId = templateId || null;
+    const resolvedTemplateId = templateId || null;
     let resolvedTemplate: TemplateRecord | null = null;
     let templateName = '默认发货通知模板';
     let templateSource: 'explicit' | 'target' | 'linked' | 'default' | 'first' = 'default';
@@ -383,6 +416,7 @@ export async function POST(request: NextRequest) {
     const zip = new JSZip();
     const results: Array<Record<string, unknown>> = [];
     const allOrderIds: string[] = [];
+    const supplierNames: string[] = [];
     const errors: string[] = [];
     let totalOrderCount = 0;
     let newDispatchCount = 0;
@@ -391,40 +425,56 @@ export async function POST(request: NextRequest) {
     let persistedDetailCount = 0;
 
     for (const supplierId of supplierIds) {
-      // 判断是否为虚拟供应商（suppliers 表中不存在，从 pending 接口补充进来的）
+      // 判断是否为虚拟发货方（suppliers 表中不存在，从 pending 接口补充进来的）
       const isSynthetic = String(supplierId).startsWith('synthetic-');
       const syntheticName = isSynthetic ? String(supplierId).replace('synthetic-', '') : '';
 
-      // 虚拟供应商：从 orders 表按 supplier_name 查询；真实供应商：查 shippers 表（统一数据源）
+      // 虚拟发货方：从 orders 表按 supplier_name 查询；真实发货方：查 shippers 表（统一数据源）
       const { data: supplier } = isSynthetic
         ? { data: null }
         : await client.from('shippers').select('*').eq('id', supplierId).maybeSingle();
 
       if (!isSynthetic && !supplier) {
-        errors.push(`供应商 ${supplierId} 不存在`);
+        errors.push(`发货方 ${supplierId} 不存在`);
         continue;
       }
 
       const supplierName = isSynthetic ? syntheticName : String((supplier as Record<string, unknown>).name || '');
+      supplierNames.push(supplierName);
 
-      let supplierTemplate = resolvedTemplate;
-      let supplierTemplateId = resolvedTemplateId;
-      let supplierTemplateName = templateName;
-      let supplierTemplateSource: 'explicit' | 'target' | 'linked' | 'default' | 'first' = templateSource;
-      if (!supplierTemplate && !isSynthetic) {
-        const { template, source } = await resolvePreferredTemplate(client, { type: 'shipping', targetType: 'supplier', targetId: supplierId });
-        if (template) {
-          supplierTemplate = template;
-          supplierTemplateId = template.id;
-          supplierTemplateName = String(template.name || '供应商发货模板');
-          supplierTemplateSource = source as 'target' | 'linked' | 'default' | 'first';
-        }
-      }
+      // 用户下拉框选择的模板（全局）
+      const userSelectedTemplate = resolvedTemplate;
+      const userSelectedTemplateId = resolvedTemplateId;
+      const userSelectedTemplateName = templateName;
+      const userSelectedTemplateSource: 'explicit' | 'target' | 'linked' | 'default' | 'first' = templateSource;
+
+      // 始终 per-supplier 解析专属模板（即使选了用户模板，也优先用发货方专属模板）
+      const { template: supplierTemplate, source: supplierTemplateSource } =
+        await resolvePreferredTemplate(client, {
+          type: 'shipping',
+          targetType: 'supplier',
+          targetId: isSynthetic ? undefined : supplierId,
+          targetName: isSynthetic ? supplierName : undefined,
+        });
+
+      // 优先级：per-supplier 专属模板 > 用户选择的模板 > 默认模板
+      const actualTemplate = supplierTemplate || userSelectedTemplate || null;
+      const actualTemplateId = actualTemplate?.id || null;
+      const actualTemplateName = actualTemplate?.name || userSelectedTemplateName || '默认发货通知模板';
+      const actualTemplateSource = supplierTemplate
+        ? (supplierTemplateSource as 'target' | 'linked' | 'default' | 'first')
+        : (userSelectedTemplate ? 'explicit' : 'first');
       const supplierFieldMappings = supplierTemplate ? parseTemplateFieldMappings(supplierTemplate) : DEFAULT_SHIPPING_FIELD_MAPPINGS;
       const supplierExportFieldMappings = Object.keys(supplierFieldMappings).length > 0 ? supplierFieldMappings : DEFAULT_SHIPPING_FIELD_MAPPINGS;
-      const isSupplierTemplate = Boolean(supplierTemplate?.target_type === 'supplier' && supplierTemplate?.target_id === supplierId);
+      // 判断当前应用的模板是否为该供应商的专属模板
+      // 专属模板：target_type=supplier 且 target_id=supplierId（真实）或 target_name=supplierName（虚拟）
+      const isSupplierTemplate = Boolean(
+        supplierTemplate?.target_type === 'supplier' &&
+        (supplierTemplate?.target_id === supplierId ||
+          supplierTemplate?.target_id === supplierName)
+      );
 
-      // 虚拟供应商：直接按 supplier_name 查询；真实供应商：优先按 supplier_id 精确匹配，回退按 supplier_name 匹配
+      // 虚拟发货方：直接按 supplier_name 查询；真实发货方：优先按 supplier_id 精确匹配，回退按 supplier_name 匹配
       let orders: Record<string, unknown>[] = [];
 
       if (isSynthetic) {
@@ -432,7 +482,7 @@ export async function POST(request: NextRequest) {
           .from('orders')
           .select('*')
           .eq('supplier_name', supplierName)
-          .in('status', isReexport ? ['assigned'] : ['pending', 'assigned']);
+          .in('status', isReexport ? ['notified'] : ['pending', 'assigned']);
         if (error) throw new Error(`按名称查询订单失败: ${error.message}`);
         orders = (data || []) as Record<string, unknown>[];
       } else {
@@ -440,7 +490,7 @@ export async function POST(request: NextRequest) {
           .from('orders')
           .select('*')
           .eq('supplier_id', supplierId)
-          .in('status', isReexport ? ['assigned'] : ['pending', 'assigned']);
+          .in('status', isReexport ? ['notified'] : ['pending', 'assigned']);
 
         if (ordersErrorById) throw new Error(`查询订单失败: ${ordersErrorById.message}`);
 
@@ -449,7 +499,7 @@ export async function POST(request: NextRequest) {
           .select('*')
           .is('supplier_id', null)
           .eq('supplier_name', supplierName)
-          .in('status', isReexport ? ['assigned'] : ['pending', 'assigned']);
+          .in('status', isReexport ? ['notified'] : ['pending', 'assigned']);
 
         if (ordersErrorByName) throw new Error(`按名称查询订单失败: ${ordersErrorByName.message}`);
 
@@ -477,8 +527,17 @@ export async function POST(request: NextRequest) {
             assignedOnlyCount += 1;
             exportRows.push(...rowsForOrder(order, supplierExportFieldMappings, String(order.assigned_batch || batchNo), undefined, isSupplierTemplate));
           } else {
-            const dispatchResult = exportMode === 'dispatch' && order.status === 'pending'
-              ? await dispatchPendingOrder(client, order, supplier as Record<string, unknown>, batchNo, isSynthetic ? undefined : supplierId, isSynthetic)
+            // 导出时：pending → notified（首次导出发货通知），已通知的订单幂等
+            const dispatchResult = exportMode === 'dispatch'
+              ? await dispatchPendingOrder(
+                  client,
+                  order,
+                  supplier as Record<string, unknown>,
+                  batchNo,
+                  isSynthetic ? undefined : supplierId,
+                  isSynthetic,
+                  'notified'
+                )
               : undefined;
             if (dispatchResult?.reusedExistingDispatch) {
               reusedDispatchCount += 1;
@@ -520,9 +579,9 @@ export async function POST(request: NextRequest) {
         supplierId,
         supplierName,
         orderCount: supplierSuccessCount,
-        templateId: supplierTemplateId,
-        templateName: supplierTemplateName,
-        templateSource: supplierTemplateSource as string,
+        templateId: actualTemplateId,
+        templateName: actualTemplateName,
+        templateSource: actualTemplateSource as string,
         fileName,
         fileUrl: detailArtifact ? buildExportRecordDownloadPath(recordId, detailIndex) : null,
         artifact: detailArtifact
@@ -547,7 +606,7 @@ export async function POST(request: NextRequest) {
     if (exportMode === 'preview') {
       return NextResponse.json({
         success: errors.length === 0,
-        message: `已生成预览内容：${results.length}个供应商，共${totalOrderCount}个订单${errors.length ? `，失败${errors.length}条` : ''}`,
+        message: `已生成预览内容：${results.length}个发货方，共${totalOrderCount}个订单${errors.length ? `，失败${errors.length}条` : ''}`,
         data: {
           batchId,
           batchNo,
@@ -584,7 +643,7 @@ export async function POST(request: NextRequest) {
     if (resolvedPersistenceMode === 'none') {
       return NextResponse.json({
         success: errors.length === 0,
-        message: `成功派发${results.length}个供应商，共${totalOrderCount}个订单${errors.length ? `，失败${errors.length}条` : ''}，未写入导出记录`,
+        message: `成功派发${results.length}个发货方，共${totalOrderCount}个订单${errors.length ? `，失败${errors.length}条` : ''}，未写入导出记录`,
         data: {
           batchId,
           recordId: null,
@@ -625,7 +684,11 @@ export async function POST(request: NextRequest) {
       id: recordId,
       export_type: 'shipping_notice',
       business_type: isReexport ? 'reexport' : 'dispatch',
-      supplier_id: supplierIds.length === 1 ? supplierIds[0] : null,
+      // 单供应商时存实际 ID（真实供应商存 supplierId，虚拟供应商存名称），多供应商时存 null
+      supplier_id: supplierIds.length === 1
+        ? (supplierIds[0].startsWith('synthetic-') ? supplierIds[0].replace('synthetic-', '') : supplierIds[0])
+        : null,
+      supplier_name: supplierNames.join(','),
       order_ids: allOrderIds,
       template_id: resolvedTemplateId,
       template_name: templateName,
@@ -640,6 +703,7 @@ export async function POST(request: NextRequest) {
         batch_id: batchId,
         batch_no: batchNo,
         supplier_ids: supplierIds,
+        supplier_names: supplierNames,
         download_mode: 'regenerate',
         is_reexport: isReexport,
         artifact: {
@@ -656,7 +720,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: errors.length === 0,
-      message: `成功导出${results.length}个供应商，共${totalOrderCount}个订单${errors.length ? `，失败${errors.length}条` : ''}`,
+        message: `成功导出${results.length}个发货方，共${totalOrderCount}个订单${errors.length ? `，失败${errors.length}条` : ''}`,
       data: {
         batchId,
         recordId,

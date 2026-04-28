@@ -59,7 +59,7 @@ export function BulkActionBar({
             disabled={!hasSelection || pendingCount === 0}
           >
             <Send className="w-4 h-4 mr-1.5" />
-            分派供应商
+            分派发货方
             {pendingCount > 0 && (
               <Badge variant="secondary" className="ml-1.5 h-5 px-1.5 text-xs">{pendingCount}</Badge>
             )}

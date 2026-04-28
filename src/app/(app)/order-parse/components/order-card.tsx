@@ -230,9 +230,9 @@ export function OrderCard({
                   <div className="col-span-2 mt-1 p-2 bg-blue-50 rounded border border-blue-100">
                     <div className="flex items-center gap-1 mb-1">
                       <Star className="h-3 w-3 text-blue-500" />
-                      <span className="text-xs font-medium text-blue-700">推荐供应商</span>
+                      <span className="text-xs font-medium text-blue-700">推荐发货方</span>
                       <Badge variant="outline" className="text-[10px] py-0 bg-blue-50">
-                        {availableSuppliers.length} 个供应商有货
+                        {availableSuppliers.length} 个发货方有货
                       </Badge>
                     </div>
                     <div className="space-y-1">
@@ -331,12 +331,12 @@ export function OrderCard({
                       />
                     </div>
                     <div>
-                      <Label className="text-xs text-muted-foreground">发货供应商</Label>
+                      <Label className="text-xs text-muted-foreground">发货发货方</Label>
                       <Input
                         value={order.supplierName as string || ''}
                         onChange={(e) => onUpdate(order.id, 'supplierName', e.target.value)}
                         className="h-7 text-xs"
-                        placeholder="发货供应商"
+                        placeholder="发货发货方"
                       />
                     </div>
                   </div>
@@ -590,7 +590,7 @@ export function OrderCard({
                   {/* Supplier selection */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label className="text-xs text-muted-foreground">分配供应商</Label>
+                      <Label className="text-xs text-muted-foreground">分配发货方</Label>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -614,7 +614,7 @@ export function OrderCard({
                           <TableHeader>
                             <TableRow className="bg-muted/30">
                               <TableHead className="w-8"></TableHead>
-                              <TableHead>供应商</TableHead>
+                              <TableHead>发货方</TableHead>
                               <TableHead>省份</TableHead>
                               <TableHead className="text-right">库存</TableHead>
                               <TableHead className="text-right">单价</TableHead>
@@ -708,10 +708,10 @@ export function OrderCard({
                       }
                     >
                       <SelectTrigger className="h-7 text-xs">
-                        <SelectValue placeholder="请选择供应商" />
+                        <SelectValue placeholder="请选择发货方" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">请选择供应商</SelectItem>
+                        <SelectItem value="none">请选择发货方</SelectItem>
                         {suppliers.map((s) => (
                           <SelectItem key={s.id} value={s.id}>
                             {s.name}

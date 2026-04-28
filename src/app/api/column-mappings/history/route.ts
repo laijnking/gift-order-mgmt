@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
-import { supportsColumnMappingMetadata } from '@/lib/column-mapping-metadata';
+import { supportsColumnMappingMetadata } from '@/lib/column-mapping-rules';
 import { requirePermission } from '@/lib/server-auth';
 import { PERMISSIONS } from '@/lib/permissions';
 

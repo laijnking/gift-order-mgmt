@@ -45,6 +45,7 @@ export async function GET(request: NextRequest) {
       orderCount: number;
       pendingCount: number;
       assignedCount: number;
+      notifiedCount: number;
       returnedCount: number;
       completedCount: number;
       cancelledCount: number;
@@ -57,6 +58,7 @@ export async function GET(request: NextRequest) {
       orderCount: number;
       pendingCount: number;
       assignedCount: number;
+      notifiedCount: number;
       returnedCount: number;
       completedCount: number;
       cancelledCount: number;
@@ -82,6 +84,7 @@ export async function GET(request: NextRequest) {
           orderCount: 0,
           pendingCount: 0,
           assignedCount: 0,
+          notifiedCount: 0,
           returnedCount: 0,
           completedCount: 0,
           cancelledCount: 0,
@@ -95,6 +98,7 @@ export async function GET(request: NextRequest) {
           orderCount: 0,
           pendingCount: 0,
           assignedCount: 0,
+          notifiedCount: 0,
           returnedCount: 0,
           completedCount: 0,
           cancelledCount: 0,
@@ -122,6 +126,9 @@ export async function GET(request: NextRequest) {
       } else if (order.status === ORDER_STATUS_ASSIGNED) {
         bySalesperson[salesperson].assignedCount++;
         byOperator[operator].assignedCount++;
+      } else if (order.status === 'notified') {
+        bySalesperson[salesperson].notifiedCount++;
+        byOperator[operator].notifiedCount++;
       } else if (isReturnProgressStatus(order.status)) {
         bySalesperson[salesperson].returnedCount++;
         byOperator[operator].returnedCount++;

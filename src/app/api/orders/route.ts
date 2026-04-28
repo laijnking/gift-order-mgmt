@@ -218,7 +218,7 @@ async function findCustomerIdByCode(client: ReturnType<typeof getSupabaseClient>
   return customersByName?.[0] ? { id: customersByName[0].id, name: customersByName[0].name } : null;
 }
 
-// 辅助函数：根据供应商名称查找供应商ID（统一查询 shippers 表）
+// 辅助函数：根据发货方名称查找发货方ID（统一查询 shippers 表）
 async function findSupplierIdByName(client: ReturnType<typeof getSupabaseClient>, name: string): Promise<{ id: string; name: string } | null> {
   if (!name) return null;
   
@@ -287,7 +287,7 @@ async function buildRelatedMaps(client: ReturnType<typeof getSupabaseClient>, or
     });
   }
   
-  // 批量查询供应商（统一查询 shippers 表）
+  // 批量查询发货方（统一查询 shippers 表）
   const supplierMap: Record<string, { id: string; name: string }> = {};
   if (supplierIds.size > 0) {
     const { data: shippers } = await client
@@ -482,7 +482,11 @@ export async function GET(request: NextRequest) {
     // =====================================================
 
     if (status && status !== 'all') {
-      query = query.eq('status', status);
+      if (status.includes(',')) {
+        query = query.in('status', status.split(',').map(s => s.trim()));
+      } else {
+        query = query.eq('status', status);
+      }
     }
 
     if (customerCode) {
@@ -650,7 +654,7 @@ export async function POST(request: NextRequest) {
           // 跟单员信息：存储ID和冗余名称
           operator_id: itemOperatorId || null,
           operator_name: itemOperatorId ? (item.operator || operatorName || '') : (operatorName || item.operator || ''),
-          // 供应商信息：存储ID和冗余名称
+          // 发货方信息：存储ID和冗余名称
           supplier_id: itemSupplierInfo?.id || null,
           supplier_name: itemSupplierInfo?.name || supplierName || '',
           // 仓库信息：存储ID和冗余名称
@@ -1098,37 +1102,67 @@ export async function POST(request: NextRequest) {
 
 // 更新订单状态
 export async function PATCH(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.ORDERS_EDIT);
-  if (authError) return authError;
-  const client = getSupabaseClient();
-  
+  const debugInfo: Record<string, unknown> = { start: new Date().toISOString(), url: request.url };
+
   try {
+    const authError = requirePermission(request, PERMISSIONS.ORDERS_EDIT);
+    if (authError) {
+      debugInfo.authError = true;
+      return NextResponse.json({ success: false, error: 'auth failed', debug: debugInfo }, { status: 401 });
+    }
+
+    const client = getSupabaseClient();
     const body = await request.json();
-    const { 
-      id, 
-      orderId, 
-      status, 
-      supplierId, 
-      supplierName, 
+    debugInfo.bodyKeys = Object.keys(body);
+
+    const {
+      id: bodyId,
+      orderId,
+      status,
+      supplierId,
+      supplierName,
       operatorId,
       operatorName,
       warehouseId,
       warehouseName,
-      expressCompany, 
-      trackingNo, 
+      expressCompany,
+      trackingNo,
       extFields,
       customerCode,
       items,
       receiver,
       expressRequirement,
       remark,
+      // snake_case variants (from frontend)
+      supplier_id,
+      supplier_name,
+      operator_id,
+      operator_name,
+      warehouse_id,
+      warehouse_name,
+      express_company,
+      tracking_no,
+      customer_code,
+      items: itemsArr,
+      express_requirement,
+      receiver_name,
+      receiver_phone,
+      receiver_address,
+      province,
     } = body;
 
-    const targetId = id || orderId;
+    const urlId = request.nextUrl.searchParams.get('id');
+    const targetId = bodyId || orderId || urlId;
+    debugInfo.extractedId = targetId;
+    debugInfo.urlId = urlId;
+    debugInfo.snake = { customer_code, receiver_name, supplier_id, express_company, tracking_no };
+    debugInfo.camel = { customerCode, receiver: !!receiver, expressCompany, trackingNo, items: !!items };
     if (!targetId) {
-      return NextResponse.json({ 
-        success: false, 
-        error: '订单ID不能为空' 
+      console.log('[PATCH /api/orders] NO TARGET ID - bodyId:', bodyId, 'orderId:', orderId, 'urlId:', urlId);
+      return NextResponse.json({
+        success: false,
+        error: '订单ID不能为空',
+        debug: debugInfo,
       }, { status: 400 });
     }
 
@@ -1145,33 +1179,49 @@ export async function PATCH(request: NextRequest) {
         updateData.completed_at = new Date().toISOString();
       }
     }
-    
-    // 供应商信息
-    if (supplierId !== undefined) updateData.supplier_id = supplierId || null;
-    if (supplierName !== undefined) updateData.supplier_name = supplierName || '';
-    
+
+    // 发货方信息
+    if (supplier_id !== undefined) updateData.supplier_id = supplier_id || null;
+    else if (supplierId !== undefined) updateData.supplier_id = supplierId || null;
+    if (supplier_name !== undefined) updateData.supplier_name = supplier_name || '';
+    else if (supplierName !== undefined) updateData.supplier_name = supplierName || '';
+
     // 跟单员信息
-    if (operatorId !== undefined) updateData.operator_id = operatorId || null;
-    if (operatorName !== undefined) updateData.operator_name = operatorName || '';
-    
+    if (operator_id !== undefined) updateData.operator_id = operator_id || null;
+    else if (operatorId !== undefined) updateData.operator_id = operatorId || null;
+    if (operator_name !== undefined) updateData.operator_name = operator_name || '';
+    else if (operatorName !== undefined) updateData.operator_name = operatorName || '';
+
     // 仓库信息
-    if (warehouseId !== undefined) updateData.warehouse_id = warehouseId || null;
-    if (warehouseName !== undefined) updateData.warehouse = warehouseName || '';
-    
+    if (warehouse_id !== undefined) updateData.warehouse_id = warehouse_id || null;
+    else if (warehouseId !== undefined) updateData.warehouse_id = warehouseId || null;
+    if (warehouse_name !== undefined) updateData.warehouse = warehouse_name || '';
+    else if (warehouseName !== undefined) updateData.warehouse = warehouseName || '';
+
     // 快递信息
-    if (expressCompany) updateData.express_company = expressCompany;
-    if (trackingNo) updateData.tracking_no = trackingNo;
+    if (express_company) updateData.express_company = express_company;
+    else if (expressCompany) updateData.express_company = expressCompany;
+    if (tracking_no) updateData.tracking_no = tracking_no;
+    else if (trackingNo) updateData.tracking_no = trackingNo;
 
     // 客户信息
-    if (customerCode !== undefined) updateData.customer_code = customerCode;
+    if (customer_code !== undefined) updateData.customer_code = customer_code;
+    else if (customerCode !== undefined) updateData.customer_code = customerCode;
 
     // 商品信息
-    if (items !== undefined) {
+    if (itemsArr !== undefined) {
+      updateData.items = typeof itemsArr === 'string' ? itemsArr : JSON.stringify(itemsArr);
+    } else if (items !== undefined) {
       updateData.items = typeof items === 'string' ? items : JSON.stringify(items);
     }
 
-    // 收货信息
-    if (receiver) {
+    // 收货信息（优先使用扁平字段）
+    if (receiver_name !== undefined) updateData.receiver_name = receiver_name;
+    if (receiver_phone !== undefined) updateData.receiver_phone = receiver_phone;
+    if (receiver_address !== undefined) updateData.receiver_address = receiver_address;
+    if (province !== undefined) updateData.province = province;
+    // 兼容嵌套 receiver 对象
+    if (receiver && receiver_name === undefined) {
       if (receiver.name !== undefined) updateData.receiver_name = receiver.name;
       if (receiver.phone !== undefined) updateData.receiver_phone = receiver.phone;
       if (receiver.address !== undefined) updateData.receiver_address = receiver.address;
@@ -1181,7 +1231,8 @@ export async function PATCH(request: NextRequest) {
     }
 
     // 其他信息
-    if (expressRequirement !== undefined) updateData.express_requirement = expressRequirement;
+    if (express_requirement !== undefined) updateData.express_requirement = express_requirement;
+    else if (expressRequirement !== undefined) updateData.express_requirement = expressRequirement;
     if (remark !== undefined) updateData.remark = remark;
 
     // 支持更新备用字段
@@ -1193,18 +1244,30 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    debugInfo.updateDataKeys = Object.keys(updateData);
+    debugInfo.updateData = updateData;
+
+    console.log('[PATCH /api/orders] calling supabase with id:', targetId, 'data:', JSON.stringify(updateData));
     const { data, error } = await client
       .from('orders')
       .update(updateData)
       .eq('id', targetId)
       .select();
-    
-    if (error) throw new Error(`更新订单失败: ${error.message}`);
+
+    if (error) {
+      console.error('[PATCH /api/orders] supabase error:', error);
+      return NextResponse.json({
+        success: false,
+        error: `更新订单失败: ${error.message}`,
+        debug: { ...debugInfo, supabaseError: error.message },
+      }, { status: 400 });
+    }
 
     if (!data || data.length === 0) {
-      return NextResponse.json({ 
-        success: false, 
-        error: '订单不存在' 
+      return NextResponse.json({
+        success: false,
+        error: '订单不存在',
+        debug: debugInfo,
       }, { status: 404 });
     }
 
@@ -1216,9 +1279,10 @@ export async function PATCH(request: NextRequest) {
 
   } catch (error) {
     console.error('更新订单失败:', error);
-    return NextResponse.json({ 
-      success: false, 
-      error: error instanceof Error ? error.message : '未知错误' 
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : '未知错误',
+      debug: { ...debugInfo, catchError: error instanceof Error ? error.message : String(error) },
     }, { status: 500 });
   }
 }

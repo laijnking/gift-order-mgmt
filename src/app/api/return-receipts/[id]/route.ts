@@ -101,7 +101,7 @@ export async function PATCH(
 
     if (orderError) throw new Error(`查询订单失败: ${orderError.message}`);
     if (receipt.supplier_id && order.supplier_id && receipt.supplier_id !== order.supplier_id) {
-      return NextResponse.json({ success: false, error: '回单与订单供应商不一致，无法关联' }, { status: 400 });
+      return NextResponse.json({ success: false, error: '回单与订单发货方不一致，无法关联' }, { status: 400 });
     }
 
     // 更新回单

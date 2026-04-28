@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
 
         // 类型映射
         const typeMap: Record<string, string> = {
-          '供应商': 'supplier', 'supplier': 'supplier',
+          '发货方': 'supplier', 'supplier': 'supplier',
           '京东': 'jd', 'jd': 'jd',
           '拼多多': 'pdd', 'pdd': 'pdd',
           '自有仓': 'self', 'self': 'self',
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
           '单结': 'per_order', 'per_order': 'per_order'
         };
 
-        const typeValue = (item.type || item['类型'] || '供应商').toString();
+        const typeValue = (item.type || item['类型'] || '发货方').toString();
         const sendTypeValue = (item.sendType || item['发货方式'] || '下载发货').toString();
         const settlementValue = (item.settlementType || item['结算方式'] || '月结').toString();
 

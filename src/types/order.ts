@@ -1,12 +1,13 @@
 // 订单状态枚举
-export type OrderStatus = 
-  | 'pending'      // 待派发
-  | 'assigned'     // 已派发
+export type OrderStatus =
+  | 'pending'       // 待派发
+  | 'assigned'      // 已派发（内部派单）
+  | 'notified'      // 通知发货（已导出发货通知单）
   | 'partial_returned'  // 部分回单
-  | 'returned'     // 已回单
-  | 'feedbacked'   // 已反馈客户
-  | 'completed'    // 已导出金蝶/归档
-  | 'cancelled';  // 已取消
+  | 'returned'      // 已回单
+  | 'feedbacked'    // 已反馈客户
+  | 'completed'     // 已导出金蝶/归档
+  | 'cancelled';    // 已取消
 
 // 订单来源
 export type OrderSource = 'wechat' | 'excel' | 'form' | 'jushuitan';
@@ -59,7 +60,7 @@ export interface Order {
   id: string;           // 内部唯一ID
   sysOrderNo?: string;  // 系统订单号（自动生成，全局唯一）
   orderNo: string;      // 客户订单号（客户侧，可能重复）
-  supplierOrderNo?: string; // 供应商侧单据号
+  supplierOrderNo?: string; // 发货方侧单据号
   status: OrderStatus;  // 订单状态
   
   // 商品信息
@@ -79,7 +80,7 @@ export interface Order {
   expressCompany?: ExpressCompany;
   trackingNo?: string;
   
-  // 供应商分配
+  // 发货方分配
   supplierId?: string;
   supplierName?: string;
   
@@ -105,12 +106,12 @@ export interface Order {
   expressRequirement?: string; // 快递要求，如"不发极兔"
 }
 
-// 供应商
+// 发货方
 export interface Supplier {
   id: string;
   name: string;
   shortName: string;    // 简称
-  type: 'warehouse' | 'supplier';  // 仓库或供应商
+  type: 'warehouse' | 'supplier';  // 仓库或发货方
   contact?: string;     // 联系方式
   sendType: 'wechat' | 'system' | 'jushuitan' | 'download'; // 发货方式
   province?: string;    // 所在省份
@@ -166,7 +167,7 @@ export interface ProductMapping {
   updatedAt: string;
 }
 
-// 供应商库存
+// 发货方库存
 export interface SupplierStock {
   id: string;
   supplierId: string;

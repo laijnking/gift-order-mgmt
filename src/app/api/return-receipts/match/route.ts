@@ -40,7 +40,7 @@ async function collectOrderCandidates(
       .eq('supplier_order_no', receipt.supplier_order_no)
       .eq('supplier_id', receipt.supplier_id);
 
-    if (error) throw new Error(`按供应商单据号匹配失败: ${error.message}`);
+    if (error) throw new Error(`按发货方单据号匹配失败: ${error.message}`);
     appendCandidates((data || []) as OrderRow[]);
   }
 

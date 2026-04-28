@@ -124,6 +124,7 @@ const ids = {
   assignedOrderId: randomUUID(),
   stockId: randomUUID(),
   explicitTemplateId: randomUUID(),
+  productMappingId: randomUUID(),
 };
 
 const insertedTemplateIds: string[] = [];
@@ -133,6 +134,7 @@ const insertedOrderIds = [ids.pendingOrderId, ids.assignedOrderId];
 const insertedStockIds = [ids.stockId];
 const insertedProductIds = [ids.productId];
 const insertedSupplierIds = [ids.supplierId];
+const insertedProductMappingIds = [ids.productMappingId];
 
 function getPool() {
   loadEnv();
@@ -198,8 +200,9 @@ async function assertFileExists(relativePath?: string | null) {
 async function seedBaseData(pool: Pool) {
   await pool.query(
     `
-      insert into suppliers (
+      insert into shippers (
         id,
+        code,
         name,
         short_name,
         type,
@@ -208,9 +211,9 @@ async function seedBaseData(pool: Pool) {
         created_at,
         updated_at
       )
-      values ($1, $2, $3, 'self', 'self', true, now(), now())
+      values ($1, $2, $3, $4, 'self', 'self', true, now(), now())
     `,
-    [ids.supplierId, `发货供应商-${RUN_ID}`, `发货商-${RUN_ID}`]
+    [ids.supplierId, `SHP-${SHORT_ID}`, `发货发货方-${RUN_ID}`, `发货商-${RUN_ID}`]
   );
 
   await pool.query(
@@ -227,6 +230,41 @@ async function seedBaseData(pool: Pool) {
       values ($1, $2, $3, $4, true, now(), now())
     `,
     [ids.productId, `SKU-${RUN_ID}`, `礼品测试商品-${RUN_ID}`, '默认规格']
+  );
+
+  // 插入发货方商品映射（supplier_product_code 是发货方特有的商品编码）
+  await pool.query(
+    `
+      insert into product_mappings (
+        id,
+        product_id,
+        product_code,
+        product_name,
+        supplier_id,
+        supplier_name,
+        supplier_product_code,
+        supplier_product_name,
+        supplier_product_spec,
+        customer_product_name,
+        mapping_type,
+        is_active,
+        created_at,
+        updated_at
+      )
+      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'supplier', true, now(), now())
+    `,
+    [
+      ids.productMappingId,
+      ids.productId,
+      `SKU-${RUN_ID}`,
+      `礼品测试商品-${RUN_ID}`,
+      ids.supplierId,
+      `发货发货方-${RUN_ID}`,
+      `SUPPLIER-SKU-${RUN_ID}`,
+      `发货方特供商品-${RUN_ID}`,
+      '发货方规格',
+      `客户商品-${RUN_ID}`,
+    ]
   );
 
   await pool.query(
@@ -247,7 +285,7 @@ async function seedBaseData(pool: Pool) {
       )
       values ($1, $2, $3, $4, $5, $6, 10, 0, 88, 'active', now(), now())
     `,
-    [ids.stockId, ids.productId, `SKU-${RUN_ID}`, `礼品测试商品-${RUN_ID}`, ids.supplierId, `发货供应商-${RUN_ID}`]
+    [ids.stockId, ids.productId, `SKU-${RUN_ID}`, `礼品测试商品-${RUN_ID}`, ids.supplierId, `发货发货方-${RUN_ID}`]
   );
 
   const items = JSON.stringify([
@@ -328,7 +366,7 @@ async function seedBaseData(pool: Pool) {
       `SHIP-P-${SHORT_ID}`,
       items,
       ids.supplierId,
-      `发货供应商-${RUN_ID}`,
+      `发货发货方-${RUN_ID}`,
       `SYS-SP-${SHORT_ID}`,
       ids.assignedOrderId,
       `SHIP-A-${SHORT_ID}`,
@@ -400,9 +438,10 @@ async function cleanup(pool: Pool) {
     await pool.query('delete from templates where id = any($1::uuid[])', [insertedTemplateIds]).catch(() => {});
   }
   await pool.query('delete from orders where id = any($1::varchar[])', [insertedOrderIds]).catch(() => {});
+  await pool.query('delete from product_mappings where id = any($1::uuid[])', [insertedProductMappingIds]).catch(() => {});
   await pool.query('delete from stocks where id = any($1::uuid[])', [insertedStockIds]).catch(() => {});
   await pool.query('delete from products where id = any($1::uuid[])', [insertedProductIds]).catch(() => {});
-  await pool.query('delete from suppliers where id = any($1::uuid[])', [insertedSupplierIds]).catch(() => {});
+  await pool.query('delete from shippers where id = any($1::uuid[])', [insertedSupplierIds]).catch(() => {});
   await rm(artifactDir, { recursive: true, force: true });
 }
 
@@ -452,7 +491,7 @@ const tests: TestCase[] = [
 
       assert(response.status === 400, `期望 400，实际 ${response.status}`);
       assert(response.data.success === false, '空 supplierIds 应返回 success=false');
-      assert(response.data.error === '请选择至少一个供应商', `错误文案异常: ${String(response.data.error)}`);
+      assert(response.data.error === '请选择至少一个发货方', `错误文案异常: ${String(response.data.error)}`);
     },
   },
   {
@@ -608,7 +647,7 @@ const tests: TestCase[] = [
       assert(data.persistenceSummary?.zipArtifactPersisted === true, `explicit zipArtifactPersisted 应为 true，实际 ${String(data.persistenceSummary?.zipArtifactPersisted)}`);
       assert(data.persistenceSummary?.detailArtifactPersistedCount === 1, `explicit detailArtifactPersistedCount 应为 1，实际 ${String(data.persistenceSummary?.detailArtifactPersistedCount)}`);
       assert(data.zipFileUrl === buildExportRecordDownloadPath(data.recordId as string), 'zipFileUrl 应指向导出记录下载路由');
-      assert(data.totalSupplierCount === 1, `期望 1 个供应商，实际 ${String(data.totalSupplierCount)}`);
+      assert(data.totalSupplierCount === 1, `期望 1 个发货方，实际 ${String(data.totalSupplierCount)}`);
       assert(data.totalOrderCount === 2, `期望 2 个订单，实际 ${String(data.totalOrderCount)}`);
 
       const details = ensureArray(data.details, 'shipping-exports.details') as ExportDetail[];
@@ -936,6 +975,174 @@ const tests: TestCase[] = [
       assert(afterDispatchCount === beforeDispatchCount, '重复派发不应再次写入 dispatch_records');
       assert(afterVersionCount === beforeVersionCount, '重复派发不应再次写入 stock_versions');
       assert(afterCostCount === beforeCostCount, '重复派发不应再次写入 order_cost_history');
+    },
+  },
+  {
+    name: 'dispatch with supplier product mapping snapshots supplierProductCode',
+    async run({ pool }) {
+      // 创建一个新的待派发订单，使用有 product_mappings 映射的商品
+      const mappingOrderId = randomUUID();
+      insertedOrderIds.push(mappingOrderId);
+
+      const mappingItems = JSON.stringify([
+        { product_code: `SKU-${RUN_ID}`, product_name: `礼品测试商品-${RUN_ID}`, quantity: 1, price: 88 }
+      ]);
+
+      await pool.query(
+        `
+          insert into orders (
+            id, order_no, status, items, receiver_name, receiver_phone, receiver_address,
+            customer_code, customer_name, salesperson, operator_name, supplier_id, supplier_name,
+            source, sys_order_no, assigned_batch, created_at, updated_at
+          )
+          values ($1, $2, 'pending', $3::jsonb, '映射测试收货人', '13700000001', '映射测试地址',
+            'CUST-TEST', '测试客户', '业务员A', '跟单员A', $4, $5, 'api-test',
+            $6, null, now(), now())
+        `,
+        [mappingOrderId, `MAP-${RUN_ID}`, mappingItems, ids.supplierId, `发货发货方-${RUN_ID}`, `SYS-MAP-${RUN_ID}`]
+      );
+
+      const response = await fetchJson<{ success?: boolean; data?: BatchResponseData; error?: string }>(
+        `${BASE_URL}/api/shipping-exports/batch`,
+        {
+          method: 'POST',
+          headers: buildAuthedHeaders(ADMIN_USER),
+          body: JSON.stringify({
+            supplierIds: [ids.supplierId],
+            exportedBy: RUN_ID,
+          }),
+        }
+      );
+
+      assert(response.status === 200, `期望 200，实际 ${response.status}，错误: ${response.data.error ?? '未知错误'}`);
+      assert(response.data.success === true, `派发失败: ${response.data.error ?? '未知错误'}`);
+
+      const data = ensureObject(response.data.data, 'supplier-mapping.data') as BatchResponseData;
+
+      // 验证派发成功
+      assert(data.dispatchSummary?.newDispatchCount === 1, `应派发 1 个新订单，实际 ${String(data.dispatchSummary?.newDispatchCount)}`);
+
+      insertedExportRecordIds.push(data.recordId as string);
+      insertedDispatchBatchNos.add(data.batchNo as string);
+
+      // 验证 dispatch_records 中包含了 supplierProductCode（来自 product_mappings）
+      const dispatchRecord = await queryOne<{ items: unknown }>(
+        pool,
+        `select items from dispatch_records where order_id = $1 and status = 'dispatched'`,
+        [mappingOrderId]
+      );
+      assert(dispatchRecord, '应存在 dispatch_records 记录');
+
+      const items = typeof dispatchRecord.items === 'string' ? JSON.parse(dispatchRecord.items) : dispatchRecord.items;
+      assert(Array.isArray(items) && items.length > 0, 'dispatch_records.items 应包含商品明细');
+
+      const firstItem = items[0] as Record<string, unknown>;
+      assert(
+        firstItem.supplierProductCode === `SUPPLIER-SKU-${RUN_ID}`,
+        `supplierProductCode 应为 ${`SUPPLIER-SKU-${RUN_ID}`}，实际 ${String(firstItem.supplierProductCode)}`
+      );
+      assert(
+        firstItem.supplierProductName === `发货方特供商品-${RUN_ID}`,
+        `supplierProductName 应为 ${`发货方特供商品-${RUN_ID}`}，实际 ${String(firstItem.supplierProductName)}`
+      );
+      assert(
+        firstItem.supplierProductSpec === '发货方规格',
+        `supplierProductSpec 应为 "发货方规格"，实际 ${String(firstItem.supplierProductSpec)}`
+      );
+      // 系统商品编码仍然保留
+      assert(
+        firstItem.productCode === `SKU-${RUN_ID}`,
+        `productCode（系统编码）应为 ${`SKU-${RUN_ID}`}，实际 ${String(firstItem.productCode)}`
+      );
+    },
+  },
+  {
+    name: 'dispatch without supplier product mapping falls back to system product code',
+    async run({ pool }) {
+      // 创建一个没有 product_mappings 映射的商品和库存
+      const noMappingProductId = randomUUID();
+      const noMappingStockId = randomUUID();
+      const noMappingOrderId = randomUUID();
+      insertedProductIds.push(noMappingProductId);
+      insertedStockIds.push(noMappingStockId);
+      insertedOrderIds.push(noMappingOrderId);
+
+      await pool.query(
+        `
+          insert into products (id, code, name, spec, is_active, created_at, updated_at)
+          values ($1, $2, $3, $4, true, now(), now())
+        `,
+        [noMappingProductId, `SKU-NOMAP-${RUN_ID}`, `无映射商品-${RUN_ID}`, '无规格']
+      );
+
+      await pool.query(
+        `
+          insert into stocks (
+            id, product_id, product_code, product_name, supplier_id, supplier_name,
+            quantity, reserved_quantity, unit_price, status, created_at, updated_at
+          )
+          values ($1, $2, $3, $4, $5, $6, 5, 0, 66, 'active', now(), now())
+        `,
+        [noMappingStockId, noMappingProductId, `SKU-NOMAP-${RUN_ID}`, `无映射商品-${RUN_ID}`, ids.supplierId, `发货发货方-${RUN_ID}`]
+      );
+
+      const noMapItems = JSON.stringify([
+        { product_code: `SKU-NOMAP-${RUN_ID}`, product_name: `无映射商品-${RUN_ID}`, quantity: 1, price: 66 }
+      ]);
+
+      await pool.query(
+        `
+          insert into orders (
+            id, order_no, status, items, receiver_name, receiver_phone, receiver_address,
+            customer_code, customer_name, salesperson, operator_name, supplier_id, supplier_name,
+            source, sys_order_no, assigned_batch, created_at, updated_at
+          )
+          values ($1, $2, 'pending', $3::jsonb, '测试收货人', '13900000001', '无映射地址',
+            'CUST-TEST', '测试客户', '业务员A', '跟单员A', $4, $5, 'api-test',
+            $6, null, now(), now())
+        `,
+        [noMappingOrderId, `NOMAP-${RUN_ID}`, noMapItems, ids.supplierId, `发货发货方-${RUN_ID}`, `SYS-NOMAP-${RUN_ID}`]
+      );
+
+      const response = await fetchJson<{ success?: boolean; data?: BatchResponseData; error?: string }>(
+        `${BASE_URL}/api/shipping-exports/batch`,
+        {
+          method: 'POST',
+          headers: buildAuthedHeaders(ADMIN_USER),
+          body: JSON.stringify({
+            supplierIds: [ids.supplierId],
+            exportedBy: RUN_ID,
+          }),
+        }
+      );
+
+      assert(response.status === 200, `期望 200，实际 ${response.status}，错误: ${response.data.error ?? '未知错误'}`);
+      assert(response.data.success === true, `派发失败: ${response.data.error ?? '未知错误'}`);
+
+      const data = ensureObject(response.data.data, 'fallback-mapping.data') as BatchResponseData;
+      insertedExportRecordIds.push(data.recordId as string);
+      insertedDispatchBatchNos.add(data.batchNo as string);
+
+      // 验证 dispatch_records 中 supplierProductCode fallback 到系统商品编码
+      const dispatchRecord = await queryOne<{ items: unknown }>(
+        pool,
+        `select items from dispatch_records where order_id = $1 and status = 'dispatched'`,
+        [noMappingOrderId]
+      );
+      assert(dispatchRecord, '应存在 dispatch_records 记录');
+
+      const items = typeof dispatchRecord.items === 'string' ? JSON.parse(dispatchRecord.items) : dispatchRecord.items;
+      assert(Array.isArray(items) && items.length > 0, 'dispatch_records.items 应包含商品明细');
+
+      const firstItem = items[0] as Record<string, unknown>;
+      assert(
+        firstItem.supplierProductCode === `SKU-NOMAP-${RUN_ID}`,
+        `无映射时应 fallback 到系统编码 ${`SKU-NOMAP-${RUN_ID}`}，实际 ${String(firstItem.supplierProductCode)}`
+      );
+      assert(
+        firstItem.supplierProductName === `无映射商品-${RUN_ID}`,
+        `无映射时应 fallback 到系统名称，实际 ${String(firstItem.supplierProductName)}`
+      );
     },
   },
 ];

@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
     const unitPrice = toNumber(body.unitPrice ?? body.unit_price ?? body.price);
 
     if (!supplierId) {
-      return NextResponse.json({ success: false, error: '供应商不能为空' }, { status: 400 });
+      return NextResponse.json({ success: false, error: '发货方不能为空' }, { status: 400 });
     }
 
     if (!productId) {

@@ -78,7 +78,7 @@ async function seedSupplier(pool: Pool) {
         id, name, short_name, type, send_type, is_active, created_at
       ) VALUES ($1, $2, $3, 'supplier', 'manual', true, now())
     `,
-    [supplierId, `成本供应商-${RUN_ID}`, `成本供应商`]
+    [supplierId, `成本发货方-${RUN_ID}`, `成本发货方`]
   );
   insertedSupplierIds.push(supplierId);
   return supplierId;
@@ -115,7 +115,7 @@ async function seedStock(pool: Pool, input: {
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, 'active', now(), now())
     `,
-    [stockId, input.productId, input.productCode, input.productName, input.supplierId, `成本供应商-${RUN_ID}`, input.quantity, input.unitPrice]
+    [stockId, input.productId, input.productCode, input.productName, input.supplierId, `成本发货方-${RUN_ID}`, input.quantity, input.unitPrice]
   );
   insertedStockIds.push(stockId);
   return stockId;
@@ -141,7 +141,7 @@ async function seedOrder(pool: Pool, supplierId: string) {
         'COST-CUSTOMER', '成本客户', '成本业务员', '成本跟单员', $4, $5, 'api-test', $6, now(), now()
       )
     `,
-    [orderId, orderNo, JSON.stringify(items), supplierId, `成本供应商-${RUN_ID}`, `SYS-${RUN_ID}`]
+    [orderId, orderNo, JSON.stringify(items), supplierId, `成本发货方-${RUN_ID}`, `SYS-${RUN_ID}`]
   );
 
   insertedOrderIds.push(orderId);
@@ -158,7 +158,7 @@ async function seedReceiptRecord(pool: Pool, supplierId: string) {
       )
       VALUES ($1, $2, $3, $4, $5, 1, 1, 0, 'api-test', now(), now())
     `,
-    [recordId, supplierId, `成本供应商-${RUN_ID}`, `/fixtures/${RUN_ID}.xlsx`, `${RUN_ID}.xlsx`]
+    [recordId, supplierId, `成本发货方-${RUN_ID}`, `/fixtures/${RUN_ID}.xlsx`, `${RUN_ID}.xlsx`]
   );
   insertedReceiptRecordIds.push(recordId);
   return recordId;
@@ -174,7 +174,7 @@ async function seedReceipt(pool: Pool, input: { recordId: string; supplierId: st
       )
       VALUES ($1, $2, $3, $4, $5, $6, '顺丰', $7, CURRENT_DATE, 1, 'auto_matched', now(), now())
     `,
-    [receiptId, input.recordId, input.orderId, input.supplierId, `成本供应商-${RUN_ID}`, input.orderNo, input.trackingNo]
+    [receiptId, input.recordId, input.orderId, input.supplierId, `成本发货方-${RUN_ID}`, input.orderNo, input.trackingNo]
   );
   insertedReceiptIds.push(receiptId);
   return receiptId;

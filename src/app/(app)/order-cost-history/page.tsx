@@ -263,7 +263,7 @@ export default function OrderCostHistoryPage() {
       '内部订单号': r.orderId,
       '客户订单号': r.orderNo,
       '匹配码': r.matchCode,
-      '供应商': r.supplierName,
+      '发货方': r.supplierName,
       '仓库': r.warehouseName,
       '商品编码': r.productCode,
       '商品名称': r.productName,
@@ -496,16 +496,16 @@ export default function OrderCostHistoryPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>供应商</Label>
+              <Label>发货方</Label>
               <Select value={supplierFilter} onValueChange={(v) => {
                 setSupplierFilter(v);
                 setPagination(prev => ({ ...prev, page: 1 }));
               }}>
                 <SelectTrigger>
-                  <SelectValue placeholder="全部供应商" />
+                  <SelectValue placeholder="全部发货方" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">全部供应商</SelectItem>
+                  <SelectItem value="all">全部发货方</SelectItem>
                   {suppliers.map(s => (
                     <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                   ))}
@@ -560,7 +560,7 @@ export default function OrderCostHistoryPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[120px]">客户订单号</TableHead>
-                  <TableHead className="w-[100px]">供应商</TableHead>
+                  <TableHead className="w-[100px]">发货方</TableHead>
                   <TableHead className="w-[80px]">仓库</TableHead>
                   <TableHead>商品名称</TableHead>
                   <TableHead className="w-[60px]">数量</TableHead>

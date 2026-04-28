@@ -11,7 +11,7 @@
     "phone": "",
     "address": "",
     "status": "active",
-    "file": "assets/供应商发单/聚水潭-广州超品汇.xlsx"
+    "file": "assets/发货方发单/聚水潭-广州超品汇.xlsx"
   },
   {
     "id": "5e561dc9-834a-48ab-bf5e-b4b23ab921f0",
@@ -25,7 +25,7 @@
     "phone": "",
     "address": "",
     "status": "active",
-    "file": "assets/供应商发单/聚水潭-广州首映礼.xlsx"
+    "file": "assets/发货方发单/聚水潭-广州首映礼.xlsx"
   },
   {
     "id": "3940838b-ae90-425d-a237-bd4601dcaa61",
@@ -39,7 +39,7 @@
     "phone": "",
     "address": "",
     "status": "active",
-    "file": "assets/供应商发单/聚水潭-邵武万家美.xlsx"
+    "file": "assets/发货方发单/聚水潭-邵武万家美.xlsx"
   },
   {
     "id": "d464e221-3107-425d-b7ba-c4718a5d7ace",
@@ -53,7 +53,7 @@
     "phone": "",
     "address": "",
     "status": "active",
-    "file": "assets/供应商发单/常州梁业.xls"
+    "file": "assets/发货方发单/常州梁业.xls"
   },
   {
     "id": "aa6bff71-11e9-4620-8de3-48d35e986680",

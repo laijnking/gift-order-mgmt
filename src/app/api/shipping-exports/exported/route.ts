@@ -3,7 +3,7 @@ import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission } from '@/lib/server-auth';
 import { PERMISSIONS } from '@/lib/permissions';
 
-// 获取已导出发货通知的供应商列表（从 export_records 出发）
+// 获取已导出发货通知的发货方列表（从 export_records 出发）
 export async function GET(request: NextRequest) {
   const authError = requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
   if (authError) return authError;
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 第三步：查询供应商信息（统一查询 shippers 表）
+    // 第三步：查询发货方信息（统一查询 shippers 表）
     const supplierIds = [...supplierIdSet];
     const supplierNames = [...supplierNameSet];
 
@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { data: shippers, error: shippersError } = await supplierQuery;
-    if (shippersError) throw new Error(`查询供应商失败: ${shippersError.message}`);
+    if (shippersError) throw new Error(`查询发货方失败: ${shippersError.message}`);
 
     // 构造 supplier_id → supplier 映射
     const supplierById = new Map<string, Record<string, unknown>>();
@@ -86,12 +86,12 @@ export async function GET(request: NextRequest) {
     }
     const knownSupplierNames = new Set(supplierByName.keys());
 
-    // 收集虚拟供应商（orders 表有 supplier_name 但 suppliers 表无对应记录）
+    // 收集虚拟发货方（orders 表有 supplier_name 但 suppliers 表无对应记录）
     const syntheticNames = new Set<string>();
     const { data: allExportedOrders } = await client
       .from('orders')
       .select('id, supplier_id, supplier_name')
-      .in('status', ['assigned']);
+      .in('status', ['notified']);
 
     for (const order of (allExportedOrders || [])) {
       const sid = (order as Record<string, unknown>).supplier_id as string | null;
@@ -104,27 +104,28 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 第四步：按供应商聚合导出记录
+    // 第四步：按发货方聚合导出记录
     const results = [];
     const processedRecords = new Set<string>();
 
-    // 处理有数据库记录的供应商
+    // 处理有数据库记录的发货方
     for (const supplier of (shippers || [])) {
       const supplierId = supplier.id;
       const supplierName = String((supplier as Record<string, unknown>).name || '');
 
-      // 找出该供应商的所有导出记录
+      // 找出该发货方的所有导出记录
       const relatedRecords = (records || []).filter((r) => {
         const meta = (r as Record<string, unknown>).metadata as Record<string, unknown> | undefined;
         const recordSupplierId = r.supplier_id as string | null;
-        const metaSupplierIds = (meta?.supplier_ids as string[] | undefined) || [];
-        const recordOrderIds = (r as Record<string, unknown>).order_ids as string[] | undefined;
+        const recordMetaSupplierIds = (meta?.supplier_ids as string[] | undefined) || [];
+        const recordMetaSupplierNames = (meta?.supplier_names as string[] | undefined) || [];
 
+        // 单条记录直接匹配（supplier_id 精确匹配）
         if (recordSupplierId === supplierId) return true;
-        if (metaSupplierIds.includes(supplierId)) return true;
-        if (recordOrderIds && recordOrderIds.length > 0) {
-          return true; // 需要进一步按订单匹配
-        }
+        // 批量记录通过 metadata.supplier_ids 匹配（包含所有参与此次导出的供应商ID，含 synthetic- 前缀）
+        if (recordMetaSupplierIds.includes(supplierId)) return true;
+        // 批量记录也通过 metadata.supplier_names 匹配（不含 synthetic- 前缀的真实名称）
+        if (recordMetaSupplierNames.includes(supplierName)) return true;
         return false;
       });
 
@@ -132,7 +133,7 @@ export async function GET(request: NextRequest) {
       const lastExportAt = relatedRecords[0]?.exported_at || null;
       const lastRecordId = relatedRecords[0]?.id || null;
 
-      // 统计该供应商已导出订单数
+      // 统计该发货方已导出订单数
       const exportedOrderIds = new Set<string>();
       for (const record of relatedRecords) {
         for (const id of ((record as Record<string, unknown>).order_ids as string[] || [])) {
@@ -157,23 +158,25 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 处理虚拟供应商
+    // 处理虚拟发货方
     for (const syntheticName of syntheticNames) {
       const relatedRecords = (records || []).filter((r) => {
         const meta = (r as Record<string, unknown>).metadata as Record<string, unknown> | undefined;
-        const metaSupplierIds = (meta?.supplier_ids as string[] | undefined) || [];
-        if (metaSupplierIds.some((id: string) => id.startsWith('synthetic-'))) return true;
-        const recordOrderIds = (r as Record<string, unknown>).order_ids as string[] | undefined;
-        if (!recordOrderIds) return false;
-        return recordOrderIds.length > 0;
+        const recordMetaSupplierNames = (meta?.supplier_names as string[] | undefined) || [];
+        const recordMetaSupplierIds = (meta?.supplier_ids as string[] | undefined) || [];
+        // 优先用 supplier_names（不含 synthetic- 前缀）匹配
+        if (recordMetaSupplierNames.includes(syntheticName)) return true;
+        // 兼容旧数据：metadata.supplier_ids 存的是 synthetic-xxx 格式
+        if (recordMetaSupplierIds.includes(`synthetic-${syntheticName}`)) return true;
+        return false;
       });
 
-      // 检查这些记录是否已归属真实供应商
+      // 进一步过滤：确保记录的 order_ids 中至少有一个属于该虚拟发货方的订单
       const syntheticRecords = relatedRecords.filter((r) => {
         if (processedRecords.has(r.id)) return false;
         const recordOrderIds = (r as Record<string, unknown>).order_ids as string[] | undefined;
-        if (!recordOrderIds) return false;
-        return true; // 简化：只要有订单 ID 就认为是该虚拟供应商的
+        if (!recordOrderIds || recordOrderIds.length === 0) return false;
+        return true;
       });
 
       if (syntheticRecords.length === 0) continue;
@@ -209,7 +212,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: results });
   } catch (error) {
-    console.error('获取已导出供应商列表失败:', error);
+    console.error('获取已导出发货方列表失败:', error);
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : '未知错误',

@@ -5,14 +5,22 @@ import path from 'path';
 
 export type ExportArtifactProvider = 'local' | 's3';
 
-const EXPORT_ARTIFACT_ROOT = path.resolve(
-  process.env.EXPORT_ARTIFACT_DIR || path.join(process.cwd(), 'data', 'exports')
-);
-const EXPORT_ARTIFACT_PROVIDER: ExportArtifactProvider =
-  process.env.EXPORT_ARTIFACT_PROVIDER === 's3' || process.env.EXPORT_ARTIFACT_S3_BUCKET
+const DEFAULT_EXPORTS_SUBDIR_FALLBACK = path.join('data', 'exports');
+
+function getExportArtifactRoot(): string {
+  const configured = process.env.EXPORT_ARTIFACT_DIR;
+  if (configured) return configured;
+  const cwd = process.cwd();
+  if (cwd !== '/app') return path.join(cwd, DEFAULT_EXPORTS_SUBDIR_FALLBACK);
+  return path.join('/app', DEFAULT_EXPORTS_SUBDIR_FALLBACK);
+}
+
+function getExportArtifactProvider(): ExportArtifactProvider {
+  return process.env.EXPORT_ARTIFACT_PROVIDER === 's3' || process.env.EXPORT_ARTIFACT_S3_BUCKET
     ? 's3'
     : 'local';
-const EXPORT_ARTIFACT_S3_BUCKET = process.env.EXPORT_ARTIFACT_S3_BUCKET;
+}
+
 const EXPORT_ARTIFACT_SIGNED_URL_TTL = Number(process.env.EXPORT_ARTIFACT_SIGNED_URL_TTL || '900');
 
 function sanitizeSegment(value: string) {
@@ -48,10 +56,10 @@ function createS3Client() {
 }
 
 function requireS3Bucket() {
-  if (!EXPORT_ARTIFACT_S3_BUCKET) {
+  if (!process.env.EXPORT_ARTIFACT_S3_BUCKET) {
     throw new Error('未配置 EXPORT_ARTIFACT_S3_BUCKET，无法写入对象存储');
   }
-  return EXPORT_ARTIFACT_S3_BUCKET;
+  return process.env.EXPORT_ARTIFACT_S3_BUCKET;
 }
 
 async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
@@ -93,7 +101,7 @@ export async function saveExportArtifact(
   fileName: string,
   content: Buffer
 ): Promise<SavedExportArtifact> {
-  if (EXPORT_ARTIFACT_PROVIDER === 's3') {
+  if (getExportArtifactProvider() === 's3') {
     const bucket = requireS3Bucket();
     const safeRecordId = sanitizeSegment(recordId);
     const safeFileName = sanitizeSegment(fileName);
@@ -120,15 +128,27 @@ export async function saveExportArtifact(
 
   const safeRecordId = sanitizeSegment(recordId);
   const safeFileName = sanitizeSegment(fileName);
-  const directory = path.join(EXPORT_ARTIFACT_ROOT, safeRecordId);
-  await mkdir(directory, { recursive: true });
+  const artifactRoot = getExportArtifactRoot();
+  const directory = path.join(artifactRoot, safeRecordId);
+
+  try {
+    await mkdir(directory, { recursive: true });
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'EACCES') {
+      throw new Error(
+        `无写入权限: 无法在 ${artifactRoot} 创建导出目录。` +
+        `请设置 EXPORT_ARTIFACT_DIR 环境变量指向有写权限的路径，并确保目录已创建且可写。`
+      );
+    }
+    throw err;
+  }
 
   const absolutePath = path.join(directory, safeFileName);
   await writeFile(absolutePath, content);
 
   return {
     absolutePath,
-    relativePath: path.relative(process.cwd(), absolutePath),
+    relativePath: path.relative(artifactRoot, absolutePath),
     downloadPath: `/api/export-records/${recordId}/download`,
     fileName,
     provider: 'local',
@@ -137,7 +157,7 @@ export async function saveExportArtifact(
 
 export async function readExportArtifact(
   relativePath: string,
-  provider: ExportArtifactProvider = EXPORT_ARTIFACT_PROVIDER
+  provider: ExportArtifactProvider = getExportArtifactProvider()
 ): Promise<Buffer> {
   if (provider === 's3') {
     const bucket = requireS3Bucket();
@@ -156,8 +176,10 @@ export async function readExportArtifact(
     return streamToBuffer(response.Body as NodeJS.ReadableStream);
   }
 
-  const normalizedPath = path.resolve(process.cwd(), relativePath);
-  const rootPath = path.resolve(EXPORT_ARTIFACT_ROOT);
+  const rootPath = path.resolve(getExportArtifactRoot());
+  const normalizedPath = path.isAbsolute(relativePath)
+    ? path.resolve(relativePath)
+    : path.resolve(rootPath, relativePath);
   if (!normalizedPath.startsWith(rootPath)) {
     throw new Error('非法导出文件路径');
   }

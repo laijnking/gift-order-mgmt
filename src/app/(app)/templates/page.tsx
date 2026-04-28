@@ -65,90 +65,122 @@ interface Supplier {
   name: string;
 }
 
-// 预设字段映射方案
+// 预设字段映射方案（fieldMappings 值必须与 rowsForOrder/context 的 keys 精确一致）
+// 重要：这些值对应 export-context keys，不是 DB column names，也不是 TS interface property names
 const PRESET_MAPPINGS = [
+  {
+    name: '发货通知单（标准）',
+    icon: '📦',
+    type: 'shipping',
+    mappings: {
+      '系统订单号（请勿删除和修改）': 'sysOrderNo',
+      '发货方商品编码': 'supplierProductCode',
+      '发货方商品名称': 'supplierProductName',
+      '收货人': 'receiverName',
+      '联系电话': 'receiverPhone',
+      '收货地址': 'receiverAddress',
+      '数量': 'quantity',
+      '物流方': 'expressCompany',
+      '物流单号': 'trackingNo',
+      '运费': 'expressFee',
+    }
+  },
   {
     name: '标准派发单',
     icon: '📋',
     mappings: {
-      '订单号': 'orderNo',
-      '商品名称': 'productName',
-      '规格型号': 'productSpec',
-      '数量': 'quantity',
-      '收货人': 'receiverName',
-      '收货电话': 'receiverPhone',
-      '收货地址': 'receiverAddress',
-      '备注': 'remark',
+      '订单号': 'orderNo',          // rowsForOrder: context.orderNo = order.order_no
+      '商品名称': 'productName',    // rowsForOrder: context.productName (from items)
+      '规格型号': 'productSpec',    // rowsForOrder: context.productSpec (from items)
+      '数量': 'quantity',          // rowsForOrder: context.quantity
+      '收货人': 'receiverName',     // rowsForOrder: context.receiverName = order.receiver_name
+      '收货电话': 'receiverPhone',   // rowsForOrder: context.receiverPhone = order.receiver_phone
+      '收货地址': 'receiverAddress', // rowsForOrder: context.receiverAddress = order.receiver_address
+      '备注': 'remark',             // rowsForOrder: context.remark = order.remark
     }
   },
   {
     name: '客户确认单',
     icon: '✅',
     mappings: {
-      '客户订单号': 'orderNo',
-      '系统订单号': 'sysOrderNo',
-      '商品名称': 'productName',
-      '数量': 'quantity',
-      '收货人': 'receiverName',
-      '收货电话': 'receiverPhone',
-      '收货地址': 'receiverAddress',
-      '快递公司': 'expressCompany',
-      '快递单号': 'trackingNo',
+      '客户订单号': 'orderNo',      // rowsForOrder: context.orderNo
+      '系统订单号': 'sysOrderNo',  // rowsForOrder: context.sysOrderNo = order.sys_order_no
+      '商品名称': 'productName',    // rowsForOrder: context.productName
+      '数量': 'quantity',           // rowsForOrder: context.quantity
+      '收货人': 'receiverName',    // rowsForOrder: context.receiverName
+      '收货电话': 'receiverPhone',  // rowsForOrder: context.receiverPhone
+      '收货地址': 'receiverAddress', // rowsForOrder: context.receiverAddress
+      '快递公司': 'expressCompany', // rowsForOrder: context.expressCompany = order.express_company
+      '快递单号': 'trackingNo',     // rowsForOrder: context.trackingNo = order.tracking_no
     }
   },
   {
-    name: '供应商发货单',
+    name: '发货方发货单',
     icon: '🚚',
     mappings: {
-      'SKU': 'productCode',
-      '商品名称': 'productName',
-      '数量': 'quantity',
-      '收货人': 'receiverName',
-      '电话': 'receiverPhone',
-      '地址': 'receiverAddress',
-      '客户代码': 'customerCode',
-      '客户名称': 'customerName',
+      'SKU': 'productCode',        // rowsForOrder: context.productCode (from items, 按模板类型切换)
+      '商品名称': 'productName',    // rowsForOrder: context.productName
+      '数量': 'quantity',           // rowsForOrder: context.quantity
+      '收货人': 'receiverName',     // rowsForOrder: context.receiverName
+      '电话': 'receiverPhone',       // rowsForOrder: context.receiverPhone
+      '地址': 'receiverAddress',     // rowsForOrder: context.receiverAddress
+      '客户代码': 'customerCode',   // rowsForOrder: context.customerCode = order.customer_code
+      '客户名称': 'customerName',   // rowsForOrder: context.customerName = order.customer_name
     }
   },
   {
     name: '简明模板',
     icon: '📄',
     mappings: {
-      '订单号': 'orderNo',
-      '商品': 'productName',
-      '数量': 'quantity',
-      '收件人': 'receiverName',
-      '电话': 'receiverPhone',
-      '地址': 'receiverAddress',
+      '订单号': 'orderNo',         // rowsForOrder: context.orderNo
+      '商品': 'productName',        // rowsForOrder: context.productName
+      '数量': 'quantity',           // rowsForOrder: context.quantity
+      '收件人': 'receiverName',     // rowsForOrder: context.receiverName
+      '电话': 'receiverPhone',      // rowsForOrder: context.receiverPhone
+      '地址': 'receiverAddress',    // rowsForOrder: context.receiverAddress
     }
   },
 ];
 
-// 系统字段列表
+// 系统字段列表（用于导出模板 fieldMappings 的 systemField 下拉选项）
+// 重要：这些 key 必须与 src/app/api/shipping-exports/batch/route.ts rowsForOrder() 中 context 对象的 keys 完全一致
+// - order-level context keys 来自 order.* 列（snake_case DB column）
+// - item-level context keys 来自 items JSONB（但映射时统一用 orderNo/productName 等 camelCase 别名）
 const SYSTEM_FIELDS = [
-  { key: 'sysOrderNo', label: '系统订单号' },
-  { key: 'orderNo', label: '客户订单号' },
-  { key: 'matchCode', label: '匹配码' },
-  { key: 'dispatchBatch', label: '派发批次' },
-  { key: 'productName', label: '商品名称' },
-  { key: 'productCode', label: '商品编码/SKU' },
-  { key: 'productSpec', label: '规格型号' },
-  { key: 'quantity', label: '数量' },
-  { key: 'receiverName', label: '收货人' },
-  { key: 'receiverPhone', label: '收货电话' },
-  { key: 'receiverAddress', label: '收货地址' },
-  { key: 'customerCode', label: '客户代码' },
-  { key: 'customerName', label: '客户名称' },
-  { key: 'salesperson', label: '业务员' },
-  { key: 'operator', label: '跟单员' },
-  { key: 'supplierName', label: '供应商名称' },
-  { key: 'expressCompany', label: '快递公司' },
-  { key: 'trackingNo', label: '快递单号' },
-  { key: 'remark', label: '备注' },
+  // === 订单基本信息 ===
+  { key: 'sysOrderNo', label: '系统订单号' },        // context.sysOrderNo = order.sys_order_no
+  { key: 'orderNo', label: '客户订单号' },            // context.orderNo = order.order_no
+  { key: 'matchCode', label: '匹配码' },             // context.matchCode = order.match_code
+  { key: 'dispatchBatch', label: '派发批次' },       // context.dispatchBatch = batchNo
+  // === 商品信息（来自 items JSONB，按 rowsForOrder 统一映射）===
+  { key: 'productCode', label: '商品编码/SKU' },     // items.product_code 或 cu_product_code（按模板类型切换）
+  { key: 'productName', label: '商品名称' },        // items.product_name 或 cu_product_name
+  { key: 'productSpec', label: '规格型号' },        // items.product_spec 或 cu_product_spec
+  { key: 'supplierProductCode', label: '发货方商品编码' }, // items.supplierProductCode（派发时快照）
+  { key: 'supplierProductName', label: '发货方商品名称' }, // items.supplierProductName（派发时快照）
+  { key: 'quantity', label: '数量' },               // items.quantity
+  { key: 'unitCost', label: '单价/成本价' },        // items.unitCost = stock.unit_price
+  { key: 'warehouseName', label: '仓库' },           // items.warehouse
+  // === 收货信息（来自 order.* 列）===
+  { key: 'receiverName', label: '收货人' },          // order.receiver_name
+  { key: 'receiverPhone', label: '收货电话' },      // order.receiver_phone
+  { key: 'receiverAddress', label: '收货地址' },     // order.receiver_address
+  // === 客户/发货方信息 ===
+  { key: 'customerCode', label: '客户代码' },       // order.customer_code
+  { key: 'customerName', label: '客户名称' },       // order.customer_name
+  { key: 'supplierName', label: '发货方名称' },     // order.supplier_name
+  { key: 'salesperson', label: '业务员' },           // order.salesperson
+  { key: 'operator', label: '跟单员' },             // order.operator_name
+  // === 快递/物流 ===
+  { key: 'expressCompany', label: '物流方/快递公司' },     // order.express_company
+  { key: 'trackingNo', label: '物流单号' },         // order.tracking_no
+  { key: 'expressFee', label: '运费' },             // order.express_fee
+  // === 备注 ===
+  { key: 'remark', label: '备注' },                  // order.remark
 ];
 
 const TEMPLATE_TYPES = [
-  { value: 'shipping', label: '发货通知模板', desc: '供应商发货通知单', color: 'bg-green-500' },
+  { value: 'shipping', label: '发货通知模板', desc: '发货方发货通知单', color: 'bg-green-500' },
   { value: 'customer_feedback', label: '客户反馈模板', desc: '客户回传反馈单', color: 'bg-blue-500' },
   { value: 'common', label: '通用模板', desc: '通用导出', color: 'bg-purple-500' },
 ];
@@ -238,7 +270,7 @@ export default function TemplatesPage() {
         setSuppliers(data.data || []);
       }
     } catch (err) {
-      console.error('获取供应商失败:', err);
+      console.error('获取发货方失败:', err);
     }
   };
 
@@ -310,6 +342,11 @@ export default function TemplatesPage() {
   };
 
   const applyPreset = (preset: typeof PRESET_MAPPINGS[0]) => {
+    // 发货通知单专用预设只能用于发货通知模板
+    if (preset.type && preset.type !== formData.type) {
+      toast.error(`「${preset.name}」仅适用于发货通知模板，请先选择正确的模板类型`);
+      return;
+    }
     const mappingArray = Object.entries(preset.mappings).map(([excelColumn, systemField]) => ({
       excelColumn,
       systemField: systemField as string,
@@ -559,10 +596,27 @@ export default function TemplatesPage() {
         case 'sysOrderNo': return 'SYS-20260415-0001';
         case 'orderNo': return 'ORD20260415001';
         case 'productName': return '苏泊尔破壁机 SPJ002S';
+        case 'productCode': return 'SKU-001';
+        case 'productSpec': return 'SPJ002S';
+        case 'supplierProductCode': return 'JD-SKU-001';
+        case 'supplierProductName': return '苏泊尔破壁机（京东专供）';
         case 'quantity': return '5';
+        case 'unitCost': return '215.00';
         case 'receiverName': return '张三';
         case 'receiverPhone': return '13800138000';
         case 'receiverAddress': return '福建省厦门市思明区XX路XX号';
+        case 'expressCompany': return '顺丰速运';
+        case 'trackingNo': return 'SF1234567890';
+        case 'expressFee': return '12.00';
+        case 'customerCode': return 'C001';
+        case 'customerName': return '泉州礼品公司';
+        case 'supplierName': return '发货方A';
+        case 'salesperson': return '李四';
+        case 'operator': return '王五';
+        case 'remark': return '加急';
+        case 'matchCode': return 'MATCH-001';
+        case 'dispatchBatch': return 'SHIP-20260415-00001';
+        case 'warehouseName': return '杭州仓';
         default: return '-';
       }
     });
@@ -580,7 +634,7 @@ export default function TemplatesPage() {
             模板配置中心
           </h1>
           <p className="text-muted-foreground">
-            管理导出模板，支持关联客户或供应商，可快速设置字段映射
+            管理导出模板，支持关联客户或发货方，可快速设置字段映射
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
@@ -631,7 +685,7 @@ export default function TemplatesPage() {
               <SelectContent>
                 <SelectItem value="all">全部对象</SelectItem>
                 <SelectItem value="customer">已关联客户</SelectItem>
-                <SelectItem value="supplier">已关联供应商</SelectItem>
+                <SelectItem value="supplier">已关联发货方</SelectItem>
                 <SelectItem value="none">未关联</SelectItem>
               </SelectContent>
             </Select>
@@ -793,7 +847,7 @@ export default function TemplatesPage() {
           <DialogHeader>
             <DialogTitle>{editingTemplate ? '编辑模板' : '新增模板'}</DialogTitle>
             <DialogDescription>
-              {editingTemplate ? '修改模板配置' : '创建新的导出模板，可关联客户或供应商'}
+              {editingTemplate ? '修改模板配置' : '创建新的导出模板，可关联客户或发货方'}
             </DialogDescription>
           </DialogHeader>
           
@@ -859,7 +913,7 @@ export default function TemplatesPage() {
                       <SelectItem value="supplier">
                         <div className="flex items-center gap-2">
                           <Building2 className="h-4 w-4" />
-                          <span>供应商</span>
+                          <span>发货方</span>
                         </div>
                       </SelectItem>
                     </SelectContent>
@@ -891,7 +945,7 @@ export default function TemplatesPage() {
               
               {formData.targetType === 'supplier' && (
                 <div className="space-y-2">
-                  <Label>选择供应商</Label>
+                  <Label>选择发货方</Label>
                   <Popover open={supplierComboboxOpen} onOpenChange={setSupplierComboboxOpen}>
                     <PopoverTrigger asChild>
                       <Button
@@ -901,17 +955,17 @@ export default function TemplatesPage() {
                         className="w-full justify-start text-left font-normal"
                       >
                         {formData.targetId ? (
-                          <span>{suppliers.find(s => s.id === formData.targetId)?.name || formData.targetName || '未知供应商'}</span>
+                          <span>{suppliers.find(s => s.id === formData.targetId)?.name || formData.targetName || '未知发货方'}</span>
                         ) : (
-                          <span className="text-muted-foreground">输入搜索供应商...</span>
+                          <span className="text-muted-foreground">输入搜索发货方...</span>
                         )}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-[400px] p-0" align="start">
                       <Command>
-                        <CommandInput placeholder="搜索供应商名称或编码..." />
+                        <CommandInput placeholder="搜索发货方名称或编码..." />
                         <CommandList>
-                          <CommandEmpty>未找到供应商</CommandEmpty>
+                          <CommandEmpty>未找到发货方</CommandEmpty>
                           <CommandGroup>
                             {suppliers.map(supplier => (
                               <CommandItem

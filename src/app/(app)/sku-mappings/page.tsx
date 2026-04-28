@@ -76,12 +76,12 @@ const CUSTOMER_IMPORT_CONFIG = {
 };
 
 // ============================================================
-// 供应商商品映射 - 导入配置
+// 发货方商品映射 - 导入配置
 // ============================================================
 const SUPPLIER_IMPORT_CONFIG = {
-  title: '供应商商品映射',
+  title: '发货方商品映射',
   fields: ['supplierCode', 'supplierProductName', 'supplierSku', 'supplierSpec', 'productCode', 'productName', 'price', 'remark'],
-  fieldLabels: ['供应商编码', '供应商商品名称', '供应商商品编码', '供应商商品规格', '系统商品编码', '系统商品名称', '价格', '备注'],
+  fieldLabels: ['发货方编码', '发货方商品名称', '发货方商品编码', '发货方商品规格', '系统商品编码', '系统商品名称', '价格', '备注'],
   template: [
     { supplierCode: 'GYS-001', supplierProductName: '苏泊尔果蔬清洗机', supplierSku: 'GS10', supplierSpec: 'GS10', productCode: 'GS10', productName: '苏泊尔果蔬清洗机', price: '115.00', remark: '' },
   ],
@@ -113,19 +113,19 @@ const CUSTOMER_SKU_CHINESE_MAPPING: Record<string, string> = {
 };
 
 // ============================================================
-// 供应商商品映射 - 列名映射
+// 发货方商品映射 - 列名映射
 // ============================================================
 const SUPPLIER_COLUMN_ALIASES: Record<string, string[]> = {
-  supplierName: ['供应商名称', '供应商'],
-  supplierProductName: ['供应商商品名称', '商品名称', '名称', '供应商商品名称/商品规格/供应商SKU'],
-  supplierSpec: ['型号规格', '规格', '规格型号', '商品规格', '产品型号', '型号', '供应商商品规格'],
+  supplierName: ['发货方名称', '发货方'],
+  supplierProductName: ['发货方商品名称', '商品名称', '名称', '发货方商品名称/商品规格/发货方SKU'],
+  supplierSpec: ['型号规格', '规格', '规格型号', '商品规格', '产品型号', '型号', '发货方商品规格'],
   productCode: ['系统商品编码', '商品编码', '编码'],
   price: ['价格', '单价'],
   remark: ['备注'],
 };
 const SUPPLIER_SKU_CHINESE_MAPPING: Record<string, string> = {
-  '供应商名称': 'supplierName',
-  '供应商商品名称/商品规格/供应商SKU': 'supplierProductName',
+  '发货方名称': 'supplierName',
+  '发货方商品名称/商品规格/发货方SKU': 'supplierProductName',
   '系统商品编码': 'productCode',
   '价格': 'price',
 };
@@ -143,14 +143,14 @@ const CUSTOMER_SYSTEM_FIELDS = [
 ];
 
 // ============================================================
-// 供应商商品映射 - 系统字段
+// 发货方商品映射 - 系统字段
 // ============================================================
 const SUPPLIER_SYSTEM_FIELDS = [
-  { key: 'supplierName', label: '供应商名称', required: true, description: '供应商名称' },
-  { key: 'supplierProductName', label: '供应商商品名称', required: true, description: '供应商商品名称' },
-  { key: 'supplierSpec', label: '型号规格', required: false, description: '供应商商品的规格型号' },
+  { key: 'supplierName', label: '发货方名称', required: true, description: '发货方名称' },
+  { key: 'supplierProductName', label: '发货方商品名称', required: true, description: '发货方商品名称' },
+  { key: 'supplierSpec', label: '型号规格', required: false, description: '发货方商品的规格型号' },
   { key: 'productCode', label: '系统商品编码', required: true, description: '系统商品编码' },
-  { key: 'price', label: '价格', required: false, description: '供应商采购价格' },
+  { key: 'price', label: '价格', required: false, description: '发货方采购价格' },
   { key: 'remark', label: '备注', required: false, description: '备注信息' },
 ];
 
@@ -277,10 +277,10 @@ export default function ProductMappingsPage() {
   useEffect(() => {
     let filtered = mappings;
 
-    // 按 mappingType 过滤 - 确保客户/供应商映射分开显示
+    // 按 mappingType 过滤 - 确保客户/发货方映射分开显示
     filtered = filtered.filter(m => m.mappingType === activeTab);
 
-    // 按客户/供应商过滤
+    // 按客户/发货方过滤
     if (activeTab === 'customer' && customerFilter !== 'all') {
       filtered = filtered.filter(m => m.customerCode === customerFilter);
     }
@@ -518,12 +518,12 @@ export default function ProductMappingsPage() {
 
     const partnerCode = activeTab === 'customer' ? selectedCustomer : selectedSupplier;
     if (!partnerCode || !importText.trim()) {
-      toast.error('请选择' + (activeTab === 'customer' ? '客户' : '供应商') + '并输入映射数据');
+      toast.error('请选择' + (activeTab === 'customer' ? '客户' : '发货方') + '并输入映射数据');
       return;
     }
 
     try {
-      // 解析导入文本（格式：供应商商品名称,SKU,系统商品编码,价格）
+      // 解析导入文本（格式：发货方商品名称,SKU,系统商品编码,价格）
       const lines = importText.trim().split('\n');
       const mappings = lines
         .map(line => {
@@ -583,7 +583,7 @@ export default function ProductMappingsPage() {
   };
 
   const handleExport = () => {
-    const partnerLabel = activeTab === 'customer' ? '客户' : '供应商';
+    const partnerLabel = activeTab === 'customer' ? '客户' : '发货方';
     const headers = [partnerLabel + '商品名称', partnerLabel + 'SKU', '系统商品编码', '商品名称', '价格', '状态'];
     const rows = filteredMappings.map(m => [
       m.customerProductName || '',
@@ -602,7 +602,7 @@ export default function ProductMappingsPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = (activeTab === 'customer' ? '客户' : '供应商') + `SKU映射_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = (activeTab === 'customer' ? '客户' : '发货方') + `SKU映射_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     toast.success('导出成功');
@@ -752,11 +752,17 @@ export default function ProductMappingsPage() {
       customers.forEach(c => {
         customerNameToCode[c.name] = c.code;
       });
-      
+
       // 构建客户编码到名称的映射（用于显示）
       const customerCodeToName: Record<string, string> = {};
       customers.forEach(c => {
         customerCodeToName[c.code] = c.name;
+      });
+
+      // 构建发货方名称到ID的映射（用于Excel导入时按名称匹配）
+      const supplierNameToId: Record<string, string> = {};
+      suppliers.forEach(s => {
+        supplierNameToId[s.name] = s.id;
       });
       
       // 检查是否提供了合作伙伴名称列（仅用于客户模式）
@@ -766,7 +772,7 @@ export default function ProductMappingsPage() {
         // 如果没有客户名称列，需要选择一个客户
         const partnerCode = activeTab === 'customer' ? selectedCustomer : selectedSupplier;
         if (!partnerCode) {
-          toast.error('请先选择' + (activeTab === 'customer' ? '客户' : '供应商'));
+          toast.error('请先选择' + (activeTab === 'customer' ? '客户' : '发货方'));
           setImporting(false);
           return;
         }
@@ -825,9 +831,19 @@ export default function ProductMappingsPage() {
             continue;
           }
         } else {
-          // 供应商模式下，必须有供应商
+          // 发货方模式下，检查Excel中是否有发货方名称列
+          if (fieldMappings.supplierName && partnerName) {
+            // 根据发货方名称查找发货方ID
+            const supplierIdByName = supplierNameToId[partnerName];
+            if (!supplierIdByName) {
+              errors.push(`第 ${i + 2} 行：发货方 "${partnerName}" 不存在，将跳过`);
+              continue;
+            }
+            partnerSelectedCode = supplierIdByName;
+          }
+          // 发货方模式下，必须有发货方
           if (!partnerSelectedCode) {
-            errors.push(`第 ${i + 2} 行：缺少供应商信息，请选择供应商`);
+            errors.push(`第 ${i + 2} 行：缺少发货方信息，请选择发货方或确保Excel包含发货方名称列`);
             continue;
           }
         }
@@ -919,7 +935,7 @@ export default function ProductMappingsPage() {
     );
   }
 
-  const partnerLabel = activeTab === 'customer' ? '客户' : '供应商';
+  const partnerLabel = activeTab === 'customer' ? '客户' : '发货方';
 
   return (
     <PageGuard permission="products:view" title="无权查看 SKU 映射" description="当前账号没有查看 SKU 映射管理的权限。">
@@ -927,7 +943,7 @@ export default function ProductMappingsPage() {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             <h1 className="text-2xl font-bold sm:text-3xl">SKU映射管理</h1>
-            <p className="text-muted-foreground">管理客户/供应商商品与系统商品的映射关系</p>
+            <p className="text-muted-foreground">管理客户/发货方商品与系统商品的映射关系</p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             {/* 隐藏的文件输入 */}
@@ -964,7 +980,7 @@ export default function ProductMappingsPage() {
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as MappingType)}>
           <TabsList className="grid w-full grid-cols-2 sm:inline-flex sm:w-auto">
             <TabsTrigger value="customer">客户商品映射</TabsTrigger>
-            <TabsTrigger value="supplier">供应商商品映射</TabsTrigger>
+            <TabsTrigger value="supplier">发货方商品映射</TabsTrigger>
           </TabsList>
         </Tabs>
 
@@ -972,7 +988,7 @@ export default function ProductMappingsPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder={activeTab === 'customer' ? "搜索客户商品名称、SKU..." : "搜索供应商商品名称、SKU..."}
+              placeholder={activeTab === 'customer' ? "搜索客户商品名称、SKU..." : "搜索发货方商品名称、SKU..."}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -980,10 +996,10 @@ export default function ProductMappingsPage() {
           </div>
           <Select value={getPartnerFilter || 'all'} onValueChange={(v) => setPartnerFilter(v === 'all' ? '' : v)}>
             <SelectTrigger className="w-full lg:w-[200px]">
-              <SelectValue placeholder={activeTab === 'customer' ? "筛选客户" : "筛选供应商"} />
+              <SelectValue placeholder={activeTab === 'customer' ? "筛选客户" : "筛选发货方"} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">{activeTab === 'customer' ? '全部客户' : '全部供应商'}</SelectItem>
+              <SelectItem value="all">{activeTab === 'customer' ? '全部客户' : '全部发货方'}</SelectItem>
               {getPartnerOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
@@ -1105,7 +1121,7 @@ export default function ProductMappingsPage() {
                 {editingMapping ? '编辑SKU映射' : '添加SKU映射'}
               </DialogTitle>
               <DialogDescription>
-                {activeTab === 'customer' ? '配置客户商品与系统商品的映射关系' : '配置供应商商品与系统商品的映射关系'}
+                {activeTab === 'customer' ? '配置客户商品与系统商品的映射关系' : '配置发货方商品与系统商品的映射关系'}
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -1133,7 +1149,7 @@ export default function ProductMappingsPage() {
                   id="partner_product_name"
                   value={formData.partnerProductName}
                   onChange={(e) => setFormData({ ...formData, partnerProductName: e.target.value })}
-                  placeholder={activeTab === 'customer' ? '输入客户商品名称' : '输入供应商商品名称'}
+                  placeholder={activeTab === 'customer' ? '输入客户商品名称' : '输入发货方商品名称'}
                 />
               </div>
               <div className="grid gap-2">
@@ -1206,7 +1222,7 @@ export default function ProductMappingsPage() {
             <DialogHeader>
               <DialogTitle>批量导入SKU映射</DialogTitle>
               <DialogDescription>
-                {activeTab === 'customer' ? '每行一条映射，格式：客户商品名称,SKU,系统商品编码,价格' : '每行一条映射，格式：供应商商品名称,SKU,系统商品编码,价格'}
+                {activeTab === 'customer' ? '每行一条映射，格式：客户商品名称,SKU,系统商品编码,价格' : '每行一条映射，格式：发货方商品名称,SKU,系统商品编码,价格'}
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -1240,8 +1256,8 @@ export default function ProductMappingsPage() {
                   placeholder={activeTab === 'customer' 
                     ? `客户商品1,SKU001,PROD001,99
 客户商品2,SKU002,PROD002,199`
-                    : `供应商商品1,SKU001,PROD001,99
-供应商商品2,SKU002,PROD002,199`
+                    : `发货方商品1,SKU001,PROD001,99
+发货方商品2,SKU002,PROD002,199`
                   }
                   rows={10}
                   className="font-mono text-sm"
@@ -1252,7 +1268,7 @@ export default function ProductMappingsPage() {
                 <ul className="list-disc list-inside mt-1">
                   <li>每行一条映射记录</li>
                   <li>字段用英文逗号分隔</li>
-                  <li>格式：{partnerLabel}商品名称,SKU,{partnerLabel === '客户' ? '客户' : '供应商'}系统商品编码,价格</li>
+                  <li>格式：{partnerLabel}商品名称,SKU,{partnerLabel === '客户' ? '客户' : '发货方'}系统商品编码,价格</li>
                   <li>价格可为空，默认为0</li>
                 </ul>
               </div>

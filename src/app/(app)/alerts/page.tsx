@@ -193,7 +193,7 @@ export default function AlertsPage() {
       const res = await fetch('/api/alert-records', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ ids, isRead: true }),
+        body: JSON.stringify({ ids, is_read: true }),
       });
       const data = await res.json();
       if (data.success) {
@@ -214,7 +214,7 @@ export default function AlertsPage() {
       const res = await fetch('/api/alert-records', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ ids, isResolved: true }),
+        body: JSON.stringify({ ids, is_resolved: true }),
       });
       const data = await res.json();
       if (data.success) {
@@ -775,7 +775,7 @@ export default function AlertsPage() {
                 </div>
                 {detailRecord.supplierName && (
                   <div>
-                    <Label className="text-muted-foreground">供应商</Label>
+                    <Label className="text-muted-foreground">发货方</Label>
                     <p className="font-medium">{detailRecord.supplierName}</p>
                   </div>
                 )}

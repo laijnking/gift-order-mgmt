@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import { PERMISSIONS, type Permission } from '@/lib/permissions';
 
 export interface AuthUser {
   id: string;
@@ -165,18 +166,6 @@ export function useAuth() {
   }
   return context;
 }
-
-export type Permission =
-  | 'dashboard:view'
-  | 'orders:view' | 'orders:create' | 'orders:edit' | 'orders:delete' | 'orders:export'
-  | 'customers:view' | 'customers:create' | 'customers:edit' | 'customers:delete'
-  | 'suppliers:view' | 'suppliers:create' | 'suppliers:edit' | 'suppliers:delete'
-  | 'products:view' | 'products:create' | 'products:edit' | 'products:delete'
-  | 'stocks:view' | 'stocks:edit'
-  | 'users:view' | 'users:create' | 'users:edit' | 'users:delete'
-  | 'agent_configs:view' | 'agent_configs:edit'
-  | 'ai_logs:view'
-  | 'settings:view';
 
 export function usePermission() {
   const { user } = useAuth();

@@ -98,7 +98,7 @@ async function runPhase(phase: { id: string; name: string; cmd: string[] }): Pro
     // 解析通过/失败数（从输出中提取）
     let passed = 0;
     let failed = 0;
-    let skipped = 0;
+    const skipped = 0;
 
     const passMatch = output.match(/(?:通过|PASS)[^0-9]*(\d+)/g);
     const failMatch = output.match(/(?:失败|FAIL)[^0-9]*(\d+)/g);

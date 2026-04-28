@@ -60,8 +60,7 @@ export async function POST(request: NextRequest) {
     
     mappings.forEach((m: Record<string, unknown>) => {
       if (m.customerCode) customerCodes.add(m.customerCode as string);
-      if (m.supplierId && typeof m.supplierId === 'string' && !m.supplierId.includes('-')) {
-        // 如果 supplierId 看起来像是编码而不是 UUID，先收集起来
+      if (m.supplierId && typeof m.supplierId === 'string') {
         shipperCodes.add(m.supplierId as string);
       }
     });
@@ -78,15 +77,19 @@ export async function POST(request: NextRequest) {
       });
     }
     
-    // 批量查询发货方ID映射
+    // 批量查询发货方ID映射（同时查code和id，确保UUID格式也能验证）
+    // 拆分为两个独立查询，避免 .or() + .in() 组合在本地客户端解析失败
     const shipperIdMap: Record<string, string> = {};
-    if (shipperCodes.size > 0) {
-      const { data: shippers } = await client
-        .from('shippers')
-        .select('id, code')
-        .in('code', Array.from(shipperCodes));
-      shippers?.forEach(s => {
-        shipperIdMap[s.code] = s.id;
+    const allShipperIdentifiers = Array.from(shipperCodes);
+    if (allShipperIdentifiers.length > 0) {
+      const [byCode, byId] = await Promise.all([
+        client.from('shippers').select('id, code').in('code', allShipperIdentifiers),
+        client.from('shippers').select('id, code').in('id', allShipperIdentifiers),
+      ]);
+      const allShippers = [...(byCode.data || []), ...(byId.data || [])];
+      allShippers.forEach(s => {
+        if (s.code) shipperIdMap[s.code] = s.id;
+        shipperIdMap[s.id] = s.id;
       });
     }
     
@@ -100,13 +103,26 @@ export async function POST(request: NextRequest) {
       }
     });
     
-    // 校验：检查无效的供应商编码
+    // 校验：检查无效的发货方编码和无效的UUID格式supplierId
     const invalidShipperCodes: string[] = [];
+    const invalidShipperIds: string[] = [];
     mappings.forEach((m) => {
       const supplierId = m.supplierId as string;
-      if (supplierId && !supplierId.includes('-') && !shipperIdMap[supplierId]) {
-        if (!invalidShipperCodes.includes(supplierId)) {
-          invalidShipperCodes.push(supplierId);
+      if (!supplierId) return;
+
+      if (!supplierId.includes('-')) {
+        // 非UUID格式：当编码处理，必须在shippers.code中找到
+        if (!shipperIdMap[supplierId]) {
+          if (!invalidShipperCodes.includes(supplierId)) {
+            invalidShipperCodes.push(supplierId);
+          }
+        }
+      } else {
+        // UUID格式：必须在shippers.id中找到（通过预查询）
+        if (!shipperIdMap[supplierId]) {
+          if (!invalidShipperIds.includes(supplierId)) {
+            invalidShipperIds.push(supplierId);
+          }
         }
       }
     });
@@ -121,10 +137,18 @@ export async function POST(request: NextRequest) {
     }
     
     if (invalidShipperCodes.length > 0) {
-      return NextResponse.json({ 
-        success: false, 
-        error: `以下供应商编码不存在: ${invalidShipperCodes.map(c => `"${c}"`).join(', ')}。请检查后重试。`,
+      return NextResponse.json({
+        success: false,
+        error: `以下发货方编码不存在: ${invalidShipperCodes.map(c => `"${c}"`).join(', ')}。请检查后重试。`,
         invalidShipperCodes
+      }, { status: 400 });
+    }
+
+    if (invalidShipperIds.length > 0) {
+      return NextResponse.json({
+        success: false,
+        error: `以下发货方ID不存在: ${invalidShipperIds.map(c => `"${c}"`).join(', ')}。请检查后重试。`,
+        invalidShipperIds
       }, { status: 400 });
     }
     
@@ -135,10 +159,10 @@ export async function POST(request: NextRequest) {
         customerId = customerIdMap[m.customerCode as string] || null;
       }
       
-      // 解析 supplier_id：优先使用传入的 supplierId（UUID格式），否则根据 supplierId 编码查找
+      // 解析 supplier_id：支持编码和UUID两种格式，都走shipperIdMap验证过的结果
       let supplierId = m.supplierId as string | null;
-      if (supplierId && !supplierId.includes('-')) {
-        // 如果不是 UUID 格式，尝试作为编码查找
+      if (supplierId) {
+        // 无论编码还是UUID，都通过 shipperIdMap 获取已验证的ID
         supplierId = shipperIdMap[supplierId] || null;
       }
       

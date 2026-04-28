@@ -3,7 +3,7 @@ import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission } from '@/lib/server-auth';
 import { PERMISSIONS } from '@/lib/permissions';
 
-// 获取待发货供应商列表（从订单出发，只返回有待发货的供应商）
+// 获取待发货发货方列表（从订单出发，只返回有待发货的发货方）
 export async function GET(request: NextRequest) {
   const authError = requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
   if (authError) return authError;
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   const status = searchParams.get('status') || 'active';
 
   try {
-    // 第一步：从 pending/assigned 订单中找出所有有供应商的订单
+    // 第一步：从 pending/assigned 订单中找出所有有发货方的订单
     // 注：不在这里用 .or() 做服务器端过滤，避免 Supabase PostgREST 不支持 "not.is.null" 语法
     // 改为取全部订单后用 JS 过滤（见第二步）
     const { data: pendingOrders, error: ordersError } = await client
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
 
     if (ordersError) throw new Error(`查询待发货订单失败: ${ordersError.message}`);
 
-    // 第二步：从第一步结果中找出已分配供应商的订单
+    // 第二步：从第一步结果中找出已分配发货方的订单
     // 有 supplier_id OR 有非空 supplier_name（空字符串不算）
     const assignedOrders = (pendingOrders || []).filter(
       (o) => o.supplier_id || (o.supplier_name && o.supplier_name.trim() !== '')
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
     // 第四步：过滤出"未导出"的订单（已派发但未在 export_records 中）
     const unexportedOrders = assignedOrders.filter((o) => !exportedOrderIds.has(o.id));
 
-    // 第五步：从未导出订单中收集供应商 ID 和 name
+    // 第五步：从未导出订单中收集发货方 ID 和 name
     const supplierIds = [...new Set(
       unexportedOrders
         .map((o) => o.supplier_id)
@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 第六步：查询供应商信息，并补充未在 suppliers 表中存在或已停用的供应商名称
+    // 第六步：查询发货方信息，并补充未在 suppliers 表中存在或已停用的发货方名称
     // 分两次查询：先按 id 查，再按 name 查，然后合并
     const suppliersById = new Map<string, Record<string, unknown>>();
     const suppliersByName = new Map<string, Record<string, unknown>>();
@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 收集需要补充的虚拟供应商条目：
+    // 收集需要补充的虚拟发货方条目：
     // - 按 supplier_name 匹配的订单中，supplier_name 在 shippers 表里找不到记录的
     // - 按 supplier_id 匹配的订单中，supplier_name 有值但对应的 supplier_id 不存在于 shippers 表的
     const syntheticNames = new Set<string>();
@@ -119,10 +119,10 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 第七步：为每个供应商计算未导出订单数，并获取上次导出时间
+    // 第七步：为每个发货方计算未导出订单数，并获取上次导出时间
     const results = [];
 
-    // 7a. 处理有数据库记录的供应商
+    // 7a. 处理有数据库记录的发货方
     for (const supplier of Array.from(suppliersById.values())) {
       const supplierId = supplier.id as string;
       const supplierName = String((supplier as Record<string, unknown>).name || '');
@@ -153,7 +153,7 @@ export async function GET(request: NextRequest) {
 
       const unexportedCount = [...allIds].filter((id) => !exportedOrderIds.has(id)).length;
 
-      // 跳过 pending=0 的供应商（不显示）
+      // 跳过 pending=0 的发货方（不显示）
       if (unexportedCount === 0) continue;
 
       // 获取上次导出记录
@@ -176,7 +176,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 7b. 处理"虚拟供应商"——订单有 supplier_name 但在 suppliers 表中找不到对应记录
+    // 7b. 处理"虚拟发货方"——订单有 supplier_name 但在 suppliers 表中找不到对应记录
     for (const syntheticName of syntheticNames) {
       // 匹配两种情况：
       // 1. supplier_id = null 且 supplier_name = syntheticName（正常情况）
@@ -212,7 +212,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 第八步：统计完全未分配供应商的订单数
+    // 第八步：统计完全未分配发货方的订单数
     const unassignedCount = (pendingOrders || []).filter(
       (o) => !o.supplier_id && !o.supplier_name
     ).length;
@@ -234,7 +234,7 @@ export async function GET(request: NextRequest) {
       unassignedCount,
     });
   } catch (error) {
-    console.error('获取待发货供应商列表失败:', error);
+    console.error('获取待发货发货方列表失败:', error);
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : '未知错误',

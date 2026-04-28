@@ -19,7 +19,7 @@ import {
 
 interface ModuleStats {
   customers: number;
-  shippers: number;  // 发货方（供应商+仓库）
+  shippers: number;  // 发货方（发货方+仓库）
   products: number;
   skuMappings: number;
 }
@@ -58,7 +58,7 @@ const MODULES = [
   },
   {
     title: '发货方管理',
-    description: '供应商和仓库统一管理',
+    description: '发货方和仓库统一管理',
     icon: Truck,
     href: '/suppliers-manage',
     color: 'bg-green-500',
@@ -184,7 +184,7 @@ export default function ArchiveManagementPage() {
         { customerCode: 'KH-001', customerProductName: '苏泊尔ZMD绞肉机', customerSku: 'JRD05-U', customerSpec: 'JRD05-U', productCode: 'JRD05-U', productName: '苏泊尔ZMD安心系列绞肉机', priority: '1', remark: '' },
       ],
       suppliers: [
-        { code: 'FHS-001', name: '广东云海供应链', shortName: '云海', type: '供应商', contactPerson: '张经理', contactPhone: '13800138000', province: '广东', city: '深圳', address: '深圳市宝安区xxx物流园', sendType: '下载发货', settlementType: '月结', costFactor: '1.0', canJd: '否', jdChannelId: '', canPdd: '否', pddShopId: '', expressRestrictions: '', remark: '' },
+        { code: 'FHS-001', name: '广东云海供应链', shortName: '云海', type: '发货方', contactPerson: '张经理', contactPhone: '13800138000', province: '广东', city: '深圳', address: '深圳市宝安区xxx物流园', sendType: '下载发货', settlementType: '月结', costFactor: '1.0', canJd: '否', jdChannelId: '', canPdd: '否', pddShopId: '', expressRestrictions: '', remark: '' },
       ],
     };
     
@@ -433,7 +433,7 @@ export default function ArchiveManagementPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="text-xs text-gray-600 space-y-1">
-                <p>• 统一管理供应商和仓库</p>
+                <p>• 统一管理发货方和仓库</p>
                 <p>• 发货限制：地区/快递配置</p>
                 <p>• 京东渠道：物流配置</p>
               </CardContent>

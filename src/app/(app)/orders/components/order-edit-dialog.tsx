@@ -92,23 +92,25 @@ export function OrderEditDialog({
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>编辑订单</DialogTitle>
-            <DialogDescription>
-              {form.status && (
-                <div className="mt-1 flex items-center gap-2 flex-wrap">
-                  <Badge className={getOrderStatusBadgeClass(form.status)}>
-                    {getOrderStatusLabel(form.status)}
-                  </Badge>
-                  {isLocked ? (
-                    <span className="text-xs text-muted-foreground">
-                      已回单/已反馈订单，仅可修改收货信息
-                    </span>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">
-                      可修改：供应商、状态、物流信息、收货信息
-                    </span>
-                  )}
-                </div>
-              )}
+            <DialogDescription asChild>
+              <p>
+                {form.status && (
+                  <span className="mt-1 flex items-center gap-2 flex-wrap">
+                    <Badge className={getOrderStatusBadgeClass(form.status)}>
+                      {getOrderStatusLabel(form.status)}
+                    </Badge>
+                    {isLocked ? (
+                      <span className="text-xs text-muted-foreground">
+                        已回单/已反馈订单，仅可修改收货信息
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        可修改：发货方、状态、物流信息、收货信息
+                      </span>
+                    )}
+                  </span>
+                )}
+              </p>
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 max-h-[60vh] overflow-y-auto">
@@ -155,12 +157,12 @@ export function OrderEditDialog({
               </div>
             </div>
 
-            {/* 供应商与状态 */}
+            {/* 发货方与状态 */}
             <div className="border-b pb-3">
-              <div className="text-sm font-medium text-muted-foreground mb-2">供应商与状态</div>
+              <div className="text-sm font-medium text-muted-foreground mb-2">发货方与状态</div>
               <div className="space-y-3">
                 <div className="space-y-2">
-                  <Label>发货方（供应商）</Label>
+                  <Label>发货方</Label>
                   <Select
                     value={form.supplierId}
                     onValueChange={(val) => {
@@ -170,7 +172,7 @@ export function OrderEditDialog({
                     disabled={isLocked}
                   >
                     <SelectTrigger className={isLocked ? 'bg-muted' : ''}>
-                      <SelectValue placeholder="选择供应商" />
+                      <SelectValue placeholder="选择发货方" />
                     </SelectTrigger>
                     <SelectContent>
                       {suppliers.map(s => (

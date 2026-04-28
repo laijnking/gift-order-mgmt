@@ -44,8 +44,8 @@ function pick(row: Record<string, unknown>, names: string[]): string {
 function normalizeRows(rawRows: Record<string, unknown>[]): NormalizedStockRow[] {
   return rawRows
     .map((row) => ({
-      supplierCode: pick(row, ['supplierCode', 'supplier_code', '供应商编码', '供应商代码', '发货方编码']),
-      supplierName: pick(row, ['supplierName', 'supplier_name', '供应商名称', '供应商', '供货商', '发货方名称']),
+      supplierCode: pick(row, ['supplierCode', 'supplier_code', '发货方编码', '发货方代码']),
+      supplierName: pick(row, ['supplierName', 'supplier_name', '发货方名称', '发货方', '供货商']),
       productName: pick(row, ['productName', 'product_name', '商品名称', '品名', '商品', '货品名称']),
       productCode: pick(row, ['productCode', 'product_code', '商品编码', 'SKU', 'sku', '货号', '商品代码']),
       productSpec: pick(row, ['spec', 'productSpec', 'product_spec', '规格', '规格型号', '型号规格', '型号']),
@@ -83,7 +83,7 @@ async function findSupplier(
   client: ReturnType<typeof getSupabaseClient>,
   row: NormalizedStockRow
 ): Promise<{ id: string; name: string } | null> {
-  // 注意：suppliers 表未使用，实际供应商档案在 shippers 表
+  // 注意：suppliers 表未使用，实际发货方档案在 shippers 表
   // shippers 通过 type 字段区分类型：supplier/jd/self/third_party
   if (row.supplierCode) {
     // 按发货方编码（code字段）精确匹配
@@ -311,7 +311,7 @@ export async function POST(request: NextRequest) {
           supplier = await createSupplier(client, row);
           stats.inserted += 0; // don't double-count; stock insert will add
         } catch (err) {
-          const key = row.supplierCode || row.supplierName || '未知供应商';
+          const key = row.supplierCode || row.supplierName || '未知发货方';
           if (!supplierNotFound.includes(key)) supplierNotFound.push(key);
           continue;
         }
@@ -414,11 +414,11 @@ export async function POST(request: NextRequest) {
         `库存导入完成：新增 ${stats.inserted} 条，更新 ${stats.updated} 条`,
         stats.matched > 0 ? `匹配商品 ${stats.matched} 条` : '',
         stats.unmatched > 0 ? `未匹配 ${stats.unmatched} 条` : '',
-        supplierNotFound.length > 0 ? `有 ${supplierNotFound.length} 个供应商未找到并跳过` : '',
+        supplierNotFound.length > 0 ? `有 ${supplierNotFound.length} 个发货方未找到并跳过` : '',
       ].filter(Boolean).join('，'),
     }, { status: errors.length > 0 && total === 0 ? 500 : 200 });
   } catch (error) {
-    console.error('供应商库存导入失败:', error);
+    console.error('发货方库存导入失败:', error);
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : '导入失败',

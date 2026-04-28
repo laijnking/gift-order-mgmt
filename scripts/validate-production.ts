@@ -178,21 +178,21 @@ async function testProducts(admin: MockUser) {
   });
 }
 
-// ─── 5. 供应商/发货方管理 ───────────────────────────────────
+// ─── 5. 发货方/发货方管理 ───────────────────────────────────
 async function testSuppliers(admin: MockUser) {
-  await runCase('GET /api/suppliers 列出供应商', async () => {
+  await runCase('GET /api/suppliers 列出发货方', async () => {
     const { status, body } = await fetchApi<unknown[]>('/api/suppliers', { user: admin });
     assert(status === 200, `预期 200，实际 ${status}`);
     assert(body.success === true, `失败: ${body.error}`);
     assert(Array.isArray(body.data), 'data 应为数组');
   });
 
-  await runCase('POST /api/suppliers 创建供应商', async () => {
+  await runCase('POST /api/suppliers 创建发货方', async () => {
     const { status, body } = await fetchApi<{ id: string }>('/api/suppliers', {
       user: admin,
       method: 'POST',
       body: JSON.stringify({
-        name: '自动化测试供应商',
+        name: '自动化测试发货方',
         short_name: '测试',
         type: 'supplier',
         send_type: '直发',

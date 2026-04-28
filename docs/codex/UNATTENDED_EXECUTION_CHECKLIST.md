@@ -100,7 +100,7 @@
 - [x] 权限改动后的基线校验已通过：`ts-check`、相关 `eslint`、`check:api-contracts`
 - [x] 预警规则执行器已落地并补齐回归：新增 `/api/alert-rules/execute` 与共享执行器 `src/lib/alert-executor.ts`，支持库存不足、待派发超时、回单超时三类规则的批量执行、未处理预警复用以及条件恢复后的自动关闭；预警中心规则页已补"执行全部规则 / 单条执行"入口，且新增 `check:alert-executor` 回归脚本，已覆盖三类规则的"新增 / 复用 / 自动关闭"行为
 - [x] 成本库更新时机已完成第一轮校准：已新增共享生命周期工具 `src/lib/order-cost-history.ts`，把派发时的成本写入改成"首次派发冻结、重复派发复用"，并让回单确认 / 自动匹配 / 手动匹配统一补齐物流与回单日期，费用录入则改为按订单总额分摊到商品行，避免多商品订单把运费重复记多次；同时已补 `check:order-cost-history` 脚本覆盖"派发 -> 费用 -> 回单 -> 重复派发"主链，当前代码侧已通过 `ts-check`，脚本在本沙箱里因本地 PostgreSQL 连接受限未能实跑
-- [x] 报表口径与状态机已完成第一轮对齐：`feedbacked` 已并入"回单阶段"统计，首页与销售/供应商分析不再把它漏掉；回单匹配/确认链路已统一回写 `orders.returned_at`，回单时效分析开始具备真实回单时间点；同时顺手修正了报表中的供应商活跃口径和库存金额字段来源
+- [x] 报表口径与状态机已完成第一轮对齐：`feedbacked` 已并入"回单阶段"统计，首页与销售/发货方分析不再把它漏掉；回单匹配/确认链路已统一回写 `orders.returned_at`，回单时效分析开始具备真实回单时间点；同时顺手修正了报表中的发货方活跃口径和库存金额字段来源
 - [x] 报表 API 契约回归已补入口：新增 `check:api-reports` 与 `scripts/validate-api-reports.ts`，用最小样例覆盖 `pending / assigned / partial_returned / returned / feedbacked / completed / cancelled` 七种状态，并锁住 `stats / sales-performance / supplier-analysis / return-timeline` 四条报表接口的关键口径；当前脚本在本沙箱里仍因本地 PostgreSQL 连接受限未能实跑
 - [x] 页面层残留状态口径已完成首轮清理：首页总览已拆开"精确状态计数"和"回单阶段聚合计数"，避免把 `feedbacked` 同时算进"已回单"和"已反馈"；报表页回单时效 CSV 已改为使用真实 `avgDispatchDays`；订单中心批次摘要已把 `feedbacked` 纳入"回单阶段"筛选
 - [x] 剩余高风险页面与 API 的权限矩阵继续收口中（已完成多轮扫尾）
@@ -136,7 +136,7 @@
 - [x] 订单 / 回单 API 集成回归已补串行总入口：新增 `check:order-receipt-api-acceptance` 与 `scripts/validate-order-receipt-api-acceptance.ts`，会串行执行 `check:api-orders`、`check:api-orders-duplicates`、`check:api-return-receipts`、`check:api-return-receipts-duplicates`；当前整条命令已通过
 - [x] `api-return-receipts` 的无人值守可观测性已补齐：`scripts/validate-api-return-receipts.ts` 现会输出 `server startup` 与逐条 `RUN/PASS` 阶段日志，避免再次出现"整条脚本长时间静默却难以定位阶段"的问题；当前单独 `check:api-return-receipts` 已通过
 - [x] 重型后端集成回归已补串行总入口：新增 `check:backend-heavy-acceptance` 与 `scripts/validate-backend-heavy-acceptance.ts`，会串行执行 `check:api-reports`、`check:alert-executor`、`check:order-cost-history`；当前整条命令已通过
-- [x] `api-reports` 断言口径已对齐接口实现：`scripts/validate-api-reports.ts` 中"活跃供应商"基线查询已从 `is_active = true` 改为与接口一致的 `is_active IS DISTINCT FROM false`，避免旧数据里 `NULL` 被接口算作活跃、但脚本基线少算 1 的漂移；当前单独 `check:api-reports` 已通过
+- [x] `api-reports` 断言口径已对齐接口实现：`scripts/validate-api-reports.ts` 中"活跃发货方"基线查询已从 `is_active = true` 改为与接口一致的 `is_active IS DISTINCT FROM false`，避免旧数据里 `NULL` 被接口算作活跃、但脚本基线少算 1 的漂移；当前单独 `check:api-reports` 已通过
 - [x] 无人值守总入口已补齐并实跑通过：新增 `check:unattended-acceptance` 与 `scripts/validate-unattended-acceptance.ts`，会串行执行 `check:local-acceptance`、`check:export-api-acceptance`、`check:order-receipt-api-acceptance`、`check:backend-heavy-acceptance`；当前整条命令已通过
 - [x] 总入口可观测性已收口：`scripts/validate-unattended-acceptance.ts` 与 `scripts/validate-local-acceptance.ts` 已从缓冲式 `execFile` 改为流式 `spawn(..., { stdio: 'inherit' })`，并补 `RUN/PASS` 阶段日志；当前可在 `check:unattended-acceptance` 中直接看到 `Local Fixtures / Layout Acceptance / Export Acceptance / Export API / Order Receipt API / Backend Heavy` 的逐层推进
 - [x] 权限回归已并入顶层总入口：`scripts/validate-unattended-acceptance.ts` 现已继续串行执行 `check:permissions`，当前完整 `check:unattended-acceptance` 已覆盖权限回归并重新跑通

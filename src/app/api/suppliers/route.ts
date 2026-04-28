@@ -33,7 +33,7 @@ function transformSupplier(dbSupplier: Record<string, unknown>) {
   };
 }
 
-// 获取所有活跃供应商（统一查询 shippers 表）
+// 获取所有活跃发货方（统一查询 shippers 表）
 export async function GET(request: NextRequest) {
   const authError = requirePermission(request, PERMISSIONS.SUPPLIERS_VIEW);
   if (authError) return authError;
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     // 统一查询 shippers 表
     let query = client.from('shippers').select('*');
 
-    // 默认只返回活跃供应商（除非显式传 active=false）
+    // 默认只返回活跃发货方（除非显式传 active=false）
     if (active !== 'false') {
       query = query.eq('is_active', true);
     }
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { data, error } = await query;
-    if (error) throw new Error(`查询供应商失败: ${error.message}`);
+    if (error) throw new Error(`查询发货方失败: ${error.message}`);
 
     // 转换数据格式
     const transformedData = (data || []).map((supplier) => transformSupplier(supplier as Record<string, unknown>));
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
       total: data?.length || 0
     });
   } catch (error) {
-    console.error('获取供应商失败:', error);
+    console.error('获取发货方失败:', error);
     return NextResponse.json({ 
       success: false, 
       error: error instanceof Error ? error.message : '未知错误' 
@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// 创建供应商（统一写入 shippers 表）
+// 创建发货方（统一写入 shippers 表）
 export async function POST(request: NextRequest) {
   const authError = requirePermission(request, PERMISSIONS.SUPPLIERS_CREATE);
   if (authError) return authError;
@@ -116,15 +116,15 @@ export async function POST(request: NextRequest) {
       .select()
       .single();
     
-    if (error) throw new Error(`创建供应商失败: ${error.message}`);
+    if (error) throw new Error(`创建发货方失败: ${error.message}`);
 
     return NextResponse.json({
       success: true,
       data: transformSupplier(data as Record<string, unknown>),
-      message: '供应商创建成功'
+      message: '发货方创建成功'
     });
   } catch (error) {
-    console.error('创建供应商失败:', error);
+    console.error('创建发货方失败:', error);
     return NextResponse.json({ 
       success: false, 
       error: error instanceof Error ? error.message : '未知错误' 

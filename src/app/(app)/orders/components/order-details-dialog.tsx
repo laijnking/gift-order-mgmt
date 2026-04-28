@@ -80,7 +80,7 @@ export function OrderDetailsDialog({
             )}
             {order.supplierOrderNo && (
               <div>
-                <h4 className="text-sm font-medium text-muted-foreground mb-1">供应商单据号</h4>
+                <h4 className="text-sm font-medium text-muted-foreground mb-1">发货方单据号</h4>
                 <p className="font-mono">{order.supplierOrderNo}</p>
               </div>
             )}
@@ -139,7 +139,7 @@ export function OrderDetailsDialog({
               <p>{order.receiver.address}</p>
             </div>
             <div>
-              <h4 className="text-sm font-medium text-muted-foreground mb-1">供应商</h4>
+              <h4 className="text-sm font-medium text-muted-foreground mb-1">发货方</h4>
               <p>{order.supplierName || '-'}</p>
             </div>
             {(order.warehouse || firstItem.warehouse) && (

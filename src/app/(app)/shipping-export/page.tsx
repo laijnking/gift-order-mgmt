@@ -57,6 +57,7 @@ interface ExportResult {
   supplierName: string;
   orderCount: number;
   fileName: string;
+  templateSource?: string;
 }
 
 interface ExportSummary {
@@ -101,7 +102,7 @@ export default function ShippingExportPage() {
   const [exportResults, setExportResults] = useState<ExportResult[]>([]);
   const [downloadingZip, setDownloadingZip] = useState(false);
 
-  // 加载待导出供应商
+  // 加载待导出发货方
   const loadPending = useCallback(async () => {
     if (!user) return;
     try {
@@ -120,7 +121,7 @@ export default function ShippingExportPage() {
     }
   }, [authHeaders, user]);
 
-  // 加载已导出供应商
+  // 加载已导出发货方
   const loadExported = useCallback(async () => {
     if (!user) return;
     try {
@@ -199,7 +200,7 @@ export default function ShippingExportPage() {
   ) => {
     const supplierIds = supplierIdsOverride?.length ? supplierIdsOverride : activeTab === 'pending' ? selectedPending : selectedExported;
     if (supplierIds.length === 0) {
-      toast.error('请至少选择一个供应商');
+      toast.error('请至少选择一个发货方');
       return;
     }
 
@@ -242,8 +243,8 @@ export default function ShippingExportPage() {
 
       toast.success(
         preview
-          ? `预览：${data.data.totalSupplierCount} 个供应商，共 ${data.data.totalOrderCount} 个订单`
-          : `导出成功：${data.data.totalSupplierCount} 个供应商，共 ${data.data.totalOrderCount} 个订单`
+          ? `预览：${data.data.totalSupplierCount} 个发货方，共 ${data.data.totalOrderCount} 个订单`
+          : `导出成功：${data.data.totalSupplierCount} 个发货方，共 ${data.data.totalOrderCount} 个订单`
       );
 
       if (!preview) {
@@ -253,7 +254,8 @@ export default function ShippingExportPage() {
         else loadExported();
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : '导出失败');
+      console.error('[Export Error]', err, { supplierIds, mode, preview });
+      toast.error(err instanceof Error ? err.message : '导出失败，请刷新后重试');
     } finally {
       setExporting(false);
     }
@@ -279,6 +281,17 @@ export default function ShippingExportPage() {
     (s) => s.name.includes(exportedSearch) || s.code.includes(exportedSearch)
   );
 
+  const getTemplateSourceLabel = (source?: string) => {
+    switch (source) {
+      case 'explicit': return '手动选择';
+      case 'target': return '发货方专属';
+      case 'linked': return '关联模板';
+      case 'default': return '系统默认';
+      case 'first': return '首个活跃';
+      default: return source || '';
+    }
+  };
+
   const selectedCount = activeTab === 'pending' ? selectedPending.length : selectedExported.length;
 
   return (
@@ -292,7 +305,7 @@ export default function ShippingExportPage() {
           </div>
           <div className="min-w-0">
             <h1 className="text-2xl font-bold">发货通知单</h1>
-            <p className="text-sm text-muted-foreground">按供应商批量导出 / 二次导出发货通知单</p>
+            <p className="text-sm text-muted-foreground">按发货方批量导出 / 二次导出发货通知单</p>
           </div>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -347,14 +360,14 @@ export default function ShippingExportPage() {
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="搜索供应商..."
+                      placeholder="搜索发货方..."
                       value={pendingSearch}
                       onChange={(e) => setPendingSearch(e.target.value)}
                       className="pl-9 w-[200px]"
                     />
                   </div>
                   <span className="text-sm text-muted-foreground">
-                    {filteredPending.length} 个供应商
+                    {filteredPending.length} 个发货方
                   </span>
                 </div>
               </div>
@@ -367,7 +380,7 @@ export default function ShippingExportPage() {
               ) : filteredPending.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>暂无待导出的供应商</p>
+                  <p>暂无待导出的发货方</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -380,7 +393,7 @@ export default function ShippingExportPage() {
                             onCheckedChange={() => toggleSelectAll(selectedPending, setSelectedPending, filteredPending)}
                           />
                         </TableHead>
-                        <TableHead>供应商</TableHead>
+                                <TableHead>发货方</TableHead>
                         <TableHead>编码</TableHead>
                         <TableHead>类型</TableHead>
                         <TableHead className="text-right">待发货订单</TableHead>
@@ -405,7 +418,7 @@ export default function ShippingExportPage() {
                           </TableCell>
                           <TableCell>{s.code}</TableCell>
                           <TableCell>
-                            <Badge variant="outline">{s.type === 'synthetic' ? '未注册' : s.type || '供应商'}</Badge>
+                            <Badge variant="outline">{s.type === 'synthetic' ? '未注册' : s.type || '发货方'}</Badge>
                           </TableCell>
                           <TableCell className="text-right">
                             <span className={s.pendingOrderCount > 10 ? 'text-red-600 font-semibold' : ''}>
@@ -454,7 +467,7 @@ export default function ShippingExportPage() {
           {filteredPending.length > 0 && (
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="text-sm text-muted-foreground">
-                已选 {selectedPending.length} 个供应商
+                已选 {selectedPending.length} 个发货方
               </div>
               <div className="flex gap-2">
                 <Button
@@ -490,14 +503,14 @@ export default function ShippingExportPage() {
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="搜索供应商..."
+                      placeholder="搜索发货方..."
                       value={exportedSearch}
                       onChange={(e) => setExportedSearch(e.target.value)}
                       className="pl-9 w-[200px]"
                     />
                   </div>
                   <span className="text-sm text-muted-foreground">
-                    {filteredExported.length} 个供应商
+                    {filteredExported.length} 个发货方
                   </span>
                 </div>
               </div>
@@ -510,7 +523,7 @@ export default function ShippingExportPage() {
               ) : filteredExported.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <History className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>暂无已导出的供应商</p>
+                  <p>暂无已导出的发货方</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -523,7 +536,7 @@ export default function ShippingExportPage() {
                             onCheckedChange={() => toggleSelectAll(selectedExported, setSelectedExported, filteredExported)}
                           />
                         </TableHead>
-                        <TableHead>供应商</TableHead>
+                                <TableHead>发货方</TableHead>
                         <TableHead>编码</TableHead>
                         <TableHead>类型</TableHead>
                         <TableHead className="text-right">已导出次数</TableHead>
@@ -549,7 +562,7 @@ export default function ShippingExportPage() {
                           </TableCell>
                           <TableCell>{s.code}</TableCell>
                           <TableCell>
-                            <Badge variant="outline">{s.type === 'synthetic' ? '未注册' : s.type || '供应商'}</Badge>
+                            <Badge variant="outline">{s.type === 'synthetic' ? '未注册' : s.type || '发货方'}</Badge>
                           </TableCell>
                           <TableCell className="text-right">{s.exportCount}</TableCell>
                           <TableCell className="text-right">{s.exportedOrderCount}</TableCell>
@@ -595,7 +608,7 @@ export default function ShippingExportPage() {
           {filteredExported.length > 0 && (
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="text-sm text-muted-foreground">
-                已选 {selectedExported.length} 个供应商
+                已选 {selectedExported.length} 个发货方
               </div>
               <div className="flex gap-2">
                 <Button
@@ -628,7 +641,7 @@ export default function ShippingExportPage() {
           <DialogHeader>
             <DialogTitle>导出结果</DialogTitle>
             <DialogDescription>
-              {exportSummary?.mode === 'reexport' ? '二次导出' : '首次导出'}：{exportSummary?.totalSupplierCount} 个供应商，{exportSummary?.totalOrderCount} 个订单
+              {exportSummary?.mode === 'reexport' ? '二次导出' : '首次导出'}：{exportSummary?.totalSupplierCount} 个发货方，{exportSummary?.totalOrderCount} 个订单
             </DialogDescription>
           </DialogHeader>
 
@@ -639,7 +652,14 @@ export default function ShippingExportPage() {
                   <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
                   <div>
                     <p className="font-medium">{r.supplierName}</p>
-                    <p className="text-sm text-muted-foreground">共 {r.orderCount} 个订单</p>
+                    <p className="text-sm text-muted-foreground">
+                      共 {r.orderCount} 个订单
+                      {r.templateSource && (
+                        <span className="ml-2 text-xs text-muted-foreground">
+                          （模板：{getTemplateSourceLabel(r.templateSource)}）
+                        </span>
+                      )}
+                    </p>
                   </div>
                 </div>
                 <Badge variant="outline" className="shrink-0 max-w-[200px] truncate">

@@ -4,7 +4,7 @@ import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission } from '@/lib/server-auth';
 import { PERMISSIONS } from '@/lib/permissions';
 
-// 获取供应商分析数据
+// 获取发货方分析数据
 export async function GET(request: NextRequest) {
   const authError = requirePermission(request, PERMISSIONS.DASHBOARD_VIEW);
   if (authError) return authError;
@@ -14,14 +14,14 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate') || new Date().toISOString().slice(0, 10);
 
-    // 查询所有供应商（统一查询 shippers 表）
+    // 查询所有发货方（统一查询 shippers 表）
     const { data: shippers, error: supplierError } = await supabase
       .from('shippers')
       .select('*')
       .order('name');
 
     if (supplierError) {
-      console.error('供应商查询错误:', supplierError);
+      console.error('发货方查询错误:', supplierError);
     }
 
     // 查询所有订单
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     const allOrders = orders || [];
     const allSuppliers = shippers || [];
 
-    // 按供应商统计
+    // 按发货方统计
     const bySupplier: Record<string, {
       id: string;
       name: string;
@@ -55,6 +55,7 @@ export async function GET(request: NextRequest) {
       statusBreakdown: {
         pending: number;
         assigned: number;
+        notified: number;
         returned: number;
         completed: number;
         cancelled: number;
@@ -63,9 +64,9 @@ export async function GET(request: NextRequest) {
       lastOrderDate: string | null;
     }> = {};
 
-    // 初始化供应商统计
+    // 初始化发货方统计
     allSuppliers.forEach((supplier: Record<string, unknown>) => {
-      const name = String(supplier.name || '未知供应商');
+      const name = String(supplier.name || '未知发货方');
       const supplierId = String(supplier.id || '');
       bySupplier[supplierId] = {
         id: supplierId,
@@ -77,6 +78,7 @@ export async function GET(request: NextRequest) {
         statusBreakdown: {
           pending: 0,
           assigned: 0,
+          notified: 0,
           returned: 0,
           completed: 0,
           cancelled: 0,
@@ -86,12 +88,12 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // 遍历订单，统计每个供应商的数据
+    // 遍历订单，统计每个发货方的数据
     allOrders.forEach(order => {
       const supplierId = order.supplier_id || order.supplierId;
       const supplierName = order.supplier_name || order.supplierName || '';
 
-      // 尝试通过名称匹配供应商
+      // 尝试通过名称匹配发货方
       let matchedSupplierId = supplierId;
       if (!matchedSupplierId && supplierName) {
         const matched = allSuppliers.find((s: Record<string, unknown>) => s.name === supplierName);
@@ -101,12 +103,12 @@ export async function GET(request: NextRequest) {
       }
 
       if (!matchedSupplierId) {
-        // 未匹配的订单，创建一个虚拟供应商
+        // 未匹配的订单，创建一个虚拟发货方
         const unMatchedKey = '__unmatched__';
         if (!bySupplier[unMatchedKey]) {
           bySupplier[unMatchedKey] = {
             id: unMatchedKey,
-            name: supplierName || '未分配供应商',
+            name: supplierName || '未分配发货方',
             code: '',
             type: 'supplier',
             orderCount: 0,
@@ -114,6 +116,7 @@ export async function GET(request: NextRequest) {
             statusBreakdown: {
               pending: 0,
               assigned: 0,
+              notified: 0,
               returned: 0,
               completed: 0,
               cancelled: 0,
@@ -144,6 +147,8 @@ export async function GET(request: NextRequest) {
           bySupplier[matchedSupplierId].statusBreakdown.pending++;
         } else if (order.status === ORDER_STATUS_ASSIGNED) {
           bySupplier[matchedSupplierId].statusBreakdown.assigned++;
+        } else if (order.status === 'notified') {
+          bySupplier[matchedSupplierId].statusBreakdown.notified++;
         } else if (isReturnProgressStatus(order.status)) {
           bySupplier[matchedSupplierId].statusBreakdown.returned++;
         } else if (order.status === ORDER_STATUS_COMPLETED) {
@@ -198,7 +203,7 @@ export async function GET(request: NextRequest) {
       byType[s.type].totalQuantity += s.totalQuantity;
     });
 
-    // 热门供应商 TOP 10
+    // 热门发货方 TOP 10
     const topSuppliers = supplierList.slice(0, 10);
 
     // 汇总统计
@@ -222,9 +227,9 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('供应商分析查询错误:', error);
+    console.error('发货方分析查询错误:', error);
     return NextResponse.json(
-      { success: false, error: '获取供应商分析数据失败' },
+      { success: false, error: '获取发货方分析数据失败' },
       { status: 500 }
     );
   }

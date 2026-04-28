@@ -105,7 +105,7 @@ async function seedStock(pool: Pool, input: {
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, 'active', now(), now())
     `,
-    [id, input.productId, input.productCode, input.productName, input.supplierId, `供应商-${RUN_ID}`, input.quantity, input.unitPrice]
+    [id, input.productId, input.productCode, input.productName, input.supplierId, `发货方-${RUN_ID}`, input.quantity, input.unitPrice]
   );
   insertedStockIds.push(id);
 }
@@ -208,8 +208,8 @@ async function main() {
 
     await cleanup(pool).catch(() => {});
 
-    const supplierId = await seedSupplier(pool, { name: `供应商-${RUN_ID}`, isActive: true });
-    await seedSupplier(pool, { name: `停用供应商-${RUN_ID}`, isActive: false });
+    const supplierId = await seedSupplier(pool, { name: `发货方-${RUN_ID}`, isActive: true });
+    await seedSupplier(pool, { name: `停用发货方-${RUN_ID}`, isActive: false });
     const productId = await seedProduct(pool, `SKU-${RUN_ID}`, `测试商品-${RUN_ID}`);
     await seedStock(pool, {
       supplierId,
@@ -222,7 +222,7 @@ async function main() {
 
     await seedOrder(pool, {
       supplierId,
-      supplierName: `供应商-${RUN_ID}`,
+      supplierName: `发货方-${RUN_ID}`,
       status: 'pending',
       orderNo: `ORDER-${RUN_ID}-PENDING`,
       sysOrderNo: `SYS-${RUN_ID}-PENDING`,
@@ -230,7 +230,7 @@ async function main() {
     });
     await seedOrder(pool, {
       supplierId,
-      supplierName: `供应商-${RUN_ID}`,
+      supplierName: `发货方-${RUN_ID}`,
       status: 'assigned',
       orderNo: `ORDER-${RUN_ID}-ASSIGNED`,
       sysOrderNo: `SYS-${RUN_ID}-ASSIGNED`,
@@ -239,7 +239,7 @@ async function main() {
     });
     await seedOrder(pool, {
       supplierId,
-      supplierName: `供应商-${RUN_ID}`,
+      supplierName: `发货方-${RUN_ID}`,
       status: 'partial_returned',
       orderNo: `ORDER-${RUN_ID}-PARTIAL`,
       sysOrderNo: `SYS-${RUN_ID}-PARTIAL`,
@@ -249,7 +249,7 @@ async function main() {
     });
     await seedOrder(pool, {
       supplierId,
-      supplierName: `供应商-${RUN_ID}`,
+      supplierName: `发货方-${RUN_ID}`,
       status: 'returned',
       orderNo: `ORDER-${RUN_ID}-RETURNED`,
       sysOrderNo: `SYS-${RUN_ID}-RETURNED`,
@@ -259,7 +259,7 @@ async function main() {
     });
     await seedOrder(pool, {
       supplierId,
-      supplierName: `供应商-${RUN_ID}`,
+      supplierName: `发货方-${RUN_ID}`,
       status: 'feedbacked',
       orderNo: `ORDER-${RUN_ID}-FEEDBACKED`,
       sysOrderNo: `SYS-${RUN_ID}-FEEDBACKED`,
@@ -269,7 +269,7 @@ async function main() {
     });
     await seedOrder(pool, {
       supplierId,
-      supplierName: `供应商-${RUN_ID}`,
+      supplierName: `发货方-${RUN_ID}`,
       status: 'completed',
       orderNo: `ORDER-${RUN_ID}-COMPLETED`,
       sysOrderNo: `SYS-${RUN_ID}-COMPLETED`,
@@ -280,7 +280,7 @@ async function main() {
     });
     await seedOrder(pool, {
       supplierId,
-      supplierName: `供应商-${RUN_ID}`,
+      supplierName: `发货方-${RUN_ID}`,
       status: 'cancelled',
       orderNo: `ORDER-${RUN_ID}-CANCELLED`,
       sysOrderNo: `SYS-${RUN_ID}-CANCELLED`,
@@ -316,7 +316,7 @@ async function main() {
     assert(orderStatus.cancelled === (baselineOrderCounts['cancelled'] ?? 0) + 1,
       `cancelled 应为 ${(baselineOrderCounts['cancelled'] ?? 0) + 1}，实际 ${String(orderStatus.cancelled)}`);
     assert(supplierStats.active === baselineActiveSupplierCount + 1,
-      `活跃供应商应为 ${baselineActiveSupplierCount + 1}，实际 ${String(supplierStats.active)}`);
+      `活跃发货方应为 ${baselineActiveSupplierCount + 1}，实际 ${String(supplierStats.active)}`);
     assert(Number(stockStats.totalValue) === baselineStockTotalValue + 100,
       `库存总值应为 ${baselineStockTotalValue + 100}，实际 ${stockStats.totalValue}`);
 
@@ -342,10 +342,10 @@ async function main() {
     assert(supplierResponse.data.success === true, `supplier-analysis 失败: ${supplierResponse.data.error ?? '未知错误'}`);
     const supplierData = ensureObject(supplierResponse.data.data, 'supplier.data');
     const bySupplier = ensureArray(supplierData.bySupplier, 'supplier.data.bySupplier');
-    const matchedSupplier = bySupplier.find((item) => item.name === `供应商-${RUN_ID}`);
-    assert(Boolean(matchedSupplier), '应找到测试供应商');
+    const matchedSupplier = bySupplier.find((item) => item.name === `发货方-${RUN_ID}`);
+    assert(Boolean(matchedSupplier), '应找到测试发货方');
     const statusBreakdown = ensureObject(matchedSupplier?.statusBreakdown, 'supplier.bySupplier[0].statusBreakdown');
-    assert(statusBreakdown.returned === 3, `供应商 returned 应包含 feedbacked 共 3 单，实际 ${String(statusBreakdown.returned)}`);
+    assert(statusBreakdown.returned === 3, `发货方 returned 应包含 feedbacked 共 3 单，实际 ${String(statusBreakdown.returned)}`);
 
     const timelineResponse = await fetchJson<{ success?: boolean; data?: unknown; error?: string }>(
       `${BASE_URL}/api/reports/return-timeline?startDate=2026-04-17&endDate=2026-04-21`,

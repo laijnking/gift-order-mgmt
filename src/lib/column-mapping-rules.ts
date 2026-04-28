@@ -1,16 +1,20 @@
 /**
  * Shared column auto-detection patterns for Excel order parsing.
  * Used by both the frontend (page.tsx) and the backend (api/order-parse/excel/route.ts).
+ * Consolidated from column-mapping-rules.ts + column-mapping-metadata.ts + column-mapping-diagnostics.ts.
  */
+
+import { createHash } from 'crypto';
+import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 // Column options for UI dropdown
 export const COLUMN_OPTIONS = [
   { value: 'bill_date', label: '单据日期', group: '基础信息' },
   { value: 'customer_order_no', label: '客户单据编号', group: '基础信息' },
-  { value: 'supplier_order_no', label: '供应商单据号', group: '基础信息' },
+  { value: 'supplier_order_no', label: '发货方单据号', group: '基础信息' },
   { value: 'customer_code', label: '客户代码', group: '基础信息' },
   { value: 'customer_name', label: '客户名称', group: '基础信息' },
-  { value: 'supplier_name', label: '发货供应商', group: '基础信息' },
+  { value: 'supplier_name', label: '发货方', group: '基础信息' },
   { value: 'salesperson', label: '业务员', group: '人员信息' },
   { value: 'operator', label: '跟单员', group: '人员信息' },
   { value: 'customer_product_name', label: '客户商品名称', group: '商品信息' },
@@ -68,6 +72,9 @@ const PATTERNS: Record<string, Array<{ regex: RegExp; exact?: boolean; priority:
     { regex: /^创建日期$/, exact: true, priority: 8 },
     { regex: /^下单时间$/, exact: true, priority: 8 },
   ],
+  bill_no: [
+    { regex: /^单据编号$/, exact: true, priority: 10 },
+  ],
   order_no: [
     { regex: /^客户订单号$/, exact: true, priority: 10 },
     { regex: /^商户订单号$/, exact: true, priority: 10 },
@@ -82,8 +89,8 @@ const PATTERNS: Record<string, Array<{ regex: RegExp; exact?: boolean; priority:
     { regex: /^订单号$/, exact: true, priority: 8 },
   ],
   supplier_order_no: [
-    { regex: /^供应商单据号$/, exact: true, priority: 10 },
-    { regex: /^供应商订单号$/, exact: true, priority: 9 },
+    { regex: /^发货方单据号$/, exact: true, priority: 10 },
+    { regex: /^发货方订单号$/, exact: true, priority: 9 },
   ],
   customer_code: [
     { regex: /^客户代码$/, exact: true, priority: 10 },
@@ -315,6 +322,13 @@ export function extractAddressParts(address: string): {
 }
 
 /**
+ * Compute a fingerprint from headers for history matching.
+ */
+export function computeHeaderFingerprint(headers: string[]): string {
+  return normalizeHeadersForCompare(headers).join('|');
+}
+
+/**
  * Normalize headers for comparison (trim + filter empty).
  */
 export function normalizeHeadersForCompare(headers: string[]): string[] {
@@ -322,8 +336,116 @@ export function normalizeHeadersForCompare(headers: string[]): string[] {
 }
 
 /**
- * Compute a fingerprint from headers for history matching.
+ * Normalize headers (trim + filter empty).
  */
-export function computeHeaderFingerprint(headers: string[]): string {
-  return normalizeHeadersForCompare(headers).join('|');
+export function normalizeHeaders(headers: string[]): string[] {
+  return headers.map((h) => h.trim()).filter(Boolean);
+}
+
+/**
+ * Build SHA256-based header fingerprint (first 16 hex chars).
+ */
+export function buildHeaderFingerprint(headers: string[]): string {
+  return createHash('sha256')
+    .update(JSON.stringify(normalizeHeaders(headers)))
+    .digest('hex')
+    .slice(0, 16);
+}
+
+/**
+ * Build template signature from mapping config + headers.
+ */
+export function buildTemplateSignature(
+  mappingConfig: Record<string, string>,
+  headerRow: number,
+  headers: string[]
+): string {
+  const normalizedMapping = Object.entries(mappingConfig)
+    .filter(([, targetField]) => Boolean(targetField) && targetField !== 'ignore')
+    .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey));
+
+  return createHash('sha256')
+    .update(JSON.stringify({
+      headerFingerprint: buildHeaderFingerprint(headers),
+      headerRow,
+      mapping: normalizedMapping,
+    }))
+    .digest('hex')
+    .slice(0, 24);
+}
+
+/**
+ * Check if the column_mappings table supports metadata columns.
+ */
+export async function supportsColumnMappingMetadata(client: ReturnType<typeof getSupabaseClient>): Promise<boolean> {
+  const { error } = await client
+    .from('column_mappings')
+    .select('id, source_headers, header_fingerprint, template_signature')
+    .limit(1);
+
+  return !error;
+}
+
+/**
+ * Diagnostics result type.
+ */
+export interface ColumnMappingDiagnostics {
+  totalHeaderCount: number;
+  nonEmptyHeaderCount: number;
+  mappedColumnCount: number;
+  ignoredColumnCount: number;
+  extensionColumnCount: number;
+  recognizedFieldCount: number;
+  coverageRate: number;
+  conflictFields: string[];
+  unrecognizedHeaders: string[];
+}
+
+/**
+ * Compute column mapping diagnostics from headers and mapping.
+ * (previously in column-mapping-diagnostics.ts)
+ */
+export function getColumnMappingDiagnostics(
+  headers: string[],
+  mapping: Record<string, string>
+): ColumnMappingDiagnostics {
+  const normalizedHeaders = headers.map((header) => String(header ?? '').trim());
+  const effectiveEntries = Object.entries(mapping).filter(([, field]) => Boolean(field));
+
+  const mappedEntries = effectiveEntries.filter(([, field]) => field !== 'ignore');
+  const ignoredEntries = effectiveEntries.filter(([, field]) => field === 'ignore');
+  const extensionEntries = effectiveEntries.filter(([, field]) => field.startsWith('ext_field_') || field === 'ext_keep');
+  const recognizedEntries = effectiveEntries.filter(([, field]) => (
+    field !== 'ignore' && field !== 'ext_keep' && !field.startsWith('ext_field_')
+  ));
+
+  const conflictFields = recognizedEntries.reduce<string[]>((duplicates, [, field], index, entries) => {
+    const firstIndex = entries.findIndex(([, candidate]) => candidate === field);
+    if (firstIndex !== index && !duplicates.includes(field)) {
+      duplicates.push(field);
+    }
+    return duplicates;
+  }, []);
+
+  const unrecognizedHeaders = normalizedHeaders.filter((header, index) => {
+    const field = mapping[String(index)];
+    return Boolean(header) && (!field || field === 'ignore' || field === 'ext_keep' || field.startsWith('ext_field_'));
+  });
+
+  const nonEmptyHeaderCount = normalizedHeaders.filter(Boolean).length;
+  const coverageRate = nonEmptyHeaderCount === 0
+    ? 0
+    : Math.round((recognizedEntries.length / nonEmptyHeaderCount) * 100);
+
+  return {
+    totalHeaderCount: normalizedHeaders.length,
+    nonEmptyHeaderCount,
+    mappedColumnCount: mappedEntries.length,
+    ignoredColumnCount: ignoredEntries.length,
+    extensionColumnCount: extensionEntries.length,
+    recognizedFieldCount: recognizedEntries.length,
+    coverageRate,
+    conflictFields,
+    unrecognizedHeaders,
+  };
 }

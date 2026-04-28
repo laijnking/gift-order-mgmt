@@ -9,11 +9,11 @@ export const metadata: Metadata = {
     template: '%s | 礼品订单管理系统',
   },
   description:
-    '礼品订单管理系统，支持订单导入、供应商匹配、发货通知导出、物流回单管理和数据报表分析。',
+    '礼品订单管理系统，支持订单导入、发货方匹配、发货通知导出、物流回单管理和数据报表分析。',
   keywords: [
     '礼品订单管理系统',
     '订单管理',
-    '供应商匹配',
+    '发货方匹配',
     '发货通知',
     '物流回单',
     '库存管理',
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: '礼品订单管理系统',
     description:
-      '支持订单导入、供应商匹配、发货通知导出、物流回单管理和数据报表分析。',
+      '支持订单导入、发货方匹配、发货通知导出、物流回单管理和数据报表分析。',
     siteName: '礼品订单管理系统',
     locale: 'zh_CN',
     type: 'website',

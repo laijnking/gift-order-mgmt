@@ -47,7 +47,7 @@ async function runShippingExportCheck(page: Page) {
         data: [
           {
             id: 'supplier-1',
-            name: '供应商A',
+            name: '发货方A',
             code: 'SUP-A',
             type: 'self',
             pendingOrderCount: 3,
@@ -55,7 +55,7 @@ async function runShippingExportCheck(page: Page) {
           },
           {
             id: 'supplier-2',
-            name: '供应商B',
+            name: '发货方B',
             code: 'SUP-B',
             type: 'jd',
             pendingOrderCount: 2,
@@ -110,7 +110,7 @@ async function runShippingExportCheck(page: Page) {
         : 'dispatch_with_persistence';
     const templateName = templateId === 'tpl-ship-2' ? '自定义发货模板' : '默认发货模板';
     const details = supplierIds.map((supplierId, index) => {
-      const supplierName = supplierId === 'supplier-1' ? '供应商A' : '供应商B';
+      const supplierName = supplierId === 'supplier-1' ? '发货方A' : '发货方B';
       const orderCount = supplierId === 'supplier-1' ? 3 : 2;
 
       return {
@@ -197,9 +197,9 @@ async function runShippingExportCheck(page: Page) {
               details: [
                 {
                   supplierId: 'supplier-1',
-                  supplierName: '供应商A',
+                  supplierName: '发货方A',
                   orderCount: 3,
-                  fileName: '供应商A+发货通知单+20260419.xlsx',
+                  fileName: '发货方A+发货通知单+20260419.xlsx',
                   fileUrl: recordFromShippingRegenerated
                     ? '/api/export-records/record-ship-ui/download?detailIndex=0'
                     : '/exports/record-ship-ui-detail.xlsx',
@@ -209,7 +209,7 @@ async function runShippingExportCheck(page: Page) {
                     ? {
                         provider: 'local',
                         relative_path: 'data/exports/record-ship-ui/supplier-a.xlsx',
-                        file_name: '供应商A+发货通知单+20260419.xlsx',
+                        file_name: '发货方A+发货通知单+20260419.xlsx',
                       }
                     : undefined,
                   status: 'success',
@@ -249,9 +249,9 @@ async function runShippingExportCheck(page: Page) {
               details: [
                 {
                   supplierId: 'supplier-1',
-                  supplierName: '供应商A',
+                  supplierName: '发货方A',
                   orderCount: 3,
-                  fileName: '供应商A+发货通知单+20260419.xlsx',
+                  fileName: '发货方A+发货通知单+20260419.xlsx',
                   fileUrl: recordFromShippingRegenerated
                     ? '/api/export-records/record-ship-ui/download?detailIndex=0'
                     : '/exports/record-ship-ui-detail.xlsx',
@@ -261,7 +261,7 @@ async function runShippingExportCheck(page: Page) {
                     ? {
                         provider: 'local',
                         relative_path: 'data/exports/record-ship-ui/supplier-a.xlsx',
-                        file_name: '供应商A+发货通知单+20260419.xlsx',
+                        file_name: '发货方A+发货通知单+20260419.xlsx',
                       }
                     : undefined,
                   status: 'success',
@@ -271,9 +271,9 @@ async function runShippingExportCheck(page: Page) {
             details: [
               {
                 supplierId: 'supplier-1',
-                supplierName: '供应商A',
+                supplierName: '发货方A',
                 orderCount: 3,
-                fileName: '供应商A+发货通知单+20260419.xlsx',
+                fileName: '发货方A+发货通知单+20260419.xlsx',
                 fileUrl: recordFromShippingRegenerated
                   ? '/api/export-records/record-ship-ui/download?detailIndex=0'
                   : '/exports/record-ship-ui-detail.xlsx',
@@ -283,7 +283,7 @@ async function runShippingExportCheck(page: Page) {
                   ? {
                       provider: 'local',
                       relative_path: 'data/exports/record-ship-ui/supplier-a.xlsx',
-                      file_name: '供应商A+发货通知单+20260419.xlsx',
+                      file_name: '发货方A+发货通知单+20260419.xlsx',
                     }
                   : undefined,
                 status: 'success',
@@ -303,21 +303,21 @@ async function runShippingExportCheck(page: Page) {
         body: JSON.stringify({
           success: true,
           data: {
-            zipFileName: '供应商A+发货通知单+20260419.zip',
+            zipFileName: '发货方A+发货通知单+20260419.zip',
             zipBase64: 'UEsFBgAAAAAAAAAAAAAAAAAAAAAAAA==',
             details: [
               {
                 supplierId: 'supplier-1',
-                supplierName: '供应商A',
+                supplierName: '发货方A',
                 orderCount: 3,
-                fileName: '供应商A+发货通知单+20260419.xlsx',
+                fileName: '发货方A+发货通知单+20260419.xlsx',
                 fileUrl: '/api/export-records/record-ship-ui/download?detailIndex=0',
                 templateName: '自定义发货模板',
                 templateSource: 'default',
                 artifact: {
                   provider: 'local',
                   relative_path: 'data/exports/record-ship-ui/supplier-a.xlsx',
-                  file_name: '供应商A+发货通知单+20260419.xlsx',
+                  file_name: '发货方A+发货通知单+20260419.xlsx',
                 },
                 status: 'success',
               },
@@ -336,7 +336,7 @@ async function runShippingExportCheck(page: Page) {
   await page.getByRole('combobox').click();
   await page.getByRole('option', { name: '自定义发货模板' }).click();
 
-  const supplierRow = page.locator('tr').filter({ hasText: '供应商A' }).first();
+  const supplierRow = page.locator('tr').filter({ hasText: '发货方A' }).first();
   await supplierRow.getByRole('button', { name: '预览' }).click();
 
   if (JSON.stringify(batchRequests[0]?.supplierIds) !== JSON.stringify(['supplier-1'])) {
@@ -414,8 +414,8 @@ async function runShippingExportCheck(page: Page) {
 
   await page.goto(`${BASE_URL}/shipping-export`);
   await page.getByRole('heading', { name: '发货通知单导出' }).waitFor();
-  const supplierARow = page.locator('tr').filter({ hasText: '供应商A' }).first();
-  const supplierBRow = page.locator('tr').filter({ hasText: '供应商B' }).first();
+  const supplierARow = page.locator('tr').filter({ hasText: '发货方A' }).first();
+  const supplierBRow = page.locator('tr').filter({ hasText: '发货方B' }).first();
   await supplierARow.getByRole('checkbox').click();
   await supplierBRow.getByRole('checkbox').click();
   await page.getByRole('button', { name: '批量导出 (2)' }).click();
@@ -534,9 +534,9 @@ async function runExportRecordsCheck(page: Page) {
               details: [
                 {
                   supplierId: 'supplier-1',
-                  supplierName: '供应商A',
+                  supplierName: '发货方A',
                   orderCount: 3,
-                  fileName: '供应商A+发货通知单+20260419.xlsx',
+                  fileName: '发货方A+发货通知单+20260419.xlsx',
                   fileUrl: record1DetailRegenerated
                     ? '/api/export-records/record-1/download?detailIndex=0'
                     : '/exports/record-1-detail.xlsx',
@@ -546,7 +546,7 @@ async function runExportRecordsCheck(page: Page) {
                     ? {
                         provider: 'local',
                         relative_path: 'data/exports/record-1/supplier-a.xlsx',
-                        file_name: '供应商A+发货通知单+20260419.xlsx',
+                        file_name: '发货方A+发货通知单+20260419.xlsx',
                       }
                     : undefined,
                   status: 'success',
@@ -556,9 +556,9 @@ async function runExportRecordsCheck(page: Page) {
             details: [
               {
                 supplierId: 'supplier-1',
-                supplierName: '供应商A',
+                supplierName: '发货方A',
                 orderCount: 3,
-                fileName: '供应商A+发货通知单+20260419.xlsx',
+                fileName: '发货方A+发货通知单+20260419.xlsx',
                 fileUrl: record1DetailRegenerated
                   ? '/api/export-records/record-1/download?detailIndex=0'
                   : '/exports/record-1-detail.xlsx',
@@ -568,7 +568,7 @@ async function runExportRecordsCheck(page: Page) {
                   ? {
                       provider: 'local',
                       relative_path: 'data/exports/record-1/supplier-a.xlsx',
-                      file_name: '供应商A+发货通知单+20260419.xlsx',
+                      file_name: '发货方A+发货通知单+20260419.xlsx',
                     }
                   : undefined,
                 status: 'success',
@@ -588,21 +588,21 @@ async function runExportRecordsCheck(page: Page) {
         body: JSON.stringify({
           success: true,
           data: {
-            zipFileName: '供应商A+发货通知单+20260419.zip',
+            zipFileName: '发货方A+发货通知单+20260419.zip',
             zipBase64: 'UEsFBgAAAAAAAAAAAAAAAAAAAAAAAA==',
             details: [
               {
                 supplierId: 'supplier-1',
-                supplierName: '供应商A',
+                supplierName: '发货方A',
                 orderCount: 3,
-                fileName: '供应商A+发货通知单+20260419.xlsx',
+                fileName: '发货方A+发货通知单+20260419.xlsx',
                 fileUrl: '/api/export-records/record-1/download?detailIndex=0',
                 templateName: '默认发货模板',
                 templateSource: 'default',
                 artifact: {
                   provider: 'local',
                   relative_path: 'data/exports/record-1/supplier-a.xlsx',
-                  file_name: '供应商A+发货通知单+20260419.xlsx',
+                  file_name: '发货方A+发货通知单+20260419.xlsx',
                 },
                 status: 'success',
               },

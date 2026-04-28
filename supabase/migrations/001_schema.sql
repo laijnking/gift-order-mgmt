@@ -1,4 +1,7 @@
 -- =====================================================
+-- ⚠️ 已废弃 - 请勿在新环境执行此文件
+-- 已由 supabase/migrations/012_consolidated_init.sql 取代
+-- =====================================================
 -- 礼品订单管理系统 - 数据库建表脚本
 -- 适用于 Supabase PostgreSQL
 -- 执行方式: 在 Supabase SQL Editor 或 psql 中执行
@@ -138,7 +141,7 @@ CREATE TABLE IF NOT EXISTS shippers (
 );
 
 -- =====================================================
--- 4. 供应商表 (suppliers)
+-- 4. 发货方表 (suppliers)
 -- =====================================================
 CREATE TABLE IF NOT EXISTS suppliers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

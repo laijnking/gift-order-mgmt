@@ -1,7 +1,7 @@
 /**
  * Phase 1: 档案管理模块 API 验证脚本
  *
- * 验证所有档案管理模块的 API：客户、供应商/发货方、商品、库存、SKU映射、仓库
+ * 验证所有档案管理模块的 API：客户、发货方/发货方、商品、库存、SKU映射、仓库
  * 覆盖列表查询、详情查询、搜索、分页、字段完整性等测试点。
  *
  * 用法: node --import tsx scripts/validate-api-archive-modules.ts
@@ -147,10 +147,10 @@ async function main() {
   }
 
   // ========================================
-  // 2. 供应商管理 (Suppliers)
+  // 2. 发货方管理 (Suppliers)
   // ========================================
   console.log('');
-  console.log('[2/7] 供应商管理 API...');
+  console.log('[2/7] 发货方管理 API...');
 
   {
     const { status, data } = await fetchJson<ApiEnvelope<Record<string, unknown>[]>>(

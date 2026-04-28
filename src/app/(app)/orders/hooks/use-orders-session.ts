@@ -208,7 +208,7 @@ export function useOrdersSession() {
       const data = await res.json();
       if (data.success) setSuppliers((data.data || []).filter((s: Supplier) => s.id && s.name));
     } catch {
-      console.error('获取供应商失败');
+      console.error('获取发货方失败');
     }
   }, [authHeaders]);
 
@@ -243,7 +243,7 @@ export function useOrdersSession() {
       await fetch('/api/alert-records', {
         method: 'PATCH',
         headers: authHeaders(),
-        body: JSON.stringify({ ids: [alertId], isRead: true }),
+        body: JSON.stringify({ ids: [alertId], is_read: true }),
       });
       setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, isRead: true } : a));
       setUnreadAlertCount(prev => Math.max(0, prev - 1));
@@ -260,7 +260,7 @@ export function useOrdersSession() {
         fetch('/api/alert-records', {
           method: 'PATCH',
           headers: authHeaders(),
-          body: JSON.stringify({ ids: [id], isRead: true }),
+          body: JSON.stringify({ ids: [id], is_read: true }),
         })
       ));
       setAlerts(prev => prev.map(a => ({ ...a, isRead: true })));

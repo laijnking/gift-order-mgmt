@@ -7,6 +7,7 @@ export const ORDER_STATUS_PARTIAL_RETURNED: OrderStatus = 'partial_returned';
 export const ORDER_STATUS_RETURNED: OrderStatus = 'returned';
 export const ORDER_STATUS_FEEDBACKED: OrderStatus = 'feedbacked';
 export const ORDER_STATUS_COMPLETED: OrderStatus = 'completed';
+export const ORDER_STATUS_NOTIFIED: OrderStatus = 'notified';
 export const ORDER_STATUS_CANCELLED: OrderStatus = 'cancelled';
 
 // Dispatch record status constants (different from order status)
@@ -18,6 +19,7 @@ export const DISPATCH_STATUS_DELIVERED = 'delivered';
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   pending: '待派发',
   assigned: '已派发',
+  notified: '通知发货',
   partial_returned: '部分回单',
   returned: '已回单',
   feedbacked: '已反馈',
@@ -28,6 +30,7 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
 export const ORDER_STATUS_BADGE_CLASSES: Record<OrderStatus, string> = {
   pending: 'bg-yellow-100 text-yellow-800',
   assigned: 'bg-blue-100 text-blue-800',
+  notified: 'bg-purple-100 text-purple-800',
   partial_returned: 'bg-orange-100 text-orange-800',
   returned: 'bg-green-100 text-green-800',
   feedbacked: 'bg-teal-100 text-teal-800',
@@ -56,6 +59,7 @@ export const RETURN_PROGRESS_STATUSES: OrderStatus[] = [
 export const ACTIVE_FULFILLMENT_STATUSES: OrderStatus[] = [
   'pending',
   'assigned',
+  'notified',
   ...RETURN_PROGRESS_STATUSES,
 ];
 

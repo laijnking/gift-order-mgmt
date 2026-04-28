@@ -249,7 +249,7 @@ async function executeReturnDelayRule(rule: AlertRuleRecord): Promise<RuleExecut
   const { data, error } = await client
     .from('orders')
     .select('id, order_no, customer_code, customer_name, assigned_at, status, tracking_no')
-    .in('status', ['assigned', 'partial_returned'])
+    .in('status', ['assigned', 'notified', 'partial_returned'])
     .lte('assigned_at', cutoff);
 
   if (error) {

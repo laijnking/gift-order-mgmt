@@ -76,7 +76,7 @@ export async function POST(
           : [];
 
     if (supplierIds.length === 0) {
-      return NextResponse.json({ success: false, error: '导出记录缺少供应商信息，无法重新导出' }, { status: 400 });
+      return NextResponse.json({ success: false, error: '导出记录缺少发货方信息，无法重新导出' }, { status: 400 });
     }
 
     const origin = request.nextUrl.origin;

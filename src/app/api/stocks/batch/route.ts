@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = getSupabaseClient();
     
-    // 先获取所有发货方（供应商）信息，用于ID匹配
+    // 先获取所有发货方（发货方）信息，用于ID匹配
     const { data: shippers } = await supabase
       .from('shippers')
       .select('id, code, name')

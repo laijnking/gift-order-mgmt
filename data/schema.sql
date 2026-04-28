@@ -138,7 +138,7 @@ CREATE TABLE IF NOT EXISTS shippers (
 );
 
 -- =====================================================
--- 4. 供应商表 (suppliers)
+-- 4. 发货方表 (suppliers)
 -- =====================================================
 CREATE TABLE IF NOT EXISTS suppliers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

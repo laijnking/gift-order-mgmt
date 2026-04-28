@@ -98,7 +98,7 @@ export default function WarehousesManagePage() {
 
       setWarehouses(warehousesData.data || []);
       
-      // 合并供应商数据作为库存数据
+      // 合并发货方数据作为库存数据
       const supplierStocks: StockItem[] = (suppliersData.data || []).map((s: Record<string, unknown>) => ({
         id: s.id as string,
         supplierId: s.id as string,
@@ -215,7 +215,7 @@ export default function WarehousesManagePage() {
       case 'own':
         return <Badge className="bg-purple-100 text-purple-800">自有仓库</Badge>;
       case 'supplier':
-        return <Badge className="bg-blue-100 text-blue-800">供应商</Badge>;
+        return <Badge className="bg-blue-100 text-blue-800">发货方</Badge>;
       case 'factory':
         return <Badge className="bg-green-100 text-green-800">工厂直发</Badge>;
       default:
@@ -283,7 +283,7 @@ export default function WarehousesManagePage() {
               客户管理
             </Link>
             <Link href="/suppliers-manage" className="py-4 px-2 border-b-2 border-transparent text-sm font-medium text-gray-600 hover:text-gray-900">
-              供应商管理
+              发货方管理
             </Link>
             <Link href="/products" className="py-4 px-2 border-b-2 border-transparent text-sm font-medium text-gray-600 hover:text-gray-900">
               商品管理
@@ -324,7 +324,7 @@ export default function WarehousesManagePage() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-blue-700">供应商</p>
+                  <p className="text-sm text-blue-700">发货方</p>
                   <p className="text-2xl font-bold text-blue-700">{warehouseStats.supplier}</p>
                 </div>
                 <Truck className="w-8 h-8 text-blue-500" />
@@ -386,7 +386,7 @@ export default function WarehousesManagePage() {
                     <SelectContent>
                       <SelectItem value="all">全部类型</SelectItem>
                       <SelectItem value="own">自有仓库</SelectItem>
-                      <SelectItem value="supplier">供应商</SelectItem>
+                      <SelectItem value="supplier">发货方</SelectItem>
                       <SelectItem value="factory">工厂直发</SelectItem>
                     </SelectContent>
                   </Select>
@@ -446,7 +446,7 @@ export default function WarehousesManagePage() {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="own">自有仓库</SelectItem>
-                              <SelectItem value="supplier">供应商</SelectItem>
+                              <SelectItem value="supplier">发货方</SelectItem>
                               <SelectItem value="factory">工厂直发</SelectItem>
                             </SelectContent>
                           </Select>
@@ -624,14 +624,14 @@ export default function WarehousesManagePage() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">实时库存</CardTitle>
-                <CardDescription>显示各仓库/供应商的商品库存情况</CardDescription>
+                <CardDescription>显示各仓库/发货方的商品库存情况</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>仓库/供应商</TableHead>
+                      <TableHead>仓库/发货方</TableHead>
                       <TableHead>类型</TableHead>
                       <TableHead>商品编码</TableHead>
                       <TableHead>商品名称</TableHead>
@@ -680,7 +680,7 @@ export default function WarehousesManagePage() {
             <AlertTriangle className="h-4 w-4 text-orange-600" />
             <AlertDescription className="text-orange-800">
               <strong>尾货预警规则：</strong>当某商品库存 ≤ 2 台时，系统将标记为&quot;尾货&quot;并发出预警提示，以防止撞单风险。
-              建议在派发订单时优先考虑库存充足的供应商。
+              建议在派发订单时优先考虑库存充足的发货方。
             </AlertDescription>
           </Alert>
         )}

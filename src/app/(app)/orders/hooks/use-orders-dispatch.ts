@@ -105,7 +105,7 @@ export function useOrdersDispatch({
           setSelectedSupplierId(((data.data[0] as Record<string, unknown>).recommendedSupplier as { id: string }).id);
         }
         if (data.data.some((item: Record<string, unknown>) => (item as Record<string, unknown>).newProductHint)) {
-          toast.warning('存在新商品（无库存），请手动选择供应商');
+          toast.warning('存在新商品（无库存），请手动选择发货方');
         } else if (data.data.some((item: Record<string, unknown>) => (item as Record<string, unknown>).warning)) {
           toast.warning('部分订单存在尾货预警，请注意查看');
         }
@@ -125,7 +125,7 @@ export function useOrdersDispatch({
   // Assign single
   const handleAssign = useCallback(async () => {
     if (!assigningOrderId || !selectedSupplierId) {
-      toast.error('请选择供应商');
+      toast.error('请选择发货方');
       return;
     }
     const supplier = suppliers.find(s => s.id === selectedSupplierId);
@@ -135,14 +135,14 @@ export function useOrdersDispatch({
         headers: authHeaders(),
         body: JSON.stringify({
           id: assigningOrderId,
-          supplierId: selectedSupplierId,
-          supplierName: supplier?.name || '',
+          supplier_id: selectedSupplierId,
+          supplier_name: supplier?.name || '',
           status: 'pending',
         }),
       });
       const data = await res.json();
       if (data.success) {
-        toast.success('已分配供应商，订单待派发');
+        toast.success('已分配发货方，订单待派发');
         fetchOrders();
         setAssignDialogOpen(false);
         setAssigningOrderId(null);
@@ -158,7 +158,7 @@ export function useOrdersDispatch({
   // Batch assign from match results
   const handleBatchAssignFromMatch = useCallback(async () => {
     if (Object.keys(selectedSuppliers).length === 0) {
-      toast.error('请为订单选择供应商');
+      toast.error('请为订单选择发货方');
       return;
     }
     try {
@@ -169,8 +169,8 @@ export function useOrdersDispatch({
           headers: authHeaders(),
           body: JSON.stringify({
             id: orderId,
-            supplierId,
-            supplierName: supplier?.name || '',
+            supplier_id: supplierId,
+            supplier_name: supplier?.name || '',
             status: 'pending',
           }),
         });
@@ -178,7 +178,7 @@ export function useOrdersDispatch({
       const results = await Promise.all(promises);
       const dataArr = await Promise.all(results.map(r => r.json()));
       const successCount = dataArr.filter(d => d.success).length;
-      toast.success(`成功分配供应商，共 ${successCount} 条订单待派发`);
+      toast.success(`成功分配发货方，共 ${successCount} 条订单待派发`);
       setMatchResults({});
       setSelectedSuppliers({});
       setAssignDialogOpen(false);
@@ -206,8 +206,8 @@ export function useOrdersDispatch({
               headers: authHeaders(),
               body: JSON.stringify({
                 id: orderId,
-                trackingNo: trackingNo || '',
-                expressCompany: expressCompany || returnExpressCompany || '',
+                tracking_no: trackingNo || '',
+                express_company: expressCompany || returnExpressCompany || '',
                 status: 'returned',
               }),
             });

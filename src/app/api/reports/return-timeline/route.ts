@@ -183,7 +183,7 @@ export async function GET(request: NextRequest) {
       }))
       .sort((a, b) => parseFloat(b.avgReturnDays) - parseFloat(a.avgReturnDays));
 
-    // 按供应商统计
+    // 按发货方统计
     const bySupplier: Record<string, {
       name: string;
       orderCount: number;
@@ -192,7 +192,7 @@ export async function GET(request: NextRequest) {
     }> = {};
 
     timingData.forEach(t => {
-      const name = t.supplierName || '未知供应商';
+      const name = t.supplierName || '未知发货方';
       if (!bySupplier[name]) {
         bySupplier[name] = {
           name,

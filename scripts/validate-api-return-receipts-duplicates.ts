@@ -236,7 +236,7 @@ function seedExistingReceipt(
     id: overrides.id,
     record_id: 'existing-record-1',
     supplier_id: overrides.supplier_id ?? 'supplier-a',
-    supplier_name: overrides.supplier_name ?? '供应商A',
+    supplier_name: overrides.supplier_name ?? '发货方A',
     customer_order_no: overrides.customer_order_no ?? 'CUST-001',
     supplier_order_no: overrides.supplier_order_no ?? 'SUP-001',
     express_company: '顺丰',
@@ -250,7 +250,7 @@ function seedExistingReceipt(
 }
 
 async function main() {
-  await runCase('同供应商已存在 tracking_no 时跳过重复插入并返回原因', async () => {
+  await runCase('同发货方已存在 tracking_no 时跳过重复插入并返回原因', async () => {
     const db = new MemoryDatabase();
     const existing = seedExistingReceipt(db, {
       supplier_id: 'supplier-a',
@@ -263,7 +263,7 @@ async function main() {
     const response = await route.POST(
       createRequest({
         supplierId: 'supplier-a',
-        supplierName: '供应商A',
+        supplierName: '发货方A',
         fileName: 'receipt-a.xlsx',
         receipts: [
           {
@@ -312,7 +312,7 @@ async function main() {
     const response = await route.POST(
       createRequest({
         supplierId: 'supplier-b',
-        supplierName: '供应商B',
+        supplierName: '发货方B',
         fileName: 'receipt-b.xlsx',
         receipts: [
           {
@@ -356,7 +356,7 @@ async function main() {
     const response = await route.POST(
       createRequest({
         supplierId: 'supplier-c',
-        supplierName: '供应商C',
+        supplierName: '发货方C',
         fileName: 'receipt-c.xlsx',
         receipts: [
           {

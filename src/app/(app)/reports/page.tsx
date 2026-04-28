@@ -279,13 +279,13 @@ export default function ReportsPage() {
         .map(row => row.map(cell => `"${cell}"`).join(','))
         .join('\n');
     } else if (type === 'supplier' && supplierData) {
-      filename = '供应商分析报表';
+      filename = '发货方分析报表';
       csv = [
-        ['报表类型', '供应商分析'],
+        ['报表类型', '发货方分析'],
         ['生成时间', new Date().toLocaleString('zh-CN')],
         [],
-        ['供应商订单排行'],
-        ['供应商名称', '订单数', '商品数量', '完成率'],
+        ['发货方订单排行'],
+        ['发货方名称', '订单数', '商品数量', '完成率'],
         ...supplierData.topSuppliers.map(s => [
           s.name, s.orderCount, s.totalQuantity, `${s.completionRate}%`,
         ]),
@@ -375,7 +375,7 @@ export default function ReportsPage() {
         <TabsList className="grid w-full grid-cols-2 sm:w-fit sm:grid-cols-4">
           <TabsTrigger value="overview">总览</TabsTrigger>
           <TabsTrigger value="sales">销售业绩</TabsTrigger>
-          <TabsTrigger value="supplier">供应商</TabsTrigger>
+          <TabsTrigger value="supplier">发货方</TabsTrigger>
           <TabsTrigger value="timeline">回单时效</TabsTrigger>
         </TabsList>
 
@@ -409,7 +409,7 @@ export default function ReportsPage() {
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">供应商总数</CardTitle>
+                <CardTitle className="text-sm font-medium">发货方总数</CardTitle>
                 <Building2 className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -878,12 +878,12 @@ export default function ReportsPage() {
           </Card>
         </TabsContent>
 
-        {/* 供应商分析 */}
+        {/* 发货方分析 */}
         <TabsContent value="supplier" className="space-y-4">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">供应商总数</CardTitle>
+                <CardTitle className="text-sm font-medium">发货方总数</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{supplierData?.summary.totalSuppliers || 0}</div>
@@ -899,7 +899,7 @@ export default function ReportsPage() {
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">供应商平均订单</CardTitle>
+                <CardTitle className="text-sm font-medium">发货方平均订单</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{supplierData?.summary.avgOrdersPerSupplier || 0}</div>
@@ -922,7 +922,7 @@ export default function ReportsPage() {
               <CardTitle className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <span className="flex items-center gap-2">
                   <Building2 className="h-5 w-5" />
-                  供应商订单排行 TOP10
+                  发货方订单排行 TOP10
                 </span>
                 <Button variant="ghost" size="sm" onClick={() => exportReport('supplier')} className="w-full sm:w-auto">
                   <Download className="h-4 w-4 mr-2" />
@@ -936,7 +936,7 @@ export default function ReportsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>排名</TableHead>
-                    <TableHead>供应商名称</TableHead>
+                    <TableHead>发货方名称</TableHead>
                     <TableHead>类型</TableHead>
                     <TableHead className="text-right">订单数</TableHead>
                     <TableHead className="text-right">商品数量</TableHead>
@@ -953,7 +953,7 @@ export default function ReportsPage() {
                       <TableCell>{item.name}</TableCell>
                       <TableCell>
                         <Badge variant="outline">
-                          {item.type === 'supplier' ? '供应商' : item.type}
+                          {item.type === 'supplier' ? '发货方' : item.type}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right font-medium">{item.orderCount}</TableCell>
@@ -1001,7 +1001,7 @@ export default function ReportsPage() {
                   <div key={index} className="p-4 border rounded-lg">
                     <div className="flex items-center justify-between">
                       <span className="font-medium">
-                        {item.type === 'supplier' ? '供应商' : item.type}
+                        {item.type === 'supplier' ? '发货方' : item.type}
                       </span>
                       <Badge>{item.supplierCount} 家</Badge>
                     </div>
@@ -1121,7 +1121,7 @@ export default function ReportsPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Clock className="h-5 w-5" />
-                供应商时效排行
+                发货方时效排行
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -1130,7 +1130,7 @@ export default function ReportsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>排名</TableHead>
-                    <TableHead>供应商名称</TableHead>
+                    <TableHead>发货方名称</TableHead>
                     <TableHead className="text-right">订单数</TableHead>
                     <TableHead className="text-right">平均回传天数</TableHead>
                   </TableRow>

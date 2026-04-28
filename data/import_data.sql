@@ -200,7 +200,7 @@ VALUES ('93180e24-43a4-4e38-8792-5c8d193336fd', '3G3253', '', '芳草地吸管',
 INSERT INTO products (id, code, barcode, name, brand, category, spec, unit, cost_price, retail_price, lifecycle_status, is_active, created_at, updated_at)
 VALUES ('21d8d3a4-1352-4cf6-9225-c32c3002c8e5', '3G3253*5', '', '芳草地吸管', '芳草地', '日杂', '3G3253*5', 'pcs', 0, 0, '在售', true, NOW(), NOW())
 
--- === 供应商档案 ===
+-- === 发货方档案 ===
 INSERT INTO suppliers (id, name, short_name, type, contact, send_type, province, can_jd, express_restrictions, cost_factor, is_active, created_at, updated_at)
 VALUES ('44a93007-a844-4165-8635-4385a88feb87', '广州超品汇', '', '聚水潭', '', '一件代发', '', false, '[]', 1, true, NOW(), NOW());
 INSERT INTO suppliers (id, name, short_name, type, contact, send_type, province, can_jd, express_restrictions, cost_factor, is_active, created_at, updated_at)

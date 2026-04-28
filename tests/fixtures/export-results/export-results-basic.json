@@ -15,14 +15,14 @@
         "details": [
           {
             "supplierId": "supplier-1",
-            "supplierName": "供应商A",
-            "fileName": "供应商A+发货通知单+20260419.xlsx",
+            "supplierName": "发货方A",
+            "fileName": "发货方A+发货通知单+20260419.xlsx",
             "fileUrl": "/api/export-records/record-ship/download?detailIndex=0",
             "templateSource": "default",
             "artifact": {
               "provider": "local",
               "relative_path": "data/exports/record-ship/supplier-a.xlsx",
-              "file_name": "供应商A+发货通知单+20260419.xlsx"
+              "file_name": "发货方A+发货通知单+20260419.xlsx"
             }
           }
         ]
@@ -99,8 +99,8 @@
         "details": [
           {
             "supplierId": "supplier-1",
-            "supplierName": "供应商A",
-            "fileName": "供应商A+发货通知单+20260419.xlsx",
+            "supplierName": "发货方A",
+            "fileName": "发货方A+发货通知单+20260419.xlsx",
             "fileUrl": "/api/export-records/record-preview/download?detailIndex=0",
             "templateSource": "explicit"
           }
@@ -177,26 +177,26 @@
         "details": [
           {
             "supplierId": "supplier-1",
-            "supplierName": "供应商A",
-            "fileName": "供应商A+发货通知单+20260419.xlsx",
+            "supplierName": "发货方A",
+            "fileName": "发货方A+发货通知单+20260419.xlsx",
             "fileUrl": "/api/export-records/record-explicit/download?detailIndex=0",
             "templateSource": "explicit",
             "artifact": {
               "provider": "local",
               "relative_path": "data/exports/record-explicit/supplier-a.xlsx",
-              "file_name": "供应商A+发货通知单+20260419.xlsx"
+              "file_name": "发货方A+发货通知单+20260419.xlsx"
             }
           },
           {
             "supplierId": "supplier-2",
-            "supplierName": "供应商B",
-            "fileName": "供应商B+发货通知单+20260419.xlsx",
+            "supplierName": "发货方B",
+            "fileName": "发货方B+发货通知单+20260419.xlsx",
             "fileUrl": "/api/export-records/record-explicit/download?detailIndex=1",
             "templateSource": "explicit",
             "artifact": {
               "provider": "local",
               "relative_path": "data/exports/record-explicit/supplier-b.xlsx",
-              "file_name": "供应商B+发货通知单+20260419.xlsx"
+              "file_name": "发货方B+发货通知单+20260419.xlsx"
             }
           }
         ]

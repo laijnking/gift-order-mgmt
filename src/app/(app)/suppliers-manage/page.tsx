@@ -28,7 +28,7 @@ const IMPORT_CONFIG = {
   fields: ['code', 'name', 'shortName', 'type', 'contactPerson', 'contactPhone', 'province', 'city', 'address', 'sendType', 'settlementType', 'costFactor', 'canJd', 'jdChannelId', 'canPdd', 'pddShopId', 'expressRestrictions', 'remark'],
   fieldLabels: ['发货方编码', '发货方名称', '简称', '类型', '联系人', '联系电话', '所在省份', '所在城市', '详细地址', '发货方式', '结算方式', '成本系数', '支持京东', '京东渠道ID', '支持拼多多', '拼多多店铺ID', '快递限制', '备注'],
   template: [
-    { code: 'FHS-001', name: '广东云海供应链', shortName: '云海', type: '供应商', contactPerson: '张经理', contactPhone: '13800138000', province: '广东', city: '深圳', address: '深圳市宝安区xxx物流园', sendType: '下载发货', settlementType: '月结', costFactor: '1.0', canJd: '否', jdChannelId: '', canPdd: '否', pddShopId: '', expressRestrictions: '', remark: '' },
+    { code: 'FHS-001', name: '广东云海供应链', shortName: '云海', type: '发货方', contactPerson: '张经理', contactPhone: '13800138000', province: '广东', city: '深圳', address: '深圳市宝安区xxx物流园', sendType: '下载发货', settlementType: '月结', costFactor: '1.0', canJd: '否', jdChannelId: '', canPdd: '否', pddShopId: '', expressRestrictions: '', remark: '' },
     { code: 'FHS-002', name: '京东一件代发', shortName: '京东', type: '京东', contactPerson: '李经理', contactPhone: '13900139000', province: '北京', city: '北京', address: '北京市大兴区京东仓库', sendType: '京东发货', settlementType: '月结预付', costFactor: '1.05', canJd: '是', jdChannelId: 'JD-CHANNEL-001', canPdd: '否', pddShopId: '', expressRestrictions: '', remark: '' },
   ],
 };
@@ -59,7 +59,7 @@ interface Shipper {
 
 // 发货类型选项
 const SHIPPER_TYPES = [
-  { value: 'supplier', label: '供应商' },
+  { value: 'supplier', label: '发货方' },
   { value: 'jd', label: '京东' },
   { value: 'pdd', label: '拼多多' },
   { value: 'self', label: '自有仓' },
@@ -259,7 +259,7 @@ export default function ShippersManagePage() {
       const shippersData = excelImportData.map(row => {
         // 类型映射
         const typeMap: Record<string, string> = {
-          '供应商': 'supplier', '京东': 'jd', '拼多多': 'pdd', '自有仓': 'self', '第三方仓': 'third_party'
+          '发货方': 'supplier', '京东': 'jd', '拼多多': 'pdd', '自有仓': 'self', '第三方仓': 'third_party'
         };
         // 发货方式映射
         const sendTypeMap: Record<string, string> = {
@@ -433,7 +433,7 @@ export default function ShippersManagePage() {
   // 获取类型标签
   const getTypeBadge = (type: string) => {
     const typeConfig: Record<string, { label: string; className: string }> = {
-      supplier: { label: '供应商', className: 'bg-blue-100 text-blue-800' },
+      supplier: { label: '发货方', className: 'bg-blue-100 text-blue-800' },
       jd: { label: '京东', className: 'bg-red-100 text-red-800' },
       pdd: { label: '拼多多', className: 'bg-orange-100 text-orange-800' },
       self: { label: '自有仓', className: 'bg-green-100 text-green-800' },
@@ -487,7 +487,7 @@ export default function ShippersManagePage() {
                 </div>
                 <div>
                   <h1 className="text-xl font-bold">发货方管理</h1>
-                  <p className="text-sm text-gray-500">统一管理供应商、仓库、京东/拼多多渠道</p>
+                  <p className="text-sm text-gray-500">统一管理发货方、仓库、京东/拼多多渠道</p>
                 </div>
               </div>
             </div>
@@ -518,7 +518,7 @@ export default function ShippersManagePage() {
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-500">供应商</p>
+                    <p className="text-sm text-gray-500">发货方</p>
                     <p className="text-2xl font-bold text-blue-600">{stats.byType.supplier}</p>
                   </div>
                   <Package className="w-8 h-8 text-blue-400" />
@@ -997,7 +997,7 @@ export default function ShippersManagePage() {
           <Alert className="mt-6 border-blue-200 bg-blue-50">
             <AlertTriangle className="h-4 w-4 text-blue-600" />
             <AlertDescription className="text-blue-800">
-              <strong>发货方档案说明：</strong>发货方档案统一管理供应商、仓库、京东/拼多多渠道等信息。
+              <strong>发货方档案说明：</strong>发货方档案统一管理发货方、仓库、京东/拼多多渠道等信息。
               渠道配置决定该发货方支持哪些平台发货，快递限制可设置不能使用的快递公司。
             </AlertDescription>
           </Alert>

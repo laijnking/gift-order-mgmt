@@ -217,7 +217,7 @@ export async function POST(request: NextRequest) {
     ]);
 
     if (orderError) throw new Error(`查询订单失败: ${orderError.message}`);
-    if (shipperError) throw new Error(`查询供应商失败: ${shipperError.message}`);
+    if (shipperError) throw new Error(`查询发货方失败: ${shipperError.message}`);
     if (stockError) throw new Error(`查询库存失败: ${stockError.message}`);
 
     const activeSuppliers = (shippers || []) as Record<string, unknown>[];
@@ -319,7 +319,7 @@ export async function POST(request: NextRequest) {
       const recommended = supplierOptions[0] || null;
       const matchReasons = [
         product.id ? `商品已匹配：${product.name || product.code}` : `商品未精确匹配：${product.name || product.code || '未知商品'}`,
-        recommended ? `推荐 ${recommended.supplierName}，库存 ${recommended.quantity}，单价 ${recommended.price}` : '未找到有库存的供应商',
+        recommended ? `推荐 ${recommended.supplierName}，库存 ${recommended.quantity}，单价 ${recommended.price}` : '未找到有库存的发货方',
       ];
 
       const warning = recommended && recommended.quantity <= 2
@@ -363,13 +363,13 @@ export async function POST(request: NextRequest) {
         hasStockForProduct: supplierOptions.length > 0,
         matchReasons,
         warning,
-        newProductHint: supplierOptions.length === 0 ? `商品「${product.name || product.code || '未知'}」暂无库存，请先导入库存或手动选择供应商` : undefined,
+        newProductHint: supplierOptions.length === 0 ? `商品「${product.name || product.code || '未知'}」暂无库存，请先导入库存或手动选择发货方` : undefined,
       });
     }
 
     return NextResponse.json({ success: true, data: results, total: results.length });
   } catch (error) {
-    console.error('匹配供应商失败:', error);
+    console.error('匹配发货方失败:', error);
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : '未知错误',

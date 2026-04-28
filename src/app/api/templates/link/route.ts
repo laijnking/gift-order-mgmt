@@ -3,7 +3,7 @@ import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { PERMISSIONS } from '@/lib/permissions';
 
-// 关联模板到客户或供应商
+// 关联模板到客户或发货方
 export async function POST(request: NextRequest) {
   const authError = requirePermission(request, PERMISSIONS.SETTINGS_EDIT);
   if (authError) return authError;

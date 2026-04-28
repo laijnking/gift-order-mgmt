@@ -77,7 +77,7 @@ async function setupCommonRoutes(page: Page) {
         data: [
           {
             id: 'supplier-1',
-            name: '供应商A',
+            name: '发货方A',
             type: 'self',
             province: '上海',
           },
@@ -170,7 +170,7 @@ async function runOrderOpsNavigationCheck(page: Page) {
             salespersonName: '销售甲',
             operatorName: '跟单乙',
             supplierId: 'supplier-1',
-            supplierName: '供应商A',
+            supplierName: '发货方A',
             receiver: {
               name: '李四',
               phone: '13900000000',
@@ -201,7 +201,7 @@ async function runOrderOpsNavigationCheck(page: Page) {
         data: [
           {
             id: 'supplier-1',
-            name: '供应商A',
+            name: '发货方A',
             code: 'SUP-A',
             type: 'self',
             pendingOrderCount: 1,
@@ -262,8 +262,8 @@ async function runOrderOpsNavigationCheck(page: Page) {
           data: {
             id: 'receipt-record-1',
             supplierId: 'supplier-1',
-            supplierName: '供应商A',
-            fileName: '供应商A-回单-20260419.xlsx',
+            supplierName: '发货方A',
+            fileName: '发货方A-回单-20260419.xlsx',
             totalCount: 2,
             matchedCount: autoMatched ? 2 : 1,
             unmatchedCount: autoMatched ? 0 : 1,
@@ -278,7 +278,7 @@ async function runOrderOpsNavigationCheck(page: Page) {
               {
                 id: 'receipt-1',
                 supplierId: 'supplier-1',
-                supplierName: '供应商A',
+                supplierName: '发货方A',
                 customerOrderNo: 'ORDER-ASSIGNED-001',
                 expressCompany: '顺丰',
                 trackingNo: 'SF1234567890',
@@ -293,7 +293,7 @@ async function runOrderOpsNavigationCheck(page: Page) {
               {
                 id: 'receipt-2',
                 supplierId: 'supplier-1',
-                supplierName: '供应商A',
+                supplierName: '发货方A',
                 customerOrderNo: 'ORDER-ASSIGNED-002',
                 expressCompany: '中通',
                 trackingNo: 'ZT1234567890',
@@ -321,8 +321,8 @@ async function runOrderOpsNavigationCheck(page: Page) {
           {
             id: 'receipt-record-1',
             supplierId: 'supplier-1',
-            supplierName: '供应商A',
-            fileName: '供应商A-回单-20260419.xlsx',
+            supplierName: '发货方A',
+            fileName: '发货方A-回单-20260419.xlsx',
             totalCount: 2,
             matchedCount: autoMatched ? 2 : 1,
             unmatchedCount: autoMatched ? 0 : 1,
@@ -418,16 +418,16 @@ async function runOrderOpsNavigationCheck(page: Page) {
   await page.getByRole('button', { name: /发货通知/ }).click();
 
   await page.getByRole('heading', { name: '发货通知单导出' }).waitFor();
-  await page.getByText('供应商A').waitFor();
+  await page.getByText('发货方A').waitFor();
 
   await page.goto(`${BASE_URL}/return-receipt`);
   await page.getByRole('heading', { name: '回单导入' }).waitFor();
-  await page.getByText('导入供应商回传快递单号，自动匹配订单').waitFor();
+  await page.getByText('导入发货方回传快递单号，自动匹配订单').waitFor();
   await page.getByRole('heading', { name: '回单导入' }).waitFor();
   await page.getByText('上传包含快递信息的Excel文件').waitFor();
   await page.locator('select').selectOption('supplier-1');
   await page.locator('input[type="file"]').setInputFiles({
-    name: '供应商A-回单-20260419.xlsx',
+    name: '发货方A-回单-20260419.xlsx',
     mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     buffer: createReturnReceiptWorkbookBuffer(),
   });
@@ -501,7 +501,7 @@ async function runOrderIntakeToOrdersCheck(page: Page) {
                   supplierMatches: [
                     {
                       supplierId: 'supplier-1',
-                      supplierName: '供应商A',
+                      supplierName: '发货方A',
                       stockQuantity: 20,
                       stockPrice: 99,
                       warehouseName: '上海仓',
@@ -574,7 +574,7 @@ async function runOrderIntakeToOrdersCheck(page: Page) {
             salespersonName: '销售甲',
             operatorName: '跟单乙',
             supplierId: 'supplier-1',
-            supplierName: '供应商A',
+            supplierName: '发货方A',
             expressCompany: '',
             trackingNo: '',
             receiver: {
@@ -646,7 +646,7 @@ async function runExportEntryCheck(page: Page) {
         data: [
           {
             id: 'supplier-1',
-            name: '供应商A',
+            name: '发货方A',
             code: 'SUP-A',
             type: 'self',
             pendingOrderCount: 1,
@@ -713,7 +713,7 @@ async function runExportEntryCheck(page: Page) {
 
   await page.goto(`${BASE_URL}/shipping-export`);
   await page.getByRole('heading', { name: '发货通知单导出' }).waitFor();
-  await page.getByText('供应商A').waitFor();
+  await page.getByText('发货方A').waitFor();
 
   await page.goto(`${BASE_URL}/export-records`);
   await page.getByRole('heading', { name: '导出记录' }).waitFor();
@@ -742,7 +742,7 @@ async function runShippingPersistenceBranchSmoke(page: Page) {
         data: [
           {
             id: 'supplier-1',
-            name: '供应商A',
+            name: '发货方A',
             code: 'SUP-A',
             type: 'self',
             pendingOrderCount: 1,
@@ -839,9 +839,9 @@ async function runShippingPersistenceBranchSmoke(page: Page) {
           details: [
             {
               supplierId: 'supplier-1',
-              supplierName: '供应商A',
+              supplierName: '发货方A',
               orderCount: 1,
-              fileName: '供应商A+发货通知单+20260419.xlsx',
+              fileName: '发货方A+发货通知单+20260419.xlsx',
               fileUrl:
                 executionMode === 'dispatch_with_persistence'
                   ? '/api/export-records/record-ship-smoke/download?detailIndex=0'
@@ -854,7 +854,7 @@ async function runShippingPersistenceBranchSmoke(page: Page) {
                   ? {
                       provider: 'local',
                       relative_path: 'data/exports/record-ship-smoke/supplier-a.xlsx',
-                      file_name: '供应商A+发货通知单+20260419.xlsx',
+                      file_name: '发货方A+发货通知单+20260419.xlsx',
                     }
                   : null,
               status: 'success',
@@ -897,9 +897,9 @@ async function runShippingPersistenceBranchSmoke(page: Page) {
                   details: [
                     {
                       supplierId: 'supplier-1',
-                      supplierName: '供应商A',
+                      supplierName: '发货方A',
                       orderCount: 1,
-                      fileName: '供应商A+发货通知单+20260419.xlsx',
+                      fileName: '发货方A+发货通知单+20260419.xlsx',
                       fileUrl: detailRegenerated
                         ? '/api/export-records/record-ship-smoke/download?detailIndex=0'
                         : '/exports/record-ship-smoke-detail.xlsx',
@@ -909,7 +909,7 @@ async function runShippingPersistenceBranchSmoke(page: Page) {
                         ? {
                             provider: 'local',
                             relative_path: 'data/exports/record-ship-smoke/supplier-a.xlsx',
-                            file_name: '供应商A+发货通知单+20260419.xlsx',
+                            file_name: '发货方A+发货通知单+20260419.xlsx',
                           }
                         : undefined,
                       status: 'success',
@@ -950,9 +950,9 @@ async function runShippingPersistenceBranchSmoke(page: Page) {
               details: [
                 {
                   supplierId: 'supplier-1',
-                  supplierName: '供应商A',
+                  supplierName: '发货方A',
                   orderCount: 1,
-                  fileName: '供应商A+发货通知单+20260419.xlsx',
+                  fileName: '发货方A+发货通知单+20260419.xlsx',
                   fileUrl: detailRegenerated
                     ? '/api/export-records/record-ship-smoke/download?detailIndex=0'
                     : '/exports/record-ship-smoke-detail.xlsx',
@@ -962,7 +962,7 @@ async function runShippingPersistenceBranchSmoke(page: Page) {
                     ? {
                         provider: 'local',
                         relative_path: 'data/exports/record-ship-smoke/supplier-a.xlsx',
-                        file_name: '供应商A+发货通知单+20260419.xlsx',
+                        file_name: '发货方A+发货通知单+20260419.xlsx',
                       }
                     : undefined,
                   status: 'success',
@@ -972,9 +972,9 @@ async function runShippingPersistenceBranchSmoke(page: Page) {
             details: [
               {
                 supplierId: 'supplier-1',
-                supplierName: '供应商A',
+                supplierName: '发货方A',
                 orderCount: 1,
-                fileName: '供应商A+发货通知单+20260419.xlsx',
+                fileName: '发货方A+发货通知单+20260419.xlsx',
                 fileUrl: detailRegenerated
                   ? '/api/export-records/record-ship-smoke/download?detailIndex=0'
                   : '/exports/record-ship-smoke-detail.xlsx',
@@ -984,7 +984,7 @@ async function runShippingPersistenceBranchSmoke(page: Page) {
                   ? {
                       provider: 'local',
                       relative_path: 'data/exports/record-ship-smoke/supplier-a.xlsx',
-                      file_name: '供应商A+发货通知单+20260419.xlsx',
+                      file_name: '发货方A+发货通知单+20260419.xlsx',
                     }
                   : undefined,
                 status: 'success',
@@ -1004,21 +1004,21 @@ async function runShippingPersistenceBranchSmoke(page: Page) {
         body: JSON.stringify({
           success: true,
           data: {
-            zipFileName: '供应商A+发货通知单+20260419.zip',
+            zipFileName: '发货方A+发货通知单+20260419.zip',
             zipBase64: 'UEsFBgAAAAAAAAAAAAAAAAAAAAAAAA==',
             details: [
               {
                 supplierId: 'supplier-1',
-                supplierName: '供应商A',
+                supplierName: '发货方A',
                 orderCount: 1,
-                fileName: '供应商A+发货通知单+20260419.xlsx',
+                fileName: '发货方A+发货通知单+20260419.xlsx',
                 fileUrl: '/api/export-records/record-ship-smoke/download?detailIndex=0',
                 templateName: '默认发货模板',
                 templateSource: 'default',
                 artifact: {
                   provider: 'local',
                   relative_path: 'data/exports/record-ship-smoke/supplier-a.xlsx',
-                  file_name: '供应商A+发货通知单+20260419.xlsx',
+                  file_name: '发货方A+发货通知单+20260419.xlsx',
                 },
                 status: 'success',
               },
@@ -1034,7 +1034,7 @@ async function runShippingPersistenceBranchSmoke(page: Page) {
 
   await page.goto(`${BASE_URL}/shipping-export`);
   await page.getByRole('heading', { name: '发货通知单导出' }).waitFor();
-  const supplierRow = page.locator('tr').filter({ hasText: '供应商A' }).first();
+  const supplierRow = page.locator('tr').filter({ hasText: '发货方A' }).first();
   await supplierRow.getByRole('button', { name: '预览' }).click();
   await page.getByRole('dialog').waitFor();
   await page.getByRole('button', { name: '确认仅派发' }).click();
@@ -1050,7 +1050,7 @@ async function runShippingPersistenceBranchSmoke(page: Page) {
 
   await page.goto(`${BASE_URL}/shipping-export`);
   await page.getByRole('heading', { name: '发货通知单导出' }).waitFor();
-  const persistedSupplierRow = page.locator('tr').filter({ hasText: '供应商A' }).first();
+  const persistedSupplierRow = page.locator('tr').filter({ hasText: '发货方A' }).first();
   await persistedSupplierRow.getByRole('button', { name: '预览' }).click();
   await page.getByRole('dialog').waitFor();
   await page.getByRole('button', { name: '确认导出并派发' }).click();

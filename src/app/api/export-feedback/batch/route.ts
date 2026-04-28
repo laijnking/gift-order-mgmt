@@ -3,7 +3,7 @@ import { requirePermission } from '@/lib/server-auth';
 import { CUSTOMER_FEEDBACK_SOURCE_STATUSES } from '@/lib/order-status';
 import { saveExportArtifact } from '@/lib/export-artifacts';
 import { buildExportRecordDownloadPath } from '@/lib/export-download';
-import { parseTemplateFieldMappings, resolvePreferredTemplate, type TemplateRecord } from '@/lib/template-utils';
+import { parseTemplateFieldMappings, migrateFieldMappings, resolvePreferredTemplate, type TemplateRecord } from '@/lib/template-utils';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { PERMISSIONS } from '@/lib/permissions';
 import * as XLSX from 'xlsx';
@@ -12,22 +12,29 @@ import JSZip from 'jszip';
 type OrderItem = Record<string, unknown>;
 type ExportTemplateSource = 'explicit' | 'default' | 'first' | 'column_mapping' | 'mixed';
 
+// fieldMappings 值必须与 buildFeedbackRows context 的 keys 精确一致（camelCase）
 const DEFAULT_CUSTOMER_FEEDBACK_MAPPINGS: Record<string, string> = {
-  客户订单号: 'order_no',
-  客户单据编号: 'customer_order_no',
-  收货人: 'receiver_name',
-  收货电话: 'receiver_phone',
-  收货地址: 'receiver_address',
-  商品名称: 'product_name',
-  商品编码: 'product_code',
-  规格型号: 'product_spec',
-  数量: 'quantity',
-  单价: 'price',
-  快递公司: 'express_company',
-  物流单号: 'tracking_no',
-  业务员: 'salesperson',
-  跟单员: 'operator',
-  备注: 'remark',
+  '客户订单号': 'orderNo',         // context.orderNo = order.order_no
+  '单据编号': 'sysOrderNo',      // context.sysOrderNo = order.sys_order_no
+  '收货人': 'receiverName',       // context.receiverName = order.receiver_name
+  '收货电话': 'receiverPhone',    // context.receiverPhone = order.receiver_phone
+  '收货地址': 'receiverAddress',  // context.receiverAddress = order.receiver_address
+  '商品名称': 'productName',      // context.productName = cu_product_name
+  '商品编码': 'productCode',     // context.productCode = cu_product_code
+  '规格型号': 'productSpec',     // context.productSpec = cu_product_spec
+  '数量': 'quantity',             // context.quantity
+  '单价': 'price',               // context.price
+  '价税合计': 'amount',         // context.amount
+  '仓库': 'warehouse',           // context.warehouse
+  '快递公司': 'expressCompany',  // context.expressCompany = order.express_company
+  '物流单号': 'trackingNo',      // context.trackingNo = order.tracking_no
+  '业务员': 'salesperson',       // context.salesperson = order.salesperson
+  '跟单员': 'operator',         // context.operator = order.operator_name
+  '备注': 'remark',              // context.remark = order.remark
+  '客户代码': 'customerCode',    // context.customerCode = order.customer_code
+  '客户名称': 'customerName',   // context.customerName = order.customer_name
+  '发货方名称': 'supplierName',  // context.supplierName = order.supplier_name
+  '发货方单据号': 'supplierOrderNo', // context.supplierOrderNo = order.supplier_order_no
 };
 
 function parseItems(value: unknown): OrderItem[] {
@@ -72,32 +79,31 @@ function buildFeedbackRows(
       : [{ product_name: '', product_code: '', product_spec: '', quantity: 1, price: null }];
 
     return rowItems.map((item) => {
-      // 基础 context：所有可能用到的字段都先计算出来
+      // 基础 context：所有可能用到的字段都先计算出来（keys 必须与 DEFAULT_CUSTOMER_FEEDBACK_MAPPINGS 值精确一致）
       const context: Record<string, unknown> = {
-        bill_no: order.sys_order_no || '',
-        bill_date: order.created_at || '',
-        order_no: order.order_no || '',
-        customer_order_no: order.customer_order_no || '',
-        supplier_order_no: order.supplier_order_no || '',
-        customer_code: order.customer_code || '',
-        customer_name: order.customer_name || '',
-        supplier_name: order.supplier_name || '',
+        sysOrderNo: order.sys_order_no || '',
+        orderNo: order.order_no || '',
+        customerOrderNo: order.customer_order_no || '',
+        supplierOrderNo: order.supplier_order_no || '',
+        customerCode: order.customer_code || '',
+        customerName: order.customer_name || '',
+        supplierName: order.supplier_name || '',
         salesperson: order.salesperson || '',
         operator: order.operator_name || '',
-        // cu_product_* 优先（客户原始信息）
-        product_name: itemText(item, 'cu_product_name', 'cuProductName', 'product_name', 'productName'),
-        product_code: itemText(item, 'cu_product_code', 'cuProductCode', 'product_code', 'productCode'),
-        product_spec: itemText(item, 'cu_product_spec', 'cuProductSpec', 'product_spec', 'productSpec'),
+        // cu_product_* 优先（客户原始信息），并提供 camelCase 别名供映射查找
+        productName: itemText(item, 'cu_product_name', 'cuProductName', 'product_name', 'productName'),
+        productCode: itemText(item, 'cu_product_code', 'cuProductCode', 'product_code', 'productCode'),
+        productSpec: itemText(item, 'cu_product_spec', 'cuProductSpec', 'product_spec', 'productSpec'),
         quantity: toNumber(item.quantity, 1),
         price: item.price ?? item.unit_price ?? '',
         amount: toNumber(item.quantity, 1) * toNumber(item.price ?? item.unit_price, 0),
         warehouse: itemText(item, 'warehouse', 'warehouseName'),
         remark: order.remark || itemText(item, 'remark'),
-        receiver_name: order.receiver_name || '',
-        receiver_phone: order.receiver_phone || '',
-        receiver_address: order.receiver_address || '',
-        express_company: order.express_company || '',
-        tracking_no: order.tracking_no || '',
+        receiverName: order.receiver_name || '',
+        receiverPhone: order.receiver_phone || '',
+        receiverAddress: order.receiver_address || '',
+        expressCompany: order.express_company || '',
+        trackingNo: order.tracking_no || '',
       };
 
       // 有客户列名映射：使用客户原始列名 + 追加物流列
@@ -107,9 +113,9 @@ function buildFeedbackRows(
 
         return Object.fromEntries(
           allHeaders.map((header) => {
-            if (header === '快递公司') return [header, context.express_company ?? ''];
-            if (header === '运单号') return [header, context.tracking_no ?? ''];
-            // 从 feedbackExportHeaders 中找系统字段名，再从 context 取值
+            if (header === '快递公司') return [header, context.expressCompany ?? ''];
+            if (header === '运单号') return [header, context.trackingNo ?? ''];
+            // 从 feedbackExportHeaders 中找系统字段名，再从 context 取值（均为 camelCase）
             const systemField = feedbackExportHeaders[header];
             return [header, systemField ? (context[systemField] ?? '') : ''];
           })
@@ -227,8 +233,57 @@ export async function POST(request: NextRequest) {
         .limit(1)
         .maybeSingle();
 
-      let exportFieldMappings = customerMapping?.mapping_config || {};
-      let feedbackExportHeaders = customerMapping?.feedback_export_headers || null;
+      // 直接读取 feedback_export_headers（无需通过 parseTemplateFieldMappings，那是 templates 表专用的）
+      const rawFeedbackHeaders = customerMapping?.feedback_export_headers;
+      let feedbackExportHeaders: Record<string, string> | null = null;
+      if (rawFeedbackHeaders) {
+        try {
+          const parsed = typeof rawFeedbackHeaders === 'string'
+            ? JSON.parse(rawFeedbackHeaders) as Record<string, string>
+            : rawFeedbackHeaders;
+          // 应用 legacy snake_case → camelCase 迁移
+          feedbackExportHeaders = {};
+          for (const [k, v] of Object.entries(parsed)) {
+            const val = String(v);
+            // 直接内联迁移逻辑（无需 import LEGACY_TO_CAMEL）
+            feedbackExportHeaders[k] = (val === 'order_no' ? 'orderNo'
+              : val === 'customer_order_no' ? 'customerOrderNo'
+              : val === 'supplier_order_no' ? 'supplierOrderNo'
+              : val === 'customer_code' ? 'customerCode'
+              : val === 'customer_name' ? 'customerName'
+              : val === 'supplier_name' ? 'supplierName'
+              : val === 'product_name' ? 'productName'
+              : val === 'product_code' ? 'productCode'
+              : val === 'product_spec' ? 'productSpec'
+              : val === 'receiver_name' ? 'receiverName'
+              : val === 'receiver_phone' ? 'receiverPhone'
+              : val === 'receiver_address' ? 'receiverAddress'
+              : val === 'express_company' ? 'expressCompany'
+              : val === 'tracking_no' ? 'trackingNo'
+              : val === 'salesperson' ? 'salesperson'
+              : val === 'operator' ? 'operator'
+              : val === 'remark' ? 'remark'
+              : val === 'quantity' ? 'quantity'
+              : val === 'price' ? 'price'
+              : val === 'amount' ? 'amount'
+              : val === 'warehouse' ? 'warehouse'
+              : val === 'sys_order_no' ? 'sysOrderNo'
+              : val === 'match_code' ? 'matchCode'
+              : val === 'dispatch_batch' ? 'dispatchBatch'
+              : val === 'unit_cost' ? 'unitCost'
+              : val === 'warehouse_name' ? 'warehouseName'
+              : val);
+          }
+        } catch { /* ignore parse errors */ }
+      }
+      // 从 column_mappings.mapping_config 读取时也需要迁移
+      let exportFieldMappings: Record<string, string> = {};
+      if (customerMapping?.mapping_config) {
+        const rawConfig = typeof customerMapping.mapping_config === 'string'
+          ? JSON.parse(customerMapping.mapping_config) as Record<string, string>
+          : customerMapping.mapping_config;
+        exportFieldMappings = migrateFieldMappings(rawConfig);
+      }
       let exportTemplateName = customerMapping
         ? `客户导入映射(v${customerMapping.version})`
         : templateName;
