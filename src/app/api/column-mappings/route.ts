@@ -10,7 +10,7 @@ import { requirePermission } from '@/lib/server-auth';
 import { PERMISSIONS } from '@/lib/permissions';
 
 const REQUIRED_MAPPING_FIELDS = [
-  'product_name',
+  'customer_product_name',
   'quantity',
   'receiver_name',
   'receiver_phone',

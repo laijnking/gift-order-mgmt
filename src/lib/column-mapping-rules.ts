@@ -79,14 +79,13 @@ const PATTERNS: Record<string, Array<{ regex: RegExp; exact?: boolean; priority:
     { regex: /^客户订单号$/, exact: true, priority: 10 },
     { regex: /^商户订单号$/, exact: true, priority: 10 },
     { regex: /^来源订单$/, exact: true, priority: 10 },
-    { regex: /^订单编号$/, exact: true, priority: 9 },
-    { regex: /^订单号$/, exact: true, priority: 9 },
+    { regex: /^订单号$/, exact: true, priority: 8 },
   ],
   customer_order_no: [
     { regex: /^客户单据编号$/, exact: true, priority: 10 },
     { regex: /^序号$/, exact: true, priority: 10 },
+    { regex: /^订单编号$/, exact: true, priority: 10 },
     { regex: /^客户订单号$/, exact: true, priority: 9 },
-    { regex: /^订单号$/, exact: true, priority: 8 },
   ],
   supplier_order_no: [
     { regex: /^发货方单据号$/, exact: true, priority: 10 },

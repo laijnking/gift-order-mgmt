@@ -11,8 +11,8 @@ import type {
 // 中文列名自动映射配置（简化为最常用的精确匹配，避免冲突）
 const CHINESE_COLUMN_MAPPING: Record<string, string[]> = {
   // 基础信息
-  order_no: ['订单编号', '订单号'],
-  customer_order_no: ['客户单据编号', '序号', '客户订单号', '客户订单号', '商户订单号', '来源订单'],
+  order_no: ['订单号'],
+  customer_order_no: ['客户单据编号', '序号', '客户订单号', '订单编号', '商户订单号', '来源订单'],
   bill_date: ['单据日期', '订单日期', '订单创建日期', '创建日期', '下单时间'],
   bill_no: ['单据编号'],
   supplier_order_no: ['发货方单据号', '发货方订单号'],

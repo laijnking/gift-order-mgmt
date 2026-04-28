@@ -149,7 +149,7 @@ import {
 } from '@/components/ui/collapsible';
 import { PageGuard } from '@/components/auth/page-guard';
 import { buildUserInfoHeaders } from '@/lib/auth';
-import { autoDetectColumnMapping, normalizeHeadersForCompare as normalizeHeadersForCompareFn, getColumnMappingDiagnostics } from '@/lib/column-mapping-rules';
+import { autoDetectColumnMapping, normalizeHeadersForCompare as normalizeHeadersForCompareFn, getColumnMappingDiagnostics, buildHeaderFingerprint } from '@/lib/column-mapping-rules';
 import { flattenBundleDraftsToFlatOrders } from '@/lib/order-parse-bundles';
 import { buildExcelPreviewRows, normalizeExcelSheetRows, resolveExcelParsePayload } from '@/lib/order-parse-excel';
 import { findUserByIdOrName, getUserDisplayName, isOperatorAssignableRole, isSalesAssignableRole } from '@/lib/roles';
@@ -665,7 +665,8 @@ export default function OrderParsePage() {
     }
 
     const normalizedHeaders = normalizeHeadersForCompare(currentHeaders);
-    const fingerprint = normalizedHeaders.join('|');
+    // 使用与后端一致的 SHA256 指纹计算方式
+    const fingerprint = buildHeaderFingerprint(currentHeaders);
 
     try {
       const res = await fetch(
