@@ -13,9 +13,18 @@ interface ReceiptRow {
   id: string;
   record_id: string;
   supplier_id?: string | null;
+  supplier_name?: string | null;
   express_company?: string | null;
   tracking_no?: string | null;
+  freight_cost?: number | null;
   match_status?: string | null;
+}
+
+// 追加物流信息（用 ";" 隔开）
+function appendLogisticsInfo(existing: string | null, newValue: string | null): string {
+  if (!newValue) return existing || '';
+  if (!existing) return newValue;
+  return `${existing}; ${newValue}`;
 }
 
 // 获取回单导入记录详情
@@ -65,7 +74,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// 手动匹配回单与订单
+// 手动匹配回单与订单（支持部分回单，移除发货方一致性校验）
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -86,7 +95,7 @@ export async function PATCH(
 
     const { data: receipt, error: receiptError } = await client
       .from('return_receipts')
-      .select('id, record_id, supplier_id, express_company, tracking_no, match_status')
+      .select('id, record_id, express_company, tracking_no, freight_cost, match_status')
       .eq('id', receiptId)
       .single<ReceiptRow>();
 
@@ -100,15 +109,16 @@ export async function PATCH(
       .single();
 
     if (orderError) throw new Error(`查询订单失败: ${orderError.message}`);
-    if (receipt.supplier_id && order.supplier_id && receipt.supplier_id !== order.supplier_id) {
-      return NextResponse.json({ success: false, error: '回单与订单发货方不一致，无法关联' }, { status: 400 });
-    }
+
+    // 移除发货方一致性校验（发货方由订单决定，不再强制校验）
 
     // 更新回单
     const { error: updateError } = await client
       .from('return_receipts')
       .update({
         order_id: orderId,
+        supplier_id: order.supplier_id || null,
+        supplier_name: order.supplier_name || null,
         match_status: 'manual_matched',
         matched_at: new Date().toISOString(),
       })
@@ -117,18 +127,32 @@ export async function PATCH(
     if (updateError) throw new Error(`更新回单失败: ${updateError.message}`);
 
     const now = new Date().toISOString();
-    const orderUpdatePayload: Record<string, string> = {
-      status: 'returned',
+
+    // 获取当前订单的物流信息（用于追加模式）
+    const existingTrackingNo = order.tracking_no || '';
+    const existingExpressCompany = order.express_company || '';
+    const hasExistingReceipt = Boolean(existingTrackingNo) && order.status !== 'returned';
+
+    // 物流信息追加策略
+    const newTrackingNo = appendLogisticsInfo(existingTrackingNo, receipt.tracking_no ?? null);
+    const newExpressCompany = appendLogisticsInfo(existingExpressCompany, receipt.express_company ?? null);
+
+    // 状态判断
+    const newStatus = hasExistingReceipt ? 'partial_returned' : 'returned';
+
+    const orderUpdatePayload: Record<string, unknown> = {
+      status: newStatus,
       returned_at: now,
       updated_at: now,
     };
 
-    if (receipt.express_company) {
-      orderUpdatePayload.express_company = receipt.express_company;
+    if (receipt.express_company || receipt.tracking_no) {
+      orderUpdatePayload.express_company = newExpressCompany || undefined;
+      orderUpdatePayload.tracking_no = newTrackingNo || undefined;
     }
 
-    if (receipt.tracking_no) {
-      orderUpdatePayload.tracking_no = receipt.tracking_no;
+    if (receipt.freight_cost !== undefined && receipt.freight_cost !== null) {
+      orderUpdatePayload.freight_cost = receipt.freight_cost;
     }
 
     const { error: orderUpdateError } = await client
@@ -142,6 +166,7 @@ export async function PATCH(
       orderId,
       expressCompany: receipt.express_company,
       trackingNo: receipt.tracking_no,
+      freightCost: receipt.freight_cost,
       returnedAt: now,
     });
 
@@ -174,6 +199,7 @@ export async function PATCH(
         orderId,
         orderNo: order.order_no,
         resolvedConflict: receipt.match_status === 'conflict',
+        isPartialReturn: hasExistingReceipt,
       },
     });
   } catch (error) {

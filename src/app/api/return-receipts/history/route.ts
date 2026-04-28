@@ -14,6 +14,8 @@ interface ImportedReceiptInput {
   tracking_no?: string;
   shipDate?: string | null;
   ship_date?: string | null;
+  freightCost?: number;
+  freight_cost?: number;
   warehouse?: string;
   quantity?: number;
   price?: number | null;
@@ -25,6 +27,9 @@ interface ImportedReceiptInput {
   ['物流单号']?: string;
   ['发货日期']?: string | null;
   ['日期']?: string | null;
+  ['运费']?: number | string;
+  ['运费成本']?: number | string;
+  ['快递费']?: number | string;
 }
 
 type DuplicateReason = 'batch_duplicate' | 'existing_receipt';
@@ -35,6 +40,7 @@ type NormalizedReceiptIdentity = {
   expressCompany: string;
   trackingNo: string;
   shipDate: string | null;
+  freightCost: number | null;
   warehouse: string;
   quantity: number;
   price: number | null;
@@ -60,12 +66,15 @@ function normalizeText(value: unknown) {
 
 function normalizeImportedReceipt(record: ImportedReceiptInput): NormalizedReceiptIdentity {
   const rawPrice = record.price;
+  const rawFreight = record.freightCost || record.freight_cost || record['运费'] || record['运费成本'] || record['快递费'];
+  
   return {
     customerOrderNo: normalizeText(record.customerOrderNo || record.customer_order_no || record['客户订单号']),
     supplierOrderNo: normalizeText(record.supplierOrderNo || record.supplier_order_no || record['发货方单据号']),
     expressCompany: normalizeText(record.expressCompany || record.express_company || record['快递公司']),
     trackingNo: normalizeText(record.trackingNo || record.tracking_no || record['快递单号'] || record['物流单号']),
     shipDate: normalizeText(record.shipDate || record.ship_date || record['发货日期'] || record['日期']) || null,
+    freightCost: typeof rawFreight === 'number' ? rawFreight : rawFreight ? Number(rawFreight) : null,
     warehouse: normalizeText(record.warehouse),
     quantity: record.quantity || 1,
     price: typeof rawPrice === 'number' ? rawPrice : rawPrice ? Number(rawPrice) : null,
@@ -153,6 +162,7 @@ function mapReceipt(receipt: Record<string, unknown>) {
     expressCompany: receipt.express_company,
     trackingNo: receipt.tracking_no,
     shipDate: receipt.ship_date,
+    freightCost: receipt.freight_cost,
     matchStatus: receipt.match_status,
     orderId: receipt.order_id,
     orderNo: receipt.order_no,
@@ -336,9 +346,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
+    // supplierId 改为可选（系统按订单号自动匹配发货方）
     const { supplierId, supplierName, receipts, fileName, importedBy } = body;
 
-    if (!supplierId || !Array.isArray(receipts)) {
+    if (!receipts || !Array.isArray(receipts)) {
       return NextResponse.json({ success: false, error: '参数错误' }, { status: 400 });
     }
 
@@ -447,13 +458,14 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 创建导入记录
+    // 创建导入记录（supplierId 改为可选）
     const { data: record, error: recordError } = await client
       .from('return_receipt_records')
       .insert({
-        supplier_id: supplierId,
-        supplier_name: supplierName,
+        // supplier_id 改为可选
+        ...(supplierId ? { supplier_id: supplierId, supplier_name: supplierName } : {}),
         file_name: fileName,
+        file_url: fileName, // 兼容旧字段
         total_count: insertedCount,
         matched_count: 0,
         unmatched_count: insertedCount,
@@ -467,13 +479,13 @@ export async function POST(request: NextRequest) {
     // 批量插入回单明细
     const receiptData = acceptedReceipts.map(({ receipt }) => ({
       record_id: record.id,
-      supplier_id: supplierId,
-      supplier_name: supplierName,
+      // supplier_id 改为可选（匹配成功后再填充）
       customer_order_no: receipt.customerOrderNo,
       supplier_order_no: receipt.supplierOrderNo,
       express_company: receipt.expressCompany,
       tracking_no: receipt.trackingNo,
       ship_date: receipt.shipDate,
+      freight_cost: receipt.freightCost,
       warehouse: receipt.warehouse,
       quantity: receipt.quantity,
       price: receipt.price,

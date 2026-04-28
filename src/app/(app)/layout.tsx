@@ -66,6 +66,7 @@ const menuItems: MenuItem[] = [
       { label: '角色与权限', href: '/roles', icon: Settings },
       { label: '预警设置', href: '/alerts', icon: Bell },
       { label: '模板配置', href: '/templates', icon: Settings },
+      { label: '系统配置', href: '/system-configs', icon: Settings },
     ]
   },
 ];

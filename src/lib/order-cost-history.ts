@@ -183,6 +183,7 @@ export async function syncOrderCostHistoryAfterReturn(
     orderId: string;
     expressCompany?: string | null;
     trackingNo?: string | null;
+    freightCost?: number | null;
     returnedAt?: string;
   }
 ) {
@@ -197,6 +198,10 @@ export async function syncOrderCostHistoryAfterReturn(
 
   if (payload.trackingNo) {
     updatePayload.tracking_no = payload.trackingNo;
+  }
+
+  if (payload.freightCost !== undefined && payload.freightCost !== null) {
+    updatePayload.express_fee = payload.freightCost;
   }
 
   const { error } = await client

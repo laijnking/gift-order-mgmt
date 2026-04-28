@@ -686,6 +686,7 @@ export async function POST(request: NextRequest) {
       }
 
       const duplicateDetails: DuplicateOrderDetail[] = [];
+      let batchSkippedCount = 0;
       const batchSeen = new Set<string>();
       const deduplicatedOrders = ordersToInsert.filter((order) => {
         const orderNo = String(order.order_no || '').trim();
@@ -700,6 +701,7 @@ export async function POST(request: NextRequest) {
             receiverName: String(order.receiver_name || ''),
             reason: 'batch_duplicate',
           });
+          batchSkippedCount++;
           return false;
         }
 
@@ -756,7 +758,8 @@ export async function POST(request: NextRequest) {
           reason: 'existing_order',
           existingSysOrderNo: existing.sysOrderNo,
         });
-        return false;
+        // 允许保存重复订单（客户一个订单可能有多个商品），但记录警告
+        return true;
       });
 
       if (freshOrders.length === 0) {
@@ -766,12 +769,12 @@ export async function POST(request: NextRequest) {
           total: 0,
           importBatch,
           duplicateSummary: {
-            totalSkipped: duplicateDetails.length,
+            totalSkipped: batchSkippedCount,
             batchDuplicateCount: duplicateDetails.filter((item) => item.reason === 'batch_duplicate').length,
             existingDuplicateCount: duplicateDetails.filter((item) => item.reason === 'existing_order').length,
             details: duplicateDetails,
           },
-          message: `没有创建新订单，${duplicateDetails.length} 条记录因重复被跳过`
+          message: `没有创建新订单，${batchSkippedCount} 条记录因重复被跳过`
         });
       }
 
@@ -784,14 +787,14 @@ export async function POST(request: NextRequest) {
         total: data?.length || 0,
         importBatch,
         duplicateSummary: {
-          totalSkipped: duplicateDetails.length,
+          totalSkipped: batchSkippedCount,
           batchDuplicateCount: duplicateDetails.filter((item) => item.reason === 'batch_duplicate').length,
           existingDuplicateCount: duplicateDetails.filter((item) => item.reason === 'existing_order').length,
           details: duplicateDetails,
         },
         message:
-          duplicateDetails.length > 0
-            ? `成功创建 ${data?.length || 0} 条订单，另有 ${duplicateDetails.length} 条重复记录已跳过`
+          batchSkippedCount > 0
+            ? `成功创建 ${data?.length || 0} 条订单，另有 ${batchSkippedCount} 条重复记录已跳过`
             : `成功创建 ${data?.length || 0} 条订单`
       });
     }
@@ -960,6 +963,7 @@ export async function POST(request: NextRequest) {
     }
 
     const duplicateDetails: DuplicateOrderDetail[] = [];
+    let batchSkippedCount = 0;
     const batchSeen = new Set<string>();
     const deduplicatedOrders = ordersToInsert.filter((order) => {
       const orderNo = String(order.order_no || '').trim();
@@ -974,6 +978,7 @@ export async function POST(request: NextRequest) {
           receiverName: String(order.receiver_name || ''),
           reason: 'batch_duplicate',
         });
+        batchSkippedCount++;
         return false;
       }
 
@@ -1030,7 +1035,8 @@ export async function POST(request: NextRequest) {
         reason: 'existing_order',
         existingSysOrderNo: existing.sysOrderNo,
       });
-      return false;
+      // 允许保存重复订单（客户一个订单可能有多个商品），但记录警告
+      return true;
     });
 
     if (freshOrders.length === 0) {
@@ -1040,7 +1046,7 @@ export async function POST(request: NextRequest) {
         total: 0,
         importBatch,
         duplicateSummary: {
-          totalSkipped: duplicateDetails.length,
+          totalSkipped: batchSkippedCount,
           batchDuplicateCount: duplicateDetails.filter((item) => item.reason === 'batch_duplicate').length,
           existingDuplicateCount: duplicateDetails.filter((item) => item.reason === 'existing_order').length,
           details: duplicateDetails,
@@ -1054,7 +1060,7 @@ export async function POST(request: NextRequest) {
           matched: 0,
           matchRate: '0.0%'
         },
-        message: `没有导入新订单，${duplicateDetails.length} 条记录因重复被跳过`
+        message: `没有导入新订单，${batchSkippedCount} 条记录因重复被跳过`
       });
     }
 
@@ -1068,7 +1074,7 @@ export async function POST(request: NextRequest) {
       total: data?.length || 0,
       importBatch,
       duplicateSummary: {
-        totalSkipped: duplicateDetails.length,
+        totalSkipped: batchSkippedCount,
         batchDuplicateCount: duplicateDetails.filter((item) => item.reason === 'batch_duplicate').length,
         existingDuplicateCount: duplicateDetails.filter((item) => item.reason === 'existing_order').length,
         details: duplicateDetails,
@@ -1086,8 +1092,8 @@ export async function POST(request: NextRequest) {
           : '0.0%'
       },
       message:
-        duplicateDetails.length > 0
-          ? `成功导入 ${data?.length || 0} 条订单，另有 ${duplicateDetails.length} 条重复记录已跳过`
+        batchSkippedCount > 0
+          ? `成功导入 ${data?.length || 0} 条订单，另有 ${batchSkippedCount} 条重复记录已跳过`
           : `成功导入 ${data?.length || 0} 条订单，其中 ${Math.max(freshOrders.length - matchStats.none, 0)} 条已匹配商品档案`
     });
 
@@ -1151,7 +1157,7 @@ export async function PATCH(request: NextRequest) {
       province,
     } = body;
 
-    const urlId = request.nextUrl.searchParams.get('id');
+    const urlId = request.nextUrl?.searchParams.get('id') ?? null;
     const targetId = bodyId || orderId || urlId;
     debugInfo.extractedId = targetId;
     debugInfo.urlId = urlId;

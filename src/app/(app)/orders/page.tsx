@@ -353,36 +353,46 @@ export default function OrdersPage() {
       ? Array.from(selectedOrders).map(o => o.id)
       : filteredOrders.filter(o => o.status === ORDER_STATUS_FEEDBACKED).map(o => o.id);
     if (targetIds.length === 0) { toast.error('没有可导出金蝶的订单（需已反馈状态）'); return; }
-    const targetOrders = orders.filter(o => targetIds.includes(o.id) && o.status === ORDER_STATUS_FEEDBACKED);
-    const header = '系统单号\t客户单号\t客户\t收货人\t电话\t地址\t商品\t数量\t发货方\t快递公司\t快递单号\t业务员\t跟单员\t派发批次';
-    const rows = targetOrders.map(o => [
-      o.sysOrderNo || '', o.orderNo || '', o.customerName || '',
-      o.receiver.name || '', o.receiver.phone || '', o.receiver.address || '',
-      o.items.map(i => i.productName || i.cuProductName || '').join('; '),
-      o.items.reduce((sum, item) => sum + (item.quantity || 0), 0),
-      o.supplierName || '', o.expressCompany || '', o.trackingNo || '',
-      o.salespersonName || o.salesperson || '', o.operatorName || '', o.assignedBatch || '',
-    ].join('\t'));
-    const blob = new Blob(['\ufeff' + header + '\n' + rows.join('\n')], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `金蝶导出_${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    const promises = targetIds.map(id =>
-      fetch('/api/orders', {
-        method: 'PATCH',
-        headers: session.authHeaders(),
-        body: JSON.stringify({ id, status: ORDER_STATUS_COMPLETED }),
-      })
-    );
-    const results = await Promise.all(promises);
-    const dataArr = await Promise.all(results.map(r => r.json()));
-    const successCount = dataArr.filter(d => d.success).length;
-    toast.success(`已导出金蝶并归档 ${successCount} 条订单`);
-    setSelectedOrders(new Set());
-    fetchOrders();
+
+    try {
+      const res = await fetch('/api/export-kingdee/batch', {
+        method: 'POST',
+        headers: { ...session.authHeaders() },
+        body: JSON.stringify({ orderIds: targetIds }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: '导出失败' }));
+        toast.error(errorData.error || '导出金蝶失败');
+        return;
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `金蝶导出_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      // 更新订单状态为 completed
+      const promises = targetIds.map(id =>
+        fetch('/api/orders', {
+          method: 'PATCH',
+          headers: session.authHeaders(),
+          body: JSON.stringify({ id, status: ORDER_STATUS_COMPLETED }),
+        })
+      );
+      const results = await Promise.all(promises);
+      const dataArr = await Promise.all(results.map(r => r.json()));
+      const successCount = dataArr.filter(d => d.success).length;
+      toast.success(`已导出金蝶并归档 ${successCount} 条订单`);
+      setSelectedOrders(new Set());
+      fetchOrders();
+    } catch (error) {
+      console.error('导出金蝶失败:', error);
+      toast.error('导出金蝶失败，请稍后重试');
+    }
   }, [selectedOrders, filteredOrders, orders, session.authHeaders, fetchOrders, setSelectedOrders]);
 
   // --- Export ---

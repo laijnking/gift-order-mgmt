@@ -59,9 +59,10 @@ export async function GET(request: NextRequest) {
 
     let supplierQuery = client.from('shippers').select('*');
     if (supplierIds.length > 0 && supplierNames.length > 0) {
-      supplierQuery = supplierQuery.or(
-        `id.in.(${supplierIds.join(',')}),name.in.(${supplierNames.map(n => `"${n}"`).join(',')})`
-      );
+      // Supabase .or() 不支持 .in()，需要展开为多个 .eq() 条件
+      const idOrConditions = supplierIds.map(id => `id.eq.${id}`).join(',');
+      const nameOrConditions = supplierNames.map(n => `name.eq."${n}"`).join(',');
+      supplierQuery = supplierQuery.or(`${idOrConditions},${nameOrConditions}`);
     } else if (supplierIds.length > 0) {
       supplierQuery = supplierQuery.in('id', supplierIds);
     } else if (supplierNames.length > 0) {

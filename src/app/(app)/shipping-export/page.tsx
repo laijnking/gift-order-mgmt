@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/select';
 import {
   Package, FileDown, Search, RefreshCw, CheckCircle2, Loader2,
-  FileSpreadsheet, Clock, History
+  FileSpreadsheet, Clock, History, AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { buildUserInfoHeaders, useAuth } from '@/lib/auth';
@@ -58,6 +58,10 @@ interface ExportResult {
   orderCount: number;
   fileName: string;
   templateSource?: string;
+}
+
+interface ExportError {
+  message: string;
 }
 
 interface ExportSummary {
@@ -100,6 +104,7 @@ export default function ShippingExportPage() {
   const [showResultDialog, setShowResultDialog] = useState(false);
   const [exportSummary, setExportSummary] = useState<ExportSummary | null>(null);
   const [exportResults, setExportResults] = useState<ExportResult[]>([]);
+  const [exportErrors, setExportErrors] = useState<ExportError[]>([]);
   const [downloadingZip, setDownloadingZip] = useState(false);
 
   // 加载待导出发货方
@@ -220,15 +225,25 @@ export default function ShippingExportPage() {
       });
 
       const data = await res.json();
-      if (!data.success) throw new Error(data.error);
 
-      if (!preview && data.data.zipBase64) {
+      // 如果 API 返回错误（无有效 data），抛出错误
+      if (!data.data) {
+        throw new Error(data.error || '导出失败');
+      }
+
+      // 即使有部分错误也显示结果对话框
+      const hasErrors = data.data?.errors?.length > 0;
+      const hasDownload = !preview && data.data?.zipBase64;
+
+      // 触发下载（如果有）
+      if (hasDownload) {
         triggerDownload(
           `data:application/zip;base64,${data.data.zipBase64}`,
           data.data.zipFileName
         );
       }
 
+      // 保存结果并显示对话框
       setExportSummary({
         recordId: data.data.recordId,
         zipFileName: data.data.zipFileName,
@@ -239,13 +254,23 @@ export default function ShippingExportPage() {
         totalOrderCount: data.data.totalOrderCount,
       });
       setExportResults(data.data.details || []);
+      setExportErrors(data.data.errors || []);
       setShowResultDialog(true);
 
-      toast.success(
-        preview
-          ? `预览：${data.data.totalSupplierCount} 个发货方，共 ${data.data.totalOrderCount} 个订单`
-          : `导出成功：${data.data.totalSupplierCount} 个发货方，共 ${data.data.totalOrderCount} 个订单`
-      );
+      // 根据是否有错误显示不同提示
+      if (hasErrors) {
+        toast.warning(
+          preview
+            ? `预览完成：${data.data.totalSupplierCount} 个发货方，共 ${data.data.totalOrderCount} 个订单（${data.data.errors?.length} 条失败）`
+            : `导出完成：${data.data.totalSupplierCount} 个发货方，共 ${data.data.totalOrderCount} 个订单（${data.data.errors?.length} 条失败）`
+        );
+      } else {
+        toast.success(
+          preview
+            ? `预览：${data.data.totalSupplierCount} 个发货方，共 ${data.data.totalOrderCount} 个订单`
+            : `导出成功：${data.data.totalSupplierCount} 个发货方，共 ${data.data.totalOrderCount} 个订单`
+        );
+      }
 
       if (!preview) {
         setSelectedPending([]);
@@ -667,6 +692,21 @@ export default function ShippingExportPage() {
                 </Badge>
               </div>
             ))}
+
+            {/* 错误列表 */}
+            {exportErrors.length > 0 && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 space-y-2">
+                <div className="flex items-center gap-2 text-red-700 font-medium">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <span>导出失败（{exportErrors.length} 条）</span>
+                </div>
+                {exportErrors.map((err, i) => (
+                  <div key={i} className="text-sm text-red-600 pl-6">
+                    {err.message}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">

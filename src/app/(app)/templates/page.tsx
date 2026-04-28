@@ -329,10 +329,21 @@ export default function TemplatesPage() {
         isDefault: template.isDefault ?? false,
         isActive: template.isActive ?? true,
       });
-      const mappingArray = Object.entries(template.fieldMappings || {}).map(([excelColumn, systemField]) => ({
-        excelColumn,
-        systemField: systemField as string,
-      }));
+      // 兼容处理：fieldMappings 可能是对象格式（旧数据）或数组格式（新数据）
+      let mappingArray: { excelColumn: string; systemField: string }[] = [];
+      if (Array.isArray(template.fieldMappings)) {
+        // 新数据：数组格式
+        mappingArray = template.fieldMappings.map((m: any) => ({
+          excelColumn: m.excelColumn || '',
+          systemField: m.systemField || '',
+        }));
+      } else if (template.fieldMappings && typeof template.fieldMappings === 'object') {
+        // 旧数据：对象格式，转换为数组但顺序可能丢失（这是旧数据的已知问题）
+        mappingArray = Object.entries(template.fieldMappings || {}).map(([excelColumn, systemField]) => ({
+          excelColumn,
+          systemField: systemField as string,
+        }));
+      }
       if (mappingArray.length === 0) mappingArray.push({ excelColumn: '', systemField: '' });
       setMappings(mappingArray);
     } else {
@@ -465,12 +476,10 @@ export default function TemplatesPage() {
     }
 
     try {
-      const fieldMappings: Record<string, string> = {};
-      mappings.forEach(m => {
-        if (m.excelColumn.trim() && m.systemField) {
-          fieldMappings[m.excelColumn.trim()] = m.systemField;
-        }
-      });
+      // 使用有序数组格式存储 fieldMappings，保持字段顺序
+      const fieldMappingsArray = mappings
+        .filter(m => m.excelColumn.trim() && m.systemField)
+        .map(m => ({ excelColumn: m.excelColumn.trim(), systemField: m.systemField }));
 
       const url = editingTemplate ? `/api/templates/${editingTemplate.id}` : '/api/templates';
       const method = editingTemplate ? 'PUT' : 'POST';
@@ -480,7 +489,7 @@ export default function TemplatesPage() {
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({
           ...formData,
-          fieldMappings,
+          fieldMappings: fieldMappingsArray,
         }),
       });
 

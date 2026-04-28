@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-export type TemplateBusinessType = 'shipping' | 'customer_feedback' | 'common';
+export type TemplateBusinessType = 'shipping' | 'customer_feedback' | 'common' | 'kingdee';
 export type TemplateTargetType = 'customer' | 'supplier';
 
 /** DB row shape — mirrors templates table (snake_case, nullable columns) */
@@ -20,7 +20,7 @@ export type TemplateRecord = {
   target_type: string | null;
   target_id: string | null;
   target_name: string | null;
-  field_mappings: Record<string, string> | string | null;
+  field_mappings: Record<string, string> | string | null | Array<{ excelColumn: string; systemField: string }>;
 };
 
 export function normalizeTemplateType(type?: string | null): TemplateBusinessType {
@@ -33,6 +33,9 @@ export function normalizeTemplateType(type?: string | null): TemplateBusinessTyp
     case 'feedback':
     case 'customer_feedback':
       return 'customer_feedback';
+    case 'kingdee':
+    case 'kingdee_export':
+      return 'kingdee';
     default:
       return 'common';
   }
@@ -77,28 +80,62 @@ export function migrateFieldMappings(mappings: Record<string, string>): Record<s
   return migrated;
 }
 
-export function parseTemplateFieldMappings(record: TemplateRecord) {
-  let raw: Record<string, string> | string | null = record.field_mappings;
+// 解析 field_mappings 并返回有序数组（保持用户设置的列顺序）
+export function parseTemplateFieldMappingsArray(record: TemplateRecord): Array<{ excelColumn: string; systemField: string }> {
+  let raw: Record<string, string> | string | null | Array<{ excelColumn: string; systemField: string }> = record.field_mappings;
 
+  // 如果是字符串，尝试解析为 JSON
   if (typeof raw === 'string') {
     try {
-      raw = JSON.parse(raw) as Record<string, string>;
+      raw = JSON.parse(raw);
     } catch {
       raw = null;
     }
   }
 
-  if (raw && typeof raw === 'object') {
-    return migrateFieldMappings(raw as Record<string, string>);
+  // 如果是数组格式，直接返回（JSON 数组本身保持顺序）
+  if (Array.isArray(raw)) {
+    return raw.map(item => ({
+      excelColumn: item.excelColumn || '',
+      systemField: LEGACY_TO_CAMEL[item.systemField] ?? (item.systemField || ''),
+    }));
   }
 
+  // 如果是对象格式，转换为数组（顺序可能丢失，这是旧数据的已知问题）
+  if (raw && typeof raw === 'object') {
+    return Object.entries(raw as Record<string, string>).map(([excelColumn, systemField]) => ({
+      excelColumn,
+      systemField: LEGACY_TO_CAMEL[systemField] ?? systemField,
+    }));
+  }
+
+  // 尝试从 config.fieldMappings 获取
   const config = record.config || {};
   const configMappings = config.fieldMappings;
   if (configMappings && typeof configMappings === 'object') {
-    return migrateFieldMappings(configMappings as Record<string, string>);
+    if (Array.isArray(configMappings)) {
+      return configMappings.map(item => ({
+        excelColumn: item.excelColumn || '',
+        systemField: LEGACY_TO_CAMEL[item.systemField] ?? (item.systemField || ''),
+      }));
+    }
+    return Object.entries(configMappings as Record<string, string>).map(([excelColumn, systemField]) => ({
+      excelColumn,
+      systemField: LEGACY_TO_CAMEL[systemField] ?? systemField,
+    }));
   }
 
-  return {};
+  return [];
+}
+
+// 保留原有的 parseTemplateFieldMappings 函数（返回对象格式，用于兼容）
+export function parseTemplateFieldMappings(record: TemplateRecord): Record<string, string> {
+  const arr = parseTemplateFieldMappingsArray(record);
+  const result: Record<string, string> = {};
+  for (const item of arr) {
+    result[item.excelColumn] = item.systemField;
+  }
+  return result;
 }
 
 export function transformTemplateRecord(record: TemplateRecord) {

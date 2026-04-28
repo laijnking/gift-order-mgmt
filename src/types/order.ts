@@ -78,7 +78,8 @@ export interface Order {
   
   // 快递信息
   expressCompany?: ExpressCompany;
-  trackingNo?: string;
+  trackingNo?: string;       // 多值时用 ";" 隔开
+  freightCost?: number;      // 运费成本
   
   // 发货方分配
   supplierId?: string;
@@ -207,8 +208,11 @@ export interface ReturnRecord {
   id: string;
   orderId: string;
   orderNo: string;
+  supplierId?: string;      // 发货方ID（可选，由订单决定）
+  supplierName?: string;     // 发货方名称
   expressCompany: string;
-  trackingNo: string;
+  trackingNo: string;         // 多值时用 ";" 隔开
+  freightCost?: number;      // 运费成本
   status?: string;
   receivedAt: string;
   note?: string;

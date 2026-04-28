@@ -4,7 +4,24 @@ import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission } from '@/lib/server-auth';
 import { PERMISSIONS } from '@/lib/permissions';
 
-// 批量确认回单（匹配订单并更新状态）
+type ReceiptRow = {
+  id: string;
+  order_id: string | null;
+  express_company: string | null;
+  tracking_no: string | null;
+  freight_cost: number | null;
+  supplier_id: string | null;
+  supplier_name: string | null;
+};
+
+// 追加物流信息（用 ";" 隔开）
+function appendLogisticsInfo(existing: string | null, newValue: string | null): string {
+  if (!newValue) return existing || '';
+  if (!existing) return newValue;
+  return `${existing}; ${newValue}`;
+}
+
+// 批量确认回单（支持部分回单，物流信息追加）
 export async function POST(request: NextRequest) {
   const authError = requirePermission(request, PERMISSIONS.ORDERS_EDIT);
   if (authError) return authError;
@@ -19,6 +36,7 @@ export async function POST(request: NextRequest) {
     }
 
     let matchedCount = 0;
+    let partialReturnCount = 0;
     const updatedOrderIds: string[] = [];
 
     // 获取回单明细
@@ -31,16 +49,37 @@ export async function POST(request: NextRequest) {
     if (receiptsError) throw new Error(`查询回单失败: ${receiptsError.message}`);
 
     // 批量更新匹配的订单
-    for (const receipt of (receipts || [])) {
+    for (const receipt of ((receipts || []) as ReceiptRow[])) {
       if (receipt.order_id) {
         const now = new Date().toISOString();
+
+        // 获取当前订单的物流信息（用于追加模式）
+        const { data: existingOrder } = await client
+          .from('orders')
+          .select('tracking_no, express_company, status')
+          .eq('id', receipt.order_id)
+          .single();
+
+        const existingTrackingNo = existingOrder?.tracking_no || '';
+        const existingExpressCompany = existingOrder?.express_company || '';
+        const hasExistingReceipt = Boolean(existingTrackingNo) && 
+          existingOrder?.status !== 'returned';
+
+        // 物流信息追加策略
+        const newTrackingNo = appendLogisticsInfo(existingTrackingNo, receipt.tracking_no);
+        const newExpressCompany = appendLogisticsInfo(existingExpressCompany, receipt.express_company);
+
+        // 状态判断：如果订单已有回单记录，则为部分回单
+        const newStatus = hasExistingReceipt ? 'partial_returned' : 'returned';
+
         // 更新订单物流信息
         const { error: updateError } = await client
           .from('orders')
           .update({
-            express_company: receipt.express_company,
-            tracking_no: receipt.tracking_no,
-            status: 'returned',
+            express_company: newExpressCompany || undefined,
+            tracking_no: newTrackingNo || undefined,
+            freight_cost: receipt.freight_cost || undefined,
+            status: newStatus,
             returned_at: now,
             updated_at: now,
           })
@@ -48,6 +87,7 @@ export async function POST(request: NextRequest) {
 
         if (!updateError) {
           matchedCount++;
+          if (hasExistingReceipt) partialReturnCount++;
           updatedOrderIds.push(receipt.order_id);
 
           // 更新回单状态为已确认
@@ -60,32 +100,25 @@ export async function POST(request: NextRequest) {
             orderId: receipt.order_id,
             expressCompany: receipt.express_company,
             trackingNo: receipt.tracking_no,
+            freightCost: receipt.freight_cost,
             returnedAt: now,
           });
         }
       }
     }
 
-    // 扣减发货方库存（简化版）
-    // 实际实现需要根据订单商品查询发货方SKU映射，然后扣减对应库存
-    for (const orderId of updatedOrderIds) {
-      const { data: order } = await client
-        .from('orders')
-        .select('supplier_id')
-        .eq('id', orderId)
-        .single();
-
-      if (order?.supplier_id) {
-        // 简化：记录库存变更日志
-        console.log(`订单 ${orderId} 发货，发货方 ${order.supplier_id} 库存扣减`);
-      }
+    // 生成结果消息
+    let message = `成功确认 ${matchedCount} 个回单`;
+    if (partialReturnCount > 0) {
+      message += `（其中 ${partialReturnCount} 个为部分回单追加）`;
     }
 
     return NextResponse.json({
       success: true,
-      message: `成功确认${matchedCount}个回单，${matchedCount}个订单状态已更新为已回单`,
+      message,
       data: {
         matchedCount,
+        partialReturnCount,
         updatedOrderIds,
       },
     });

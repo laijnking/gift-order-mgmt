@@ -79,8 +79,8 @@
         ]
       },
       "expected": {
-        "createdCount": 1,
-        "totalSkipped": 1,
+        "createdCount": 2,
+        "totalSkipped": 0,
         "batchDuplicateCount": 0,
         "existingDuplicateCount": 1,
         "details": [
@@ -127,11 +127,11 @@
         ]
       },
       "expected": {
-        "createdCount": 0,
-        "totalSkipped": 2,
+        "createdCount": 1,
+        "totalSkipped": 1,
         "batchDuplicateCount": 1,
         "existingDuplicateCount": 1,
-        "messageIncludes": "没有创建新订单",
+        "messageIncludes": "成功创建",
         "details": [
           {
             "orderNo": "ZERO-001",
@@ -175,11 +175,11 @@
         ]
       },
       "expected": {
-        "createdCount": 0,
-        "totalSkipped": 1,
+        "createdCount": 1,
+        "totalSkipped": 0,
         "batchDuplicateCount": 0,
         "existingDuplicateCount": 1,
-        "messageIncludes": "没有创建新订单",
+        "messageIncludes": "成功创建",
         "details": [
           {
             "orderNo": "DETAIL-001",

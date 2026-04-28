@@ -129,6 +129,7 @@ const PATTERNS: Record<string, Array<{ regex: RegExp; exact?: boolean; priority:
     { regex: /^商品规格$/, exact: true, priority: 10 },
     { regex: /^规格型号$/, exact: true, priority: 10 },
     { regex: /^型号规格$/, exact: true, priority: 9 },
+    { regex: /^规格名称$/, exact: true, priority: 9 },
     { regex: /^规格$/, exact: true, priority: 7 },
     { regex: /^型号$/, exact: true, priority: 7 },
     { regex: /^商品型号$/, exact: true, priority: 10 },
@@ -192,6 +193,7 @@ const PATTERNS: Record<string, Array<{ regex: RegExp; exact?: boolean; priority:
     { regex: /^收货地址$/, exact: true, priority: 9 },
     { regex: /^收件地址$/, exact: true, priority: 8 },
     { regex: /^详细地址$/, exact: true, priority: 7 },
+    { regex: /^省市区详细地址$/, exact: true, priority: 10 },
   ],
   express_company: [
     { regex: /^物流公司$/, exact: true, priority: 10 },

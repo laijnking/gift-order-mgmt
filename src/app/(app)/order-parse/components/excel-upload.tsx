@@ -136,7 +136,7 @@ export function ExcelUpload({
   }
 
   return (
-    <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-hidden">
+    <div className="flex flex-col gap-3 shrink-0">
       {/* File info */}
       <div className="flex flex-col gap-2 rounded-md bg-muted p-2 text-sm sm:flex-row sm:items-center sm:justify-between shrink-0">
         <div className="flex min-w-0 items-center gap-2 text-sm">

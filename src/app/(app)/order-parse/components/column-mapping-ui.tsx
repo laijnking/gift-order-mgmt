@@ -15,7 +15,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { ChevronDown } from 'lucide-react';
 import {
   COLUMN_OPTIONS,
@@ -57,12 +56,12 @@ export function ColumnMappingUI({
         </div>
       </CollapsibleTrigger>
       <CollapsibleContent className="flex-1 min-h-0 overflow-hidden flex flex-col">
-        <ScrollArea className="flex-1 mt-2 pr-2">
+        <div className="flex-1 overflow-y-auto mt-2 pr-2">
           <div className="space-y-2 pb-2">
             {headers.map((header, idx) => (
               <div key={idx} className="flex items-center gap-2 bg-muted/50 p-2 rounded">
                 <code className="text-xs bg-muted px-2 py-1 rounded min-w-[80px] max-w-[120px] truncate flex-shrink-0">
-{header || `列${idx + 1}`}
+                  {header || `列${idx + 1}`}
                 </code>
                 <span className="text-muted-foreground text-xs flex-shrink-0">→</span>
                 <Select
@@ -116,7 +115,7 @@ onValueChange={(v) => {
               </div>
             ))}
           </div>
-        </ScrollArea>
+        </div>
 
         {/* Preview table */}
         <details className="mt-2 shrink-0">

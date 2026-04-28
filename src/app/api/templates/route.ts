@@ -69,6 +69,21 @@ export async function POST(request: NextRequest) {
         .eq('is_default', true);
     }
 
+    // 转换 fieldMappings 为有序数组格式存储（如果已是数组则直接存储，否则转换对象格式）
+    let fieldMappingsArray = body.fieldMappings;
+    if (Array.isArray(body.fieldMappings)) {
+      // 已是数组格式
+      fieldMappingsArray = body.fieldMappings;
+    } else if (body.fieldMappings && typeof body.fieldMappings === 'object') {
+      // 对象格式，转换为有序数组
+      fieldMappingsArray = Object.entries(body.fieldMappings).map(([excelColumn, systemField]) => ({
+        excelColumn,
+        systemField,
+      }));
+    } else {
+      fieldMappingsArray = [];
+    }
+
     const templateData = {
       code: body.code || `TPL-${Date.now()}`,
       name: body.name,
@@ -77,9 +92,9 @@ export async function POST(request: NextRequest) {
       target_type: body.targetType || null,
       target_id: body.targetId || null,
       target_name: body.targetName || null,
-      field_mappings: body.fieldMappings ? JSON.stringify(body.fieldMappings) : '{}',
+      field_mappings: JSON.stringify(fieldMappingsArray),
       config: {
-        fieldMappings: body.fieldMappings || {},
+        fieldMappings: fieldMappingsArray,
       },
       is_default: body.isDefault ?? false,
       is_active: body.isActive !== false,

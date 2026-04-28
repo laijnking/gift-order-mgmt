@@ -35,6 +35,7 @@ const DEFAULT_CUSTOMER_FEEDBACK_MAPPINGS: Record<string, string> = {
   '客户名称': 'customerName',   // context.customerName = order.customer_name
   '发货方名称': 'supplierName',  // context.supplierName = order.supplier_name
   '发货方单据号': 'supplierOrderNo', // context.supplierOrderNo = order.supplier_order_no
+  '客户单据编号': 'customerOrderNo', // context.customerOrderNo = order.customer_order_no
 };
 
 function parseItems(value: unknown): OrderItem[] {

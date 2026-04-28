@@ -11,8 +11,8 @@ import type {
 // 中文列名自动映射配置（简化为最常用的精确匹配，避免冲突）
 const CHINESE_COLUMN_MAPPING: Record<string, string[]> = {
   // 基础信息
-  order_no: [],
-  customer_order_no: ['客户单据编号', '序号', '客户订单号', '订单号','客户订单号','商户订单号', '来源订单', '订单编号'],
+  order_no: ['订单编号', '订单号'],
+  customer_order_no: ['客户单据编号', '序号', '客户订单号', '客户订单号', '商户订单号', '来源订单'],
   bill_date: ['单据日期', '订单日期', '订单创建日期', '创建日期', '下单时间'],
   bill_no: ['单据编号'],
   supplier_order_no: ['发货方单据号', '发货方订单号'],
@@ -21,7 +21,7 @@ const CHINESE_COLUMN_MAPPING: Record<string, string[]> = {
   // 客户商品信息（使用 customer_product_* 作为内部字段名）
   customer_product_name: ['商品', '商品名称', '商品名', '货品名称', '品名', '客户商品名称', '客户商品名', '客户货品名称'],
   customer_product_code: ['商品编码', '商品代码', '货号', '客户商品编码', '客户商品代码', '客户货号'],
-  customer_product_spec: ['商品规格', '规格/型号', '规格型号', '型号规格', '规格', '型号', '商品型号', '客户商品规格', '客户规格型号', '客户型号规格'],
+  customer_product_spec: ['商品规格', '规格/型号', '规格型号', '型号规格', '规格名称', '规格', '型号', '商品型号', '客户商品规格', '客户规格型号', '客户型号规格'],
   quantity: ['商品数量', '下单数量', '数量', '件数', '台数'],
   price: ['单价', '售价'],
   amount: ['价税合计', '含税金额', '金额'],
@@ -32,7 +32,7 @@ const CHINESE_COLUMN_MAPPING: Record<string, string[]> = {
   // 收货信息
   receiver_name: ['收件人姓名', '收货人姓名', '收货人', '收件人', '会员昵称'],
   receiver_phone: ['电话', '收件人手机', '收货人手机号', '收货人电话', '收件人电话', '收货电话', '收件电话', '手机号码', '联系电话'],
-  receiver_address: ['收件人地址', '收货详细地址', '收货人地址', '收货地址', '收件地址', '详细地址'],
+  receiver_address: ['收件人地址', '收货详细地址', '收货人地址', '收货地址', '收件地址', '详细地址', '省市区详细地址'],
   // 快递信息
   express_company: ['物流公司', '快递公司', '承运商'],
   tracking_no: ['物流单号', '快递单号', '运单号', '快递号'],
@@ -432,7 +432,7 @@ async function parseExcelData(
         try {
           const addressParts = extractAddressParts(receiverAddress);
           order = {
-            id: `order_${Date.now()}_${orders.size}`,
+            id: `order_${Date.now()}_${orders.size}_${Math.random().toString(36).slice(2, 8)}`,
             orderNo,
             customerOrderNo,
             billDate,
@@ -481,7 +481,7 @@ async function parseExcelData(
 
       // 创建订单商品明细
       const orderItem: ParsedOrderDraftItem = {
-        id: `item_${Date.now()}_${i}`,
+        id: `item_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 8)}`,
         customerProductName: finalProductName,
         customerProductSpec: finalProductSpec,
         customerProductCode: finalProductCode,

@@ -7,7 +7,14 @@ export type ExportArtifactProvider = 'local' | 's3';
 
 const DEFAULT_EXPORTS_SUBDIR_FALLBACK = path.join('data', 'exports');
 
-function getExportArtifactRoot(): string {
+export interface ExportConfig {
+  provider?: 'local' | 's3';
+  localPath?: string;
+}
+
+function getExportArtifactRoot(config?: ExportConfig): string {
+  // 优先级：数据库配置 > 环境变量 > 默认值
+  if (config?.localPath) return config.localPath;
   const configured = process.env.EXPORT_ARTIFACT_DIR;
   if (configured) return configured;
   const cwd = process.cwd();
@@ -15,7 +22,16 @@ function getExportArtifactRoot(): string {
   return path.join('/app', DEFAULT_EXPORTS_SUBDIR_FALLBACK);
 }
 
-function getExportArtifactProvider(): ExportArtifactProvider {
+function getExportArtifactProvider(config?: ExportConfig): ExportArtifactProvider {
+  // 优先级：数据库配置 > 环境变量
+  if (config?.provider) {
+    // 如果数据库配置为 s3，但环境变量没有配置 S3 bucket，则降级为 local
+    if (config.provider === 's3' && !process.env.EXPORT_ARTIFACT_S3_BUCKET) {
+      console.warn('数据库配置为 S3，但未配置 EXPORT_ARTIFACT_S3_BUCKET，自动降级为 local');
+      return 'local';
+    }
+    return config.provider;
+  }
   return process.env.EXPORT_ARTIFACT_PROVIDER === 's3' || process.env.EXPORT_ARTIFACT_S3_BUCKET
     ? 's3'
     : 'local';
@@ -99,9 +115,10 @@ export async function getExportArtifactDownloadTarget(
 export async function saveExportArtifact(
   recordId: string,
   fileName: string,
-  content: Buffer
+  content: Buffer,
+  config?: ExportConfig
 ): Promise<SavedExportArtifact> {
-  if (getExportArtifactProvider() === 's3') {
+  if (getExportArtifactProvider(config) === 's3') {
     const bucket = requireS3Bucket();
     const safeRecordId = sanitizeSegment(recordId);
     const safeFileName = sanitizeSegment(fileName);
@@ -128,7 +145,7 @@ export async function saveExportArtifact(
 
   const safeRecordId = sanitizeSegment(recordId);
   const safeFileName = sanitizeSegment(fileName);
-  const artifactRoot = getExportArtifactRoot();
+  const artifactRoot = getExportArtifactRoot(config);
   const directory = path.join(artifactRoot, safeRecordId);
 
   try {
@@ -157,8 +174,10 @@ export async function saveExportArtifact(
 
 export async function readExportArtifact(
   relativePath: string,
-  provider: ExportArtifactProvider = getExportArtifactProvider()
+  providerOrConfig?: ExportArtifactProvider | ExportConfig
 ): Promise<Buffer> {
+  const provider = typeof providerOrConfig === 'string' ? providerOrConfig : getExportArtifactProvider(providerOrConfig);
+  const config = typeof providerOrConfig === 'object' ? providerOrConfig : undefined;
   if (provider === 's3') {
     const bucket = requireS3Bucket();
     const client = createS3Client();
@@ -176,7 +195,7 @@ export async function readExportArtifact(
     return streamToBuffer(response.Body as NodeJS.ReadableStream);
   }
 
-  const rootPath = path.resolve(getExportArtifactRoot());
+  const rootPath = path.resolve(getExportArtifactRoot(config));
   const normalizedPath = path.isAbsolute(relativePath)
     ? path.resolve(relativePath)
     : path.resolve(rootPath, relativePath);

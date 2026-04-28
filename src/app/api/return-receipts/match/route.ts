@@ -7,16 +7,19 @@ import { PERMISSIONS } from '@/lib/permissions';
 type ReceiptRow = {
   id: string;
   record_id: string;
-  supplier_id: string;
+  supplier_id?: string | null;
   supplier_order_no?: string | null;
   customer_order_no?: string | null;
   express_company?: string | null;
   tracking_no?: string | null;
+  freight_cost?: number | null;
 };
 
 type OrderRow = {
   id: string;
   order_no: string;
+  supplier_id?: string | null;
+  supplier_name?: string | null;
 };
 
 async function collectOrderCandidates(
@@ -33,36 +36,45 @@ async function collectOrderCandidates(
     }
   };
 
-  if (receipt.supplier_order_no) {
-    const { data, error } = await client
-      .from('orders')
-      .select('id, order_no')
-      .eq('supplier_order_no', receipt.supplier_order_no)
-      .eq('supplier_id', receipt.supplier_id);
+  // 匹配优先级：系统订单号精确匹配 > 客户订单号精确匹配 > 客户订单号模糊匹配
+  // 不再强制依赖 supplier_id，按订单号全局匹配
 
-    if (error) throw new Error(`按发货方单据号匹配失败: ${error.message}`);
-    appendCandidates((data || []) as OrderRow[]);
-  }
-
+  // 1. 优先按系统订单号精确匹配
   if (receipt.customer_order_no) {
+    // 先尝试作为系统订单号 (sys_order_no) 精确匹配
+    const { data: sysOrderData, error: sysOrderError } = await client
+      .from('orders')
+      .select('id, order_no, supplier_id, supplier_name')
+      .eq('sys_order_no', receipt.customer_order_no)
+      .limit(1);
+
+    if (sysOrderError) throw new Error(`按系统订单号精确匹配失败: ${sysOrderError.message}`);
+    if (sysOrderData && sysOrderData.length > 0) {
+      appendCandidates(sysOrderData as OrderRow[]);
+      return Array.from(candidates.values());
+    }
+
+    // 2. 按客户订单号 (order_no) 精确匹配
     const { data: exactOrders, error: exactError } = await client
       .from('orders')
-      .select('id, order_no')
+      .select('id, order_no, supplier_id, supplier_name')
       .eq('order_no', receipt.customer_order_no)
-      .eq('supplier_id', receipt.supplier_id);
+      .limit(10);
 
     if (exactError) throw new Error(`按客户订单号精确匹配失败: ${exactError.message}`);
     appendCandidates((exactOrders || []) as OrderRow[]);
 
-    const { data: fuzzyOrderNoOrders, error: fuzzyOrderNoError } = await client
-      .from('orders')
-      .select('id, order_no')
-      .eq('supplier_id', receipt.supplier_id)
-      .ilike('order_no', `%${receipt.customer_order_no}%`);
+    // 3. 按客户订单号模糊匹配（仅当精确匹配为空时）
+    if (exactOrders?.length === 0) {
+      const { data: fuzzyOrderNoOrders, error: fuzzyOrderNoError } = await client
+        .from('orders')
+        .select('id, order_no, supplier_id, supplier_name')
+        .ilike('order_no', `%${receipt.customer_order_no}%`)
+        .limit(10);
 
-    if (fuzzyOrderNoError) throw new Error(`按订单号模糊匹配失败: ${fuzzyOrderNoError.message}`);
-    appendCandidates((fuzzyOrderNoOrders || []) as OrderRow[]);
-
+      if (fuzzyOrderNoError) throw new Error(`按订单号模糊匹配失败: ${fuzzyOrderNoError.message}`);
+      appendCandidates((fuzzyOrderNoOrders || []) as OrderRow[]);
+    }
   }
 
   return Array.from(candidates.values());
@@ -104,37 +116,64 @@ export async function POST(request: NextRequest) {
       // 更新回单状态
       if (matchedOrder) {
         const now = new Date().toISOString();
+        
+        // 匹配成功后，自动获取订单的发货方信息并填充
         await client
           .from('return_receipts')
           .update({
             order_id: matchedOrder.id,
+            supplier_id: matchedOrder.supplier_id || null,
+            supplier_name: matchedOrder.supplier_name || null,
             match_status: 'auto_matched',
             matched_at: now,
             express_company: receipt.express_company || undefined,
             tracking_no: receipt.tracking_no || undefined,
+            freight_cost: receipt.freight_cost || undefined,
           })
           .eq('id', receipt.id);
 
-        // 更新订单的快递信息
-        if (receipt.tracking_no || receipt.express_company) {
-          await client
-            .from('orders')
-            .update({
-              tracking_no: receipt.tracking_no || undefined,
-              express_company: receipt.express_company || undefined,
-              status: 'returned',
-              returned_at: now,
-              updated_at: now,
-            })
-            .eq('id', matchedOrder.id);
+        // 更新订单的快递信息（追加模式，支持部分回单）
+        // 先获取当前订单的物流信息
+        const { data: existingOrder } = await client
+          .from('orders')
+          .select('tracking_no, express_company, status')
+          .eq('id', matchedOrder.id)
+          .single();
 
-          await syncOrderCostHistoryAfterReturn(client, {
-            orderId: matchedOrder.id,
-            expressCompany: receipt.express_company,
-            trackingNo: receipt.tracking_no,
-            returnedAt: now,
-          });
-        }
+        // 物流信息合并策略：用 ";" 隔开多个快递信息
+        const existingTrackingNo = existingOrder?.tracking_no || '';
+        const existingExpressCompany = existingOrder?.express_company || '';
+        const newTrackingNo = existingTrackingNo 
+          ? `${existingTrackingNo}; ${receipt.tracking_no || ''}`
+          : (receipt.tracking_no || '');
+        const newExpressCompany = existingExpressCompany 
+          ? `${existingExpressCompany}; ${receipt.express_company || ''}`
+          : (receipt.express_company || '');
+
+        // 状态判断：已有回单记录或当前状态为 partial_returned 时保持，部分回单新状态
+        // 如果订单已有 tracking_no，说明之前有回单过，此次追加回单
+        const hasExistingReceipt = Boolean(existingTrackingNo) && existingOrder?.status !== 'returned';
+        const newStatus = hasExistingReceipt ? 'partial_returned' : 'returned';
+
+        await client
+          .from('orders')
+          .update({
+            tracking_no: newTrackingNo || undefined,
+            express_company: newExpressCompany || undefined,
+            freight_cost: receipt.freight_cost || undefined,
+            status: newStatus,
+            returned_at: now,
+            updated_at: now,
+          })
+          .eq('id', matchedOrder.id);
+
+        await syncOrderCostHistoryAfterReturn(client, {
+          orderId: matchedOrder.id,
+          expressCompany: receipt.express_company,
+          trackingNo: receipt.tracking_no,
+          freightCost: receipt.freight_cost,
+          returnedAt: now,
+        });
 
         autoMatchedCount++;
         results.push({
@@ -144,6 +183,7 @@ export async function POST(request: NextRequest) {
           matched: true,
           orderId: matchedOrder.id,
           orderNo: matchedOrder.order_no,
+          isPartialReturn: hasExistingReceipt,
         });
       } else if (candidates.length > 1) {
         conflictCount++;

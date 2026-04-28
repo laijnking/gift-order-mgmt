@@ -61,6 +61,7 @@ interface SessionState {
     recommendedSupplierId?: string;
   }>;
   savedAt: number;
+  mappingCollapsed: boolean;
 }
 
 function saveSession(state: Partial<SessionState>) {
@@ -90,6 +91,7 @@ function saveSession(state: Partial<SessionState>) {
       mappingAutoLoadedId: state.mappingAutoLoadedId ?? prev?.mappingAutoLoadedId ?? null,
       supplierMatchResults: state.supplierMatchResults ?? prev?.supplierMatchResults ?? {},
       savedAt: Date.now(),
+      mappingCollapsed: state.mappingCollapsed ?? prev?.mappingCollapsed ?? false,
     };
     // 超过2小时的会话数据不再恢复
     if (Date.now() - next.savedAt < 2 * 60 * 60 * 1000) {
@@ -387,7 +389,7 @@ function buildFlatOrdersForPage(
 ): ParsedOrder[] {
   return flattenBundleDraftsToFlatOrders(bundles, customerCode).map((order, index) => ({
     ...order,
-    id: order.id || `${idPrefix}_${Date.now()}_${index}`,
+    id: order.id || `${idPrefix}_${Date.now()}_${index}_${Math.random().toString(36).slice(2, 6)}`,
     selected: true,
     expanded: true,
   }));
@@ -497,7 +499,7 @@ export default function OrderParsePage() {
   const [showMappingDialog, setShowMappingDialog] = useState(false);
   const [mappingSearchTerm, setMappingSearchTerm] = useState('');
   const [mappingAutoLoaded, setMappingAutoLoaded] = useState(_restored?.mappingAutoLoaded ?? false);
-  const [mappingCollapsed, setMappingCollapsed] = useState(false);
+  const [mappingCollapsed, setMappingCollapsed] = useState(_restored?.mappingCollapsed ?? false);
   const [mappingAutoLoadedId, setMappingAutoLoadedId] = useState<string | null>(_restored?.mappingAutoLoadedId ?? null);
   const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
   const [customerSearch, setCustomerSearch] = useState('');
@@ -630,10 +632,11 @@ export default function OrderParsePage() {
     excelPreview,
     excelFileName,
     excelFileSize,
-    mappingAutoLoaded,
-    mappingAutoLoadedId,
-    supplierMatchResults,
-  ]);
+      mappingAutoLoaded,
+      mappingAutoLoadedId,
+      supplierMatchResults,
+      mappingCollapsed,
+    ]);
 
   // 恢复会话时显示提示
   useEffect(() => {
@@ -721,6 +724,20 @@ export default function OrderParsePage() {
       setMappingCollapsed(false);
     }
   }, [selectedCustomer, autoLoadMappingByFingerprint, loadMappingHistory]);
+
+  // 当 Excel 文件上传后（excelPreview 就绪），也尝试按 fingerprint 自动加载历史映射
+  // 这解决「先选客户后上传文件」场景下映射未自动加载的问题
+  useEffect(() => {
+    if (
+      selectedCustomer &&
+      excelPreview.length > headerRow &&
+      (excelPreview[headerRow]?.length ?? 0) > 0 &&
+      !mappingAutoLoaded
+    ) {
+      autoLoadMappingByFingerprint(selectedCustomer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [excelPreview, headerRow]);
 
   // 保存当前映射配置
   const saveMapping = async () => {
@@ -1107,7 +1124,7 @@ export default function OrderParsePage() {
       const original = orders[idx];
       const copy: ParsedOrder = {
         ...original,
-        id: `copy_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        id: `copy_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         selected: true,
         expanded: true,
       };
@@ -1122,7 +1139,7 @@ export default function OrderParsePage() {
     setParsedOrders(orders => [
       ...orders,
       {
-        id: `manual_${Date.now()}`,
+        id: `manual_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         customer_code: selectedCustomer,
         product_name: '',
         quantity: 1,
@@ -1546,16 +1563,20 @@ export default function OrderParsePage() {
              {leftPanelCollapsed ? '展开' : '收起'}输入
            </Button>
         </div>
+        </div>
 
         {/* Main content */}
-          <div className="flex flex-1 min-h-0 flex-col gap-4 xl:flex-row">
-        {/* Left Panel: Input */}
+        <div className="flex flex-1 min-h-0 flex-col gap-4 xl:flex-row">
+          {/* Left Panel: Input */}
           <div
-          className={`transition-all duration-300 ease-in-out shrink-0 ${
-            leftPanelCollapsed ? 'h-0 overflow-hidden opacity-0 xl:h-auto xl:w-0' : 'w-full opacity-100 xl:w-[520px]'
-          }`}
-        >
-           <div className="flex h-full flex-col gap-3 overflow-y-auto pr-0 xl:pr-1">
+            className={cn(
+              'transition-all duration-300 ease-in-out shrink-0',
+              leftPanelCollapsed
+                ? 'hidden xl:block xl:w-0 xl:overflow-hidden'
+                : 'w-full xl:w-[520px]'
+            )}
+          >
+            <div className="flex h-full flex-col gap-3 overflow-y-auto pr-0 xl:pr-1">
             <CustomerSelector
               customers={customers}
               selectedCustomer={selectedCustomer}
@@ -1618,11 +1639,11 @@ export default function OrderParsePage() {
               mappingCollapsed={mappingCollapsed}
               onRemoveFile={handleRemoveFile}
             />
-           </div>
+            </div>
           </div>
 
-        {/* Right Panel: Parsed Orders */}
-        <OrderPreviewPanel
+          {/* Right Panel: Parsed Orders */}
+          <OrderPreviewPanel
           orders={parsedOrders}
           parseStats={parseStats}
           submitValidation={submitValidation}
@@ -1648,45 +1669,39 @@ export default function OrderParsePage() {
           onAddOrder={addOrder}
           onSubmit={handleSubmitOrders}
         />
-
-      {/* Closing the flex container (line 1550) */}
         </div>
-      {/* Closing the outer container (line 1511) */}
-      </div>
 
+          {/* Product Picker Dialog */}
+          <ProductPickerDialog
+            open={productPickerOpen}
+            onOpenChange={(open) => {
+              setProductPickerOpen(open);
+              if (!open) setProductPickerOrderId(null);
+            }}
+            onSelect={handleProductSelect}
+            title="选择系统商品（按编码或名称搜索）"
+          />
 
-      {/* Product Picker Dialog */}
-      <ProductPickerDialog
-          open={productPickerOpen}
-          onOpenChange={(open) => {
-            setProductPickerOpen(open);
-            if (!open) setProductPickerOrderId(null);
-          }}
-          onSelect={handleProductSelect}
-          title="选择系统商品（按编码或名称搜索）"
-        />
+          {/* Import Result Dialog */}
+          <ImportResultDialog
+            open={!!importResult}
+            onOpenChange={(open) => { if (!open) setImportResult(null); }}
+            total={importResult?.total ?? 0}
+            importBatch={importResult?.importBatch ?? ''}
+            sysOrderNos={importResult?.sysOrderNos ?? []}
+            message={importResult?.message ?? ''}
+            customerName={importResult?.customerName}
+            onClose={() => setImportResult(null)}
+          />
 
-      {/* Import Result Dialog */}
-      <ImportResultDialog
-          open={!!importResult}
-          onOpenChange={(open) => { if (!open) setImportResult(null); }}
-          total={importResult?.total ?? 0}
-          importBatch={importResult?.importBatch ?? ''}
-          sysOrderNos={importResult?.sysOrderNos ?? []}
-          message={importResult?.message ?? ''}
-          customerName={importResult?.customerName}
-          onClose={() => setImportResult(null)}
-      />
-      </div>
-
-      {/* Mapping History Dialog */}
-      <MappingHistoryDialog
-          open={showMappingDialog}
-          onOpenChange={setShowMappingDialog}
-          history={mappingHistory}
-          onRestore={restoreMapping}
-      />
-
+          {/* Mapping History Dialog */}
+          <MappingHistoryDialog
+            open={showMappingDialog}
+            onOpenChange={setShowMappingDialog}
+            history={mappingHistory}
+            onRestore={restoreMapping}
+          />
+        </div>
       </PageGuard>
-  );
-}
+    );
+  }

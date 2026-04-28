@@ -1,15 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { saveExportArtifact } from '@/lib/export-artifacts';
+import { saveExportArtifact, type ExportConfig } from '@/lib/export-artifacts';
 import { buildExportRecordDownloadPath } from '@/lib/export-download';
 import { recordOrderCostFromDispatch } from '@/lib/order-cost-history';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
-import { parseTemplateFieldMappings, resolvePreferredTemplate, type TemplateRecord } from '@/lib/template-utils';
+import { parseTemplateFieldMappings, parseTemplateFieldMappingsArray, resolvePreferredTemplate, type TemplateRecord } from '@/lib/template-utils';
 import { requirePermission } from '@/lib/server-auth';
 import { PERMISSIONS } from '@/lib/permissions';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 
 type OrderItem = Record<string, unknown>;
+
+// 获取导出配置（从数据库的 system_configs 表读取）
+async function getExportConfig(client: ReturnType<typeof getSupabaseClient>): Promise<ExportConfig | undefined> {
+  try {
+    // 查询导出配置
+    const { data: configs, error } = await client
+      .from('system_configs')
+      .select('code, config')
+      .in('code', ['export_default_dir', 'export_provider'])
+      .eq('is_active', true);
+
+    if (error) {
+      console.warn('获取导出配置失败，使用默认配置:', error.message);
+      return undefined;
+    }
+
+    const configMap: Record<string, Record<string, unknown>> = {};
+    for (const c of (configs || [])) {
+      configMap[c.code] = c.config;
+    }
+
+    const exportDirConfig = configMap['export_default_dir'];
+    const exportProviderConfig = configMap['export_provider'];
+
+    return {
+      provider: (exportProviderConfig?.provider as 'local' | 's3') || undefined,
+      localPath: exportDirConfig?.localPath as string || undefined,
+    };
+  } catch (err) {
+    console.warn('获取导出配置异常，使用默认配置:', err);
+    return undefined;
+  }
+}
 
 function parseItems(value: unknown): OrderItem[] {
   if (Array.isArray(value)) return value as OrderItem[];
@@ -29,23 +62,24 @@ function toNumber(value: unknown, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
-const DEFAULT_SHIPPING_FIELD_MAPPINGS: Record<string, string> = {
-  系统订单号: 'sysOrderNo',
-  客户订单号: 'orderNo',
-  收货人: 'receiverName',
-  联系电话: 'receiverPhone',
-  收货地址: 'receiverAddress',
-  商品编码: 'productCode',
-  商品名称: 'productName',
-  数量: 'quantity',
-  单价: 'unitCost',
-  仓库: 'warehouseName',
-  客户代码: 'customerCode',
-  客户名称: 'customerName',
-  业务员: 'salesperson',
-  跟单员: 'operator',
-  备注: 'remark',
-};
+// 默认字段映射 - 有序数组格式，保持导出列顺序
+const DEFAULT_SHIPPING_FIELD_MAPPINGS: Array<{ excelColumn: string; systemField: string }> = [
+  { excelColumn: '系统订单号', systemField: 'sysOrderNo' },
+  { excelColumn: '客户订单号', systemField: 'orderNo' },
+  { excelColumn: '收货人', systemField: 'receiverName' },
+  { excelColumn: '联系电话', systemField: 'receiverPhone' },
+  { excelColumn: '收货地址', systemField: 'receiverAddress' },
+  { excelColumn: '商品编码', systemField: 'productCode' },
+  { excelColumn: '商品名称', systemField: 'productName' },
+  { excelColumn: '数量', systemField: 'quantity' },
+  { excelColumn: '单价', systemField: 'unitCost' },
+  { excelColumn: '仓库', systemField: 'warehouseName' },
+  { excelColumn: '客户代码', systemField: 'customerCode' },
+  { excelColumn: '客户名称', systemField: 'customerName' },
+  { excelColumn: '业务员', systemField: 'salesperson' },
+  { excelColumn: '跟单员', systemField: 'operator' },
+  { excelColumn: '备注', systemField: 'remark' },
+];
 
 function itemText(item: OrderItem, ...keys: string[]): string {
   for (const key of keys) {
@@ -300,7 +334,7 @@ async function dispatchPendingOrder(
 
 function rowsForOrder(
   order: Record<string, unknown>,
-  fieldMappings: Record<string, string>,
+  fieldMappings: Array<{ excelColumn: string; systemField: string }>,
   batchNo: string,
   dispatchItems?: Array<Record<string, unknown>>,
   isSupplierTemplate?: boolean
@@ -362,7 +396,7 @@ function rowsForOrder(
     };
 
     return Object.fromEntries(
-      Object.entries(fieldMappings).map(([header, fieldKey]) => [header, context[fieldKey] ?? ''])
+      fieldMappings.map(({ excelColumn, systemField }) => [excelColumn, context[systemField] ?? ''])
     );
   });
 }
@@ -372,6 +406,9 @@ export async function POST(request: NextRequest) {
   if (authError) return authError;
 
   const client = getSupabaseClient();
+
+  // 获取导出配置（数据库配置优先于环境变量）
+  const exportConfig = await getExportConfig(client);
 
   try {
     const body = await request.json();
@@ -406,8 +443,8 @@ export async function POST(request: NextRequest) {
         templateSource = 'explicit';
       }
     }
-    const fieldMappings = resolvedTemplate ? parseTemplateFieldMappings(resolvedTemplate) : DEFAULT_SHIPPING_FIELD_MAPPINGS;
-    const exportFieldMappings = Object.keys(fieldMappings).length > 0 ? fieldMappings : DEFAULT_SHIPPING_FIELD_MAPPINGS;
+    const fieldMappings = resolvedTemplate ? parseTemplateFieldMappingsArray(resolvedTemplate) : DEFAULT_SHIPPING_FIELD_MAPPINGS;
+    const exportFieldMappings = fieldMappings.length > 0 ? fieldMappings : DEFAULT_SHIPPING_FIELD_MAPPINGS;
 
     const batchId = crypto.randomUUID();
     const recordId = crypto.randomUUID();
@@ -464,8 +501,8 @@ export async function POST(request: NextRequest) {
       const actualTemplateSource = supplierTemplate
         ? (supplierTemplateSource as 'target' | 'linked' | 'default' | 'first')
         : (userSelectedTemplate ? 'explicit' : 'first');
-      const supplierFieldMappings = supplierTemplate ? parseTemplateFieldMappings(supplierTemplate) : DEFAULT_SHIPPING_FIELD_MAPPINGS;
-      const supplierExportFieldMappings = Object.keys(supplierFieldMappings).length > 0 ? supplierFieldMappings : DEFAULT_SHIPPING_FIELD_MAPPINGS;
+      const supplierFieldMappings = supplierTemplate ? parseTemplateFieldMappingsArray(supplierTemplate) : DEFAULT_SHIPPING_FIELD_MAPPINGS;
+      const supplierExportFieldMappings = supplierFieldMappings.length > 0 ? supplierFieldMappings : DEFAULT_SHIPPING_FIELD_MAPPINGS;
       // 判断当前应用的模板是否为该供应商的专属模板
       // 专属模板：target_type=supplier 且 target_id=supplierId（真实）或 target_name=supplierName（虚拟）
       const isSupplierTemplate = Boolean(
@@ -524,8 +561,20 @@ export async function POST(request: NextRequest) {
         try {
           // 二次导出模式：不派发、不扣库存，只生成文件
           if (isReexport) {
+            // 从 dispatch_records 查询历史派发记录，获取发货方商品信息
+            const { data: dispatchRecord } = await client
+              .from('dispatch_records')
+              .select('items, batch_no')
+              .eq('order_id', order.id)
+              .eq('status', 'dispatched')
+              .order('dispatch_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            const dispatchItems = dispatchRecord?.items || undefined;
+            const dispatchBatchNo = dispatchRecord?.batch_no || String(order.assigned_batch || batchNo);
             assignedOnlyCount += 1;
-            exportRows.push(...rowsForOrder(order, supplierExportFieldMappings, String(order.assigned_batch || batchNo), undefined, isSupplierTemplate));
+            exportRows.push(...rowsForOrder(order, supplierExportFieldMappings, dispatchBatchNo, dispatchItems, isSupplierTemplate));
           } else {
             // 导出时：pending → notified（首次导出发货通知），已通知的订单幂等
             const dispatchResult = exportMode === 'dispatch'
@@ -561,7 +610,7 @@ export async function POST(request: NextRequest) {
       const safeSupplierName = supplierName.replace(/[\\/:*?"<>|]/g, '_');
       const fileName = `${safeSupplierName}+发货通知单+${today}.xlsx`;
       const worksheet = XLSX.utils.json_to_sheet(exportRows);
-      const headers = Object.keys(supplierExportFieldMappings);
+      const headers = supplierExportFieldMappings.map(m => m.excelColumn);
       worksheet['!cols'] = headers.map((header) => ({ wch: Math.max(12, Math.min(48, header.length * 2 + 4)) }));
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, '发货通知单');
@@ -569,7 +618,7 @@ export async function POST(request: NextRequest) {
       zip.file(fileName, workbookBuffer);
       const detailIndex = results.length;
       const detailArtifact = exportMode === 'dispatch' && resolvedPersistenceMode === 'full'
-        ? await saveExportArtifact(recordId, fileName, workbookBuffer)
+        ? await saveExportArtifact(recordId, fileName, workbookBuffer, exportConfig)
         : null;
       if (detailArtifact) {
         persistedDetailCount += 1;
@@ -678,7 +727,16 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const artifact = await saveExportArtifact(recordId, zipFileName, zipBuffer);
+    let artifact = null;
+    let artifactError: string | null = null;
+    try {
+      artifact = await saveExportArtifact(recordId, zipFileName, zipBuffer, exportConfig);
+    } catch (err) {
+      artifactError = err instanceof Error ? err.message : String(err);
+      console.error('保存导出文件失败:', artifactError);
+      // 即使文件保存失败，也记录错误并继续创建导出记录
+      errors.push(`文件持久化失败: ${artifactError}`);
+    }
 
     const { error: recordError } = await client.from('export_records').insert({
       id: recordId,
@@ -692,9 +750,9 @@ export async function POST(request: NextRequest) {
       order_ids: allOrderIds,
       template_id: resolvedTemplateId,
       template_name: templateName,
-      file_url: artifact.downloadPath,
+      file_url: artifact?.downloadPath || null,
       file_name: zipFileName,
-      zip_file_url: artifact.downloadPath,
+      zip_file_url: artifact?.downloadPath || null,
       zip_file_name: zipFileName,
       total_count: totalOrderCount,
       exported_by: exportedBy || 'system',
@@ -704,35 +762,40 @@ export async function POST(request: NextRequest) {
         batch_no: batchNo,
         supplier_ids: supplierIds,
         supplier_names: supplierNames,
-        download_mode: 'regenerate',
+        download_mode: artifact ? 'regenerate' : 'inline',
         is_reexport: isReexport,
-        artifact: {
+        artifact: artifact ? {
           relative_path: artifact.relativePath,
           file_name: artifact.fileName,
           provider: artifact.provider,
-        },
+        } : null,
         template_source: templateSource,
         details: results,
         errors,
       },
     });
-    if (recordError) throw new Error(`保存导出记录失败: ${recordError.message}`);
+    if (recordError) {
+      console.error('保存导出记录失败:', recordError);
+      errors.push(`保存导出记录失败: ${recordError.message}`);
+    }
 
     return NextResponse.json({
       success: errors.length === 0,
-        message: `成功导出${results.length}个发货方，共${totalOrderCount}个订单${errors.length ? `，失败${errors.length}条` : ''}`,
+      message: errors.length > 0
+        ? `部分成功：导出完成但有${errors.length}个问题，详见错误列表`
+        : `成功导出${results.length}个发货方，共${totalOrderCount}个订单`,
       data: {
         batchId,
         recordId,
         batchNo,
         zipFileName,
-        zipFileUrl: artifact.downloadPath,
+        zipFileUrl: artifact?.downloadPath || null,
         zipBase64,
-        artifact: {
+        artifact: artifact ? {
           relative_path: artifact.relativePath,
           file_name: artifact.fileName,
           provider: artifact.provider,
-        },
+        } : null,
         totalSupplierCount: results.length,
         totalOrderCount,
         templateId: resolvedTemplateId,
@@ -746,7 +809,7 @@ export async function POST(request: NextRequest) {
         },
         persistenceSummary: {
           exportRecordCreated: true,
-          zipArtifactPersisted: true,
+          zipArtifactPersisted: !!artifact,
           detailArtifactPersistedCount: persistedDetailCount,
         },
         executionMode,

@@ -116,8 +116,8 @@ export function OrderPreviewPanel({
             {allSelected ? '取消全选' : '全选'}
           </Button>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <Button variant="outline" size="sm" onClick={onAddOrder} className="h-8 sm:w-auto">
+        <div className="flex items-stretch gap-2 sm:items-center">
+          <Button variant="outline" size="sm" onClick={onAddOrder} className="h-8 flex-1 sm:flex-none sm:w-auto">
             <Plus className="h-4 w-4 mr-1" />
             添加
           </Button>
@@ -126,7 +126,7 @@ export function OrderPreviewPanel({
             size="sm"
             onClick={onSubmit}
             disabled={isSubmitting || selectedValidOrderCount === 0}
-            className="h-8 sm:w-auto"
+            className="h-8 flex-1 sm:flex-none sm:w-auto"
           >
             {isSubmitting ? (
               <>

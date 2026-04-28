@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,8 +33,8 @@ import { buildUserInfoHeaders, useAuth, usePermission } from '@/lib/auth';
 
 interface ReceiptRecord {
   id: string;
-  supplierId: string;
-  supplierName: string;
+  supplierId?: string;
+  supplierName?: string;
   fileName: string;
   totalCount: number;
   matchedCount: number;
@@ -59,10 +59,12 @@ interface Receipt {
   expressCompany: string;
   trackingNo: string;
   shipDate: string | null;
+  freightCost?: number | null;
   matchStatus: 'pending' | 'auto_matched' | 'manual_matched' | 'conflict';
   orderId: string | null;
   orderNo: string | null;
   createdAt: string;
+  matchedAt?: string;
   reviewStatus?: 'matched' | 'needs_review' | 'conflict';
   reviewReason?: 'matched' | 'unmatched' | 'conflict';
 }
@@ -82,11 +84,6 @@ interface Order {
   supplierName: string;
 }
 
-interface SupplierOption {
-  id: string;
-  name: string;
-}
-
 interface ImportedReceiptRow {
   customerOrderNo?: string;
   orderNo?: string;
@@ -94,6 +91,7 @@ interface ImportedReceiptRow {
   expressCompany?: string;
   trackingNo?: string;
   shipDate?: string | null;
+  freightCost?: number | string;
   quantity?: number | string;
   price?: number | string | null;
   warehouse?: string;
@@ -107,6 +105,9 @@ interface ImportedReceiptRow {
   ['物流单号']?: string;
   ['发货日期']?: string | null;
   ['日期']?: string | null;
+  ['运费']?: number | string;
+  ['运费成本']?: number | string;
+  ['快递费']?: number | string;
   ['数量']?: number | string;
   ['价格']?: number | string | null;
   ['单价']?: number | string | null;
@@ -120,8 +121,6 @@ export default function ReturnReceiptPage() {
   const canEditOrders = hasPermission('orders:edit');
 
   const [loading, setLoading] = useState(false);
-  const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
-  const [selectedSupplier, setSelectedSupplier] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [records, setRecords] = useState<ReceiptRecord[]>([]);
   const [currentRecord, setCurrentRecord] = useState<ReceiptRecord | null>(null);
@@ -146,18 +145,6 @@ export default function ReturnReceiptPage() {
     [user]
   );
 
-  const loadSuppliers = useCallback(async () => {
-    try {
-      const response = await fetch('/api/suppliers?status=active', { headers: authHeaders() });
-      const data = await response.json();
-      if (data.success) {
-        setSuppliers(data.data || []);
-      }
-    } catch (error) {
-      console.error('加载发货方失败:', error);
-    }
-  }, [authHeaders]);
-
   const loadRecords = useCallback(async () => {
     try {
       setLoading(true);
@@ -173,19 +160,8 @@ export default function ReturnReceiptPage() {
     }
   }, [authHeaders]);
 
-  // 加载发货方列表
-  useEffect(() => {
-    loadSuppliers();
-    loadRecords();
-  }, [loadRecords, loadSuppliers]);
-
-  // 文件上传处理
+  // 文件上传处理（不再需要选择发货方）
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
-    if (!selectedSupplier) {
-      toast.error('请先选择发货方');
-      return;
-    }
-
     const file = acceptedFiles[0];
     if (!file) return;
 
@@ -202,31 +178,36 @@ export default function ReturnReceiptPage() {
         throw new Error('Excel文件为空');
       }
 
-      // 提取回单数据 - 增强支持更多字段
-      const receipts = jsonData.map((row) => ({
-        customerOrderNo: row['客户订单号'] || row['订单号'] || row.customerOrderNo || row.orderNo || row['单据编号'] || '',
-        supplierOrderNo: row['发货方单据号'] || row.supplierOrderNo || '',
-        expressCompany: row['快递公司'] || row.expressCompany || '',
-        trackingNo: row['快递单号'] || row.trackingNo || row['物流单号'] || '',
-        shipDate: row['发货日期'] || row.shipDate || row['日期'] || null,
-        quantity: row['数量'] || row.quantity || 1,
-        price: row['价格'] || row.price || row['单价'] || null,
-        warehouse: row['仓库'] || row.warehouse || '',
-        remark: row['备注'] || row.remark || '',
-      })).filter(r => r.customerOrderNo || r.trackingNo || r.supplierOrderNo);
+      // 提取回单数据
+      const receipts = jsonData.map((row) => {
+        const rawFreight = row.freightCost || row['运费'] || row['运费成本'] || row['快递费'];
+        const freightCost = typeof rawFreight === 'number' 
+          ? rawFreight 
+          : rawFreight ? Number(rawFreight) : undefined;
+        
+        return {
+          customerOrderNo: row['客户订单号'] || row['订单号'] || row.customerOrderNo || row.orderNo || row['单据编号'] || '',
+          supplierOrderNo: row['发货方单据号'] || row.supplierOrderNo || '',
+          expressCompany: row['快递公司'] || row.expressCompany || '',
+          trackingNo: row['快递单号'] || row.trackingNo || row['物流单号'] || '',
+          shipDate: row['发货日期'] || row.shipDate || row['日期'] || null,
+          freightCost,
+          quantity: row['数量'] || row.quantity || 1,
+          price: row['价格'] || row.price || row['单价'] || null,
+          warehouse: row['仓库'] || row.warehouse || '',
+          remark: row['备注'] || row.remark || '',
+        };
+      }).filter(r => r.customerOrderNo || r.trackingNo || r.supplierOrderNo);
 
       if (receipts.length === 0) {
         throw new Error('未找到有效的回单数据，请检查Excel格式');
       }
 
-      // 提交到服务器
-      const supplier = suppliers.find(s => s.id === selectedSupplier);
+      // 提交到服务器（不再传递 supplierId）
       const response = await fetch('/api/return-receipts/history', {
         method: 'POST',
         headers: jsonHeaders(),
         body: JSON.stringify({
-          supplierId: selectedSupplier,
-          supplierName: supplier?.name || '',
           receipts,
           fileName: file.name,
           importedBy: actorName,
@@ -245,8 +226,6 @@ export default function ReturnReceiptPage() {
         if (result.data.recordId) {
           setCurrentRecord({
             id: result.data.recordId,
-            supplierId: selectedSupplier,
-            supplierName: supplier?.name || '',
             fileName: file.name,
             totalCount: result.data.totalCount || receipts.length,
             matchedCount: 0,
@@ -257,14 +236,14 @@ export default function ReturnReceiptPage() {
           setShowMatchDialog(true);
         }
       } else {
-      throw new Error(result.error);
+        throw new Error(result.error);
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '未知错误');
     }
-  }, [actorName, jsonHeaders, loadRecords, selectedSupplier, suppliers]);
+  }, [actorName, jsonHeaders, loadRecords]);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive, fileRejections } = useDropzone({
     onDrop,
     accept: {
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
@@ -272,6 +251,15 @@ export default function ReturnReceiptPage() {
     },
     multiple: false,
   });
+
+  // 显示文件被拒绝的错误
+  useEffect(() => {
+    if (fileRejections.length > 0) {
+      const rejection = fileRejections[0];
+      const errorMessage = rejection.errors[0]?.message || '不支持的文件类型';
+      toast.error(`文件上传失败: ${errorMessage}`);
+    }
+  }, [fileRejections]);
 
   // 自动匹配回单
   const handleAutoMatch = async () => {
@@ -396,31 +384,34 @@ export default function ReturnReceiptPage() {
     setCurrentReceipt(receipt);
     
     try {
-      // 加载待匹配订单列表
-      const response = await fetch(`/api/orders?status=assigned,notified&supplierId=${receipt.supplierId || ''}`, { headers: authHeaders() });
+      // 加载待匹配订单列表（不限定发货方）
+      const response = await fetch('/api/orders?status=assigned,notified', { headers: authHeaders() });
       const data = await response.json();
       
       if (data.success) {
         const availableOrders = data.data.filter((o: Order) => 
-          (o.status === 'assigned' || o.status === 'notified') && !receipts.some(r => r.orderId === o.id && r.id !== receipt.id)
+          (o.status === 'assigned' || o.status === 'notified' || o.status === 'partial_returned') && 
+          !receipts.some(r => r.orderId === o.id && r.id !== receipt.id)
         );
 
         const sortedOrders = [...availableOrders].sort((a: Order, b: Order) => {
-          const aExact = a.customerOrderNo === receipt.customerOrderNo || a.orderNo === receipt.customerOrderNo;
-          const bExact = b.customerOrderNo === receipt.customerOrderNo || b.orderNo === receipt.customerOrderNo;
+          const aOrderNo = String(a.orderNo ?? '');
+          const bOrderNo = String(b.orderNo ?? '');
+          const aExact = a.customerOrderNo === receipt.customerOrderNo || aOrderNo === receipt.customerOrderNo;
+          const bExact = b.customerOrderNo === receipt.customerOrderNo || bOrderNo === receipt.customerOrderNo;
           if (aExact !== bExact) return aExact ? -1 : 1;
 
           const aIncludes = Boolean(receipt.customerOrderNo) && (
             a.customerOrderNo?.includes(receipt.customerOrderNo) ||
-            a.orderNo?.includes(receipt.customerOrderNo)
+            aOrderNo.includes(receipt.customerOrderNo)
           );
           const bIncludes = Boolean(receipt.customerOrderNo) && (
             b.customerOrderNo?.includes(receipt.customerOrderNo) ||
-            b.orderNo?.includes(receipt.customerOrderNo)
+            bOrderNo.includes(receipt.customerOrderNo)
           );
           if (aIncludes !== bIncludes) return aIncludes ? -1 : 1;
 
-          return a.orderNo.localeCompare(b.orderNo);
+          return aOrderNo.localeCompare(bOrderNo);
         });
 
         setUnmatchedOrders(sortedOrders);
@@ -470,9 +461,8 @@ export default function ReturnReceiptPage() {
     }
   };
 
-  // 过滤记录
+  // 过滤记录（不再按发货方过滤）
   const filteredRecords = records.filter(r => {
-    if (selectedSupplier && r.supplierId !== selectedSupplier) return false;
     if (searchTerm && !r.fileName.includes(searchTerm)) return false;
     return true;
   });
@@ -504,7 +494,7 @@ export default function ReturnReceiptPage() {
           </div>
           <div className="min-w-0">
             <h1 className="text-2xl font-bold">回单导入</h1>
-            <p className="text-sm text-muted-foreground">导入发货方回传快递单号，自动匹配订单</p>
+            <p className="text-sm text-muted-foreground">上传Excel自动匹配订单，无需选择发货方</p>
           </div>
         </div>
         <Button variant="outline" onClick={loadRecords} disabled={loading} className="w-full sm:w-auto">
@@ -540,28 +530,12 @@ export default function ReturnReceiptPage() {
               <CardDescription>上传包含快递信息的Excel文件</CardDescription>
             </CardHeader>
             <CardContent>
-              {/* 发货方选择 - 必须先选择 */}
-              <div className="mb-4">
-                <label className="text-sm font-medium mb-2 block">选择发货方</label>
-                <select
-                  value={selectedSupplier}
-                  onChange={(e) => setSelectedSupplier(e.target.value)}
-                  className="w-full h-10 px-3 border rounded-md bg-background text-sm"
-                >
-                  <option value="">请先选择发货方</option>
-                  {suppliers.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-              </div>
-              
               {canEditOrders ? (
                 <div
                   {...getRootProps()}
                   className={`
                     relative border-2 border-dashed rounded-lg p-8 text-center cursor-pointer
                     transition-colors
-                    ${!selectedSupplier ? 'opacity-50 cursor-not-allowed' : ''}
                     ${isDragActive ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50'}
                   `}
                 >
@@ -576,9 +550,6 @@ export default function ReturnReceiptPage() {
                   <p className="text-xs text-muted-foreground mt-2">
                     支持 .xlsx, .xls 格式
                   </p>
-                  {!selectedSupplier && (
-                    <p className="text-xs text-orange-500 mt-2">请先选择发货方</p>
-                  )}
                 </div>
               ) : (
                 <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
@@ -590,10 +561,11 @@ export default function ReturnReceiptPage() {
               <div className="mt-4 p-3 bg-muted rounded-lg">
                 <p className="text-xs font-medium mb-2">Excel应包含以下列：</p>
                 <ul className="text-xs text-muted-foreground space-y-1">
-                  <li>客户订单号 / 订单号</li>
+                  <li>客户订单号 / 订单号（必填）</li>
                   <li>快递公司</li>
                   <li>快递单号</li>
                   <li>发货日期（可选）</li>
+                  <li>运费 / 运费成本 / 快递费（可选）</li>
                 </ul>
               </div>
             </CardContent>
@@ -773,6 +745,7 @@ export default function ReturnReceiptPage() {
                         <TableHead>客户订单号</TableHead>
                         <TableHead>快递公司</TableHead>
                         <TableHead>快递单号</TableHead>
+                        <TableHead>运费</TableHead>
                         <TableHead>发货日期</TableHead>
                         <TableHead>匹配状态</TableHead>
                         <TableHead>关联订单</TableHead>
@@ -798,8 +771,9 @@ export default function ReturnReceiptPage() {
                             )}
                           </TableCell>
                           <TableCell className="font-medium">{receipt.customerOrderNo}</TableCell>
-                          <TableCell>{receipt.expressCompany}</TableCell>
-                          <TableCell className="font-mono">{receipt.trackingNo}</TableCell>
+                          <TableCell>{receipt.expressCompany || '-'}</TableCell>
+                          <TableCell className="font-mono">{receipt.trackingNo || '-'}</TableCell>
+                          <TableCell>{receipt.freightCost !== undefined ? `¥${receipt.freightCost}` : '-'}</TableCell>
                           <TableCell>{receipt.shipDate || '-'}</TableCell>
                           <TableCell>
                             {receipt.reviewStatus === 'conflict' ? (
@@ -856,7 +830,7 @@ export default function ReturnReceiptPage() {
           <DialogHeader>
             <DialogTitle>自动匹配</DialogTitle>
             <DialogDescription>
-              系统将根据客户订单号自动匹配回单与订单，未命中或冲突的记录会进入人工复核池
+              系统将根据订单号自动匹配回单与订单，未命中或冲突的记录会进入人工复核池
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -865,7 +839,7 @@ export default function ReturnReceiptPage() {
               <div>
                 <p className="text-sm font-medium">即将进行自动匹配</p>
                 <p className="text-xs text-muted-foreground">
-                  匹配规则：客户订单号精确匹配 &gt; 系统订单号模糊匹配
+                  匹配规则：系统订单号精确匹配 &gt; 客户订单号精确匹配 &gt; 模糊匹配
                 </p>
               </div>
             </div>
@@ -895,14 +869,18 @@ export default function ReturnReceiptPage() {
           <div className="space-y-4">
             {/* 回单信息 */}
             <div className="p-4 bg-muted rounded-lg">
-              <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-3">
                 <div>
                   <span className="text-muted-foreground">快递公司：</span>
-                  <span className="font-medium">{currentReceipt?.expressCompany}</span>
+                  <span className="font-medium">{currentReceipt?.expressCompany || '-'}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground">快递单号：</span>
-                  <span className="font-medium font-mono">{currentReceipt?.trackingNo}</span>
+                  <span className="font-medium font-mono">{currentReceipt?.trackingNo || '-'}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">运费：</span>
+                  <span className="font-medium">{currentReceipt?.freightCost !== undefined ? `¥${currentReceipt.freightCost}` : '-'}</span>
                 </div>
               </div>
             </div>
