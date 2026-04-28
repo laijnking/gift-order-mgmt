@@ -214,7 +214,7 @@ export function ExcelUpload({
           ) : (
             <>
               <Sparkles className="h-3 w-3 mr-1" />
-              批量匹配供应商
+              批量匹配发货方
             </>
           )}
         </Button>

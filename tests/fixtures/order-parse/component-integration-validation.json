@@ -1,0 +1,357 @@
+{
+  "name": "component-integration-validation",
+  "description": "验证 page.tsx 与组件文件的 props 接口兼容性",
+  "version": "1.0.0",
+  "components": [
+    {
+      "name": "InputPanel",
+      "file": "src/app/(app)/order-parse/components/input-panel.tsx",
+      "props": {
+        "inputMode": { "type": "'text' | 'excel'", "required": true },
+        "onInputModeChange": { "type": "(v: 'text' | 'excel') => void", "required": true },
+        "inputText": { "type": "string", "required": true },
+        "onInputTextChange": { "type": "(v: string) => void", "required": true },
+        "excelFile": { "type": "File | null", "required": true },
+        "excelFileName": { "type": "string", "required": true },
+        "excelFileSize": { "type": "number", "required": true },
+        "excelSheetNames": { "type": "string[]", "required": true },
+        "selectedSheet": { "type": "string", "required": true },
+        "headerRow": { "type": "number", "required": true },
+        "excelPreview": { "type": "string[][]", "required": true },
+        "columnMapping": { "type": "Record<string, string>", "required": true },
+        "mappingAutoLoaded": { "type": "boolean", "required": true },
+        "mappingAutoLoadedId": { "type": "string | null", "required": true },
+        "isLoading": { "type": "boolean", "required": true },
+        "parseResult": { "type": "{ duration: number } | null", "required": true },
+        "parsedOrdersCount": { "type": "number", "required": true },
+        "isMatchingSupplier": { "type": "boolean", "required": true },
+        "onTextParse": { "type": "() => void", "required": true },
+        "onExcelFileUpload": { "type": "(file: File) => void", "required": true },
+        "onSheetChange": { "type": "(sheetName: string) => void", "required": true },
+        "onHeaderRowChange": { "type": "(row: number) => void", "required": true },
+        "onReDetectMapping": { "type": "() => void", "required": true },
+        "onMatchAllSuppliers": { "type": "() => void", "required": true },
+        "onParse": { "type": "() => void", "required": true },
+        "onClear": { "type": "() => void", "required": true },
+        "onMappingChange": { "type": "(mapping: Record<string, string> | ((prev: Record<string, string>) => Record<string, string>)) => void", "required": true },
+        "onMappingAutoLoadedClear": { "type": "() => void", "required": true },
+        "onMappingCollapsedChange": { "type": "(v: boolean) => void", "required": true },
+        "onRemoveFile": { "type": "() => void", "required": true }
+      },
+      "pageStateMapping": {
+        "inputMode": "inputMode state",
+        "onInputModeChange": "setInputMode",
+        "inputText": "inputText state",
+        "onInputTextChange": "setInputText",
+        "excelFile": "excelFile state",
+        "excelFileName": "excelFileName state",
+        "excelFileSize": "excelFileSize state",
+        "excelSheetNames": "excelSheetNames state",
+        "selectedSheet": "selectedSheet state",
+        "headerRow": "headerRow state",
+        "excelPreview": "excelPreview state",
+        "columnMapping": "columnMapping state",
+        "mappingAutoLoaded": "mappingAutoLoaded state",
+        "mappingAutoLoadedId": "mappingAutoLoadedId state",
+        "isLoading": "isLoading state",
+        "parseResult": "parseResult state",
+        "parsedOrdersCount": "parsedOrders.length",
+        "isMatchingSupplier": "isMatchingSupplier state",
+        "onTextParse": "handleParseText",
+        "onExcelFileUpload": "handleExcelUpload",
+        "onSheetChange": "handleSheetChange",
+        "onHeaderRowChange": "setHeaderRow",
+        "onReDetectMapping": "inline: autoDetectMapping(excelPreview[headerRow])",
+        "onMatchAllSuppliers": "handleMatchAllSuppliers",
+        "onParse": "handleParse",
+        "onClear": "handleClear",
+        "onMappingChange": "setColumnMapping",
+        "onMappingAutoLoadedClear": "setMappingAutoLoaded(false) + setMappingAutoLoadedId(null)",
+        "onMappingCollapsedChange": "setMappingCollapsed",
+        "onRemoveFile": "handleExcelUpload(null) via setExcelFile(null)"
+      }
+    },
+    {
+      "name": "CustomerSelector",
+      "file": "src/app/(app)/order-parse/components/customer-selector.tsx",
+      "props": {
+        "customers": { "type": "Customer[]", "required": true },
+        "selectedCustomer": { "type": "string", "required": true },
+        "users": { "type": "UserInfo[]", "required": true },
+        "salespersonId": { "type": "string", "required": true },
+        "salespersonName": { "type": "string", "required": true },
+        "operatorId": { "type": "string", "required": true },
+        "operatorName": { "type": "string", "required": true },
+        "activeMappingMeta": { "type": "{ version: number; header_fingerprint?: string; template_signature?: string; source_headers?: string[]; } | null", "required": false },
+        "currentPreviewHeaders": { "type": "string[]", "required": true },
+        "activeMappingHeaders": { "type": "string[]", "required": true },
+        "isCurrentHeaderAlignedWithActiveMapping": { "type": "boolean", "required": true },
+        "onCustomerChange": { "type": "(code: string, customer: Customer) => void", "required": true },
+        "onSalespersonChange": { "type": "(id: string, name: string) => void", "required": true },
+        "onOperatorChange": { "type": "(id: string, name: string) => void", "required": true },
+        "onSaveMapping": { "type": "() => void", "required": true }
+      },
+      "pageStateMapping": {
+        "customers": "customers state",
+        "selectedCustomer": "selectedCustomer state",
+        "users": "users state",
+        "salespersonId": "salespersonId state",
+        "salespersonName": "salespersonName state",
+        "operatorId": "operatorId state",
+        "operatorName": "operatorName state",
+        "activeMappingMeta": "activeMappingMeta state",
+        "currentPreviewHeaders": "excelPreview[headerRow]",
+        "activeMappingHeaders": "activeMappingMeta?.source_headers",
+        "isCurrentHeaderAlignedWithActiveMapping": "inline: normalizeHeaders(currentPreviewHeaders) === normalizeHeaders(activeMappingHeaders)",
+        "onCustomerChange": "inline: setSelectedCustomer(code) + autoLoadMappingByFingerprint(code)",
+        "onSalespersonChange": "syncGlobalAssigneeToOrders('salesperson', id, name, salespersonName)",
+        "onOperatorChange": "syncGlobalAssigneeToOrders('operator', id, name, operatorName)",
+        "onSaveMapping": "saveMapping"
+      }
+    },
+    {
+      "name": "OrderPreviewPanel",
+      "file": "src/app/(app)/order-parse/components/order-preview-panel.tsx",
+      "props": {
+        "orders": { "type": "ParsedOrder[]", "required": true },
+        "parseStats": { "type": "ParseStats | null", "required": true },
+        "submitValidation": { "type": "SubmitValidationSummary", "required": true },
+        "selectedValidOrderCount": { "type": "number", "required": true },
+        "selectedCustomer": { "type": "string", "required": true },
+        "salespersonName": { "type": "string", "required": true },
+        "operatorName": { "type": "string", "required": true },
+        "customers": { "type": "CustomerInfo[]", "required": true },
+        "suppliers": { "type": "SupplierInfo[]", "required": true },
+        "supplierMatchResults": { "type": "Record<string, SupplierMatchResult>", "required": true },
+        "isMatchingSupplier": { "type": "boolean", "required": true },
+        "matchingSupplierOrderId": { "type": "string | null", "required": true },
+        "isSubmitting": { "type": "boolean", "required": true },
+        "onToggle": { "type": "(id: string) => void", "required": true },
+        "onToggleExpand": { "type": "(id: string) => void", "required": true },
+        "onDuplicate": { "type": "(id: string) => void", "required": true },
+        "onRemove": { "type": "(id: string) => void", "required": true },
+        "onUpdate": { "type": "(id: string, field: string, value: unknown) => void", "required": true },
+        "onMatchSupplier": { "type": "(id: string) => void", "required": true },
+        "onSupplierChange": { "type": "(orderId: string, supplierId: string) => void", "required": true },
+        "onProductSelect": { "type": "(orderId: string, product: ProductPickerItem | null) => void", "required": true },
+        "onSelectAll": { "type": "(selected: boolean) => void", "required": true },
+        "onAddOrder": { "type": "() => void", "required": true },
+        "onSubmit": { "type": "() => void", "required": true }
+      },
+      "pageStateMapping": {
+        "orders": "parsedOrders state",
+        "parseStats": "parseStats state",
+        "submitValidation": "submitValidation useMemo",
+        "selectedValidOrderCount": "selectedValidOrderCount useMemo",
+        "selectedCustomer": "selectedCustomer state",
+        "salespersonName": "salespersonName state",
+        "operatorName": "operatorName state",
+        "customers": "customers state (filtered)",
+        "suppliers": "suppliers state (filtered)",
+        "supplierMatchResults": "supplierMatchResults state",
+        "isMatchingSupplier": "isMatchingSupplier state",
+        "matchingSupplierOrderId": "matchingSupplierOrderId state",
+        "isSubmitting": "isSubmitting state",
+        "onToggle": "toggleOrder",
+        "onToggleExpand": "toggleExpand",
+        "onDuplicate": "duplicateOrder",
+        "onRemove": "removeOrder",
+        "onUpdate": "updateOrder",
+        "onMatchSupplier": "handleMatchSupplier",
+        "onSupplierChange": "handleSupplierChange",
+        "onProductSelect": "handleProductSelect",
+        "onSelectAll": "inline: (selected) => parsedOrders.forEach(o => { if (o.selected !== selected) toggleOrder(o.id) })",
+        "onAddOrder": "addOrder",
+        "onSubmit": "handleSubmit"
+      }
+    },
+    {
+      "name": "ImportResultDialog",
+      "file": "src/app/(app)/order-parse/components/import-result-dialog.tsx",
+      "props": {
+        "open": { "type": "boolean", "required": true },
+        "onOpenChange": { "type": "(open: boolean) => void", "required": true },
+        "total": { "type": "number", "required": true },
+        "importBatch": { "type": "string", "required": true },
+        "sysOrderNos": { "type": "string[]", "required": true },
+        "message": { "type": "string", "required": true },
+        "customerName": { "type": "string | undefined", "required": false },
+        "duplicateTotalSkipped": { "type": "number | undefined", "required": false },
+        "onClose": { "type": "() => void", "required": true }
+      },
+      "pageStateMapping": {
+        "open": "importResult.open",
+        "onOpenChange": "setImportResult({ ...importResult, open: v })",
+        "total": "importResult.total",
+        "importBatch": "importResult.importBatch",
+        "sysOrderNos": "importResult.sysOrderNos",
+        "message": "importResult.message",
+        "customerName": "importResult.customerName",
+        "duplicateTotalSkipped": "importResult.duplicateSummary?.totalSkipped",
+        "onClose": "setImportResult(null)"
+      }
+    },
+    {
+      "name": "MappingHistoryDialog",
+      "file": "src/app/(app)/order-parse/components/mapping-history-dialog.tsx",
+      "props": {
+        "open": { "type": "boolean", "required": true },
+        "onOpenChange": { "type": "(open: boolean) => void", "required": true },
+        "history": { "type": "MappingHistory[]", "required": true },
+        "onRestore": { "type": "(mappingId: string) => void", "required": true }
+      },
+      "pageStateMapping": {
+        "open": "showMappingDialog",
+        "onOpenChange": "setShowMappingDialog",
+        "history": "mappingHistory state",
+        "onRestore": "restoreMapping"
+      }
+    }
+  ],
+  "integrationChecks": [
+    {
+      "check": "page.tsx imports CustomerSelector",
+      "expected": "from './components/customer-selector'",
+      "severity": "required"
+    },
+    {
+      "check": "page.tsx imports InputPanel",
+      "expected": "from './components/input-panel'",
+      "severity": "required"
+    },
+    {
+      "check": "page.tsx imports OrderPreviewPanel",
+      "expected": "from './components/order-preview-panel'",
+      "severity": "required"
+    },
+    {
+      "check": "page.tsx imports ImportResultDialog",
+      "expected": "from './components/import-result-dialog'",
+      "severity": "required"
+    },
+    {
+      "check": "page.tsx imports MappingHistoryDialog",
+      "expected": "from './components/mapping-history-dialog'",
+      "severity": "required"
+    },
+    {
+      "check": "page.tsx no longer has inline customer selector JSX",
+      "expected": "no <Popover> with customers.map block in left panel",
+      "severity": "required"
+    },
+    {
+      "check": "page.tsx no longer has inline input panel JSX",
+      "expected": "no <Tabs> with text/excel TabsContent in left panel",
+      "severity": "required"
+    },
+    {
+      "check": "page.tsx no longer has inline order preview JSX",
+      "expected": "no OrderList mapping with supplierMatchResults in right panel",
+      "severity": "required"
+    },
+    {
+      "check": "page.tsx no longer has inline ImportResultDialog JSX",
+      "expected": "no Dialog with sysOrderNos mapping and duplicateSummary",
+      "severity": "required"
+    },
+    {
+      "check": "page.tsx no longer has inline MappingHistoryDialog JSX",
+      "expected": "no Dialog with filteredHistory mapping",
+      "severity": "required"
+    },
+    {
+      "check": "page.tsx line count under threshold",
+      "expected": "lineCount < 500",
+      "severity": "required"
+    },
+    {
+      "check": "all component files exist and have exports",
+      "expected": "InputPanel, CustomerSelector, OrderPreviewPanel, ImportResultDialog, MappingHistoryDialog all exported",
+      "severity": "required"
+    },
+    {
+      "check": "ColumnMappingUI imported by InputPanel",
+      "expected": "InputPanel imports ColumnMappingUI from './column-mapping-ui'",
+      "severity": "required"
+    },
+    {
+      "check": "ExcelUpload imported by InputPanel",
+      "expected": "InputPanel imports ExcelUpload from './excel-upload'",
+      "severity": "required"
+    },
+    {
+      "check": "TextInput imported by InputPanel",
+      "expected": "InputPanel imports TextInput from './text-input'",
+      "severity": "required"
+    },
+    {
+      "check": "ParseButton imported by InputPanel",
+      "expected": "InputPanel imports ParseButton from './parse-button'",
+      "severity": "required"
+    },
+    {
+      "check": "OrderStats imported by OrderPreviewPanel",
+      "expected": "OrderPreviewPanel imports OrderStats from './order-stats'",
+      "severity": "required"
+    },
+    {
+      "check": "OrderList imported by OrderPreviewPanel",
+      "expected": "OrderPreviewPanel imports OrderList from './order-list'",
+      "severity": "required"
+    }
+  ],
+  "propsCompatibilityMatrix": {
+    "pageTypesMatchComponents": [
+      {
+        "pageType": "Customer in page.tsx lines 262-269",
+        "componentType": "Customer in customer-selector.tsx lines 28-35",
+        "compatible": true,
+        "note": "page defines Customer as {code, name, salesUserId, ...} same as component"
+      },
+      {
+        "pageType": "UserInfo in page.tsx lines 271-277",
+        "componentType": "UserInfo in customer-selector.tsx lines 20-26",
+        "compatible": true,
+        "note": "Identical interface definition"
+      },
+      {
+        "pageType": "ParsedOrder = ParsedOrderDraft & {id, selected?, expanded?}",
+        "componentType": "ParsedOrder imported from use-order-parse-session",
+        "compatible": true,
+        "note": "component re-exports ParsedOrder from hooks, consistent"
+      },
+      {
+        "pageType": "ParseStats inline definition",
+        "componentType": "ParseStats from use-order-parse-session",
+        "compatible": true,
+        "note": "Identical shape: totalItems, matchedItems, unmatchedItems, ordersWithSupplier, ordersWithoutSupplier"
+      },
+      {
+        "pageType": "SubmitValidationSummary inline definition",
+        "componentType": "SubmitValidationSummary in order-preview-panel.tsx",
+        "compatible": true,
+        "note": "page and component define identical interface"
+      }
+    ]
+  },
+  "handlerBridging": {
+    "onCustomerChange": {
+      "componentSignature": "(code: string, customer: Customer) => void",
+      "pageHandler": "setSelectedCustomer(code) + loadMappingHistory(code) + autoLoadMappingByFingerprint(code)",
+      "needsBridge": true,
+      "bridgeImplementation": "const handleCustomerChange = (code: string, _customer: Customer) => { setSelectedCustomer(code); loadMappingHistory(code); autoLoadMappingByFingerprint(code); }"
+    },
+    "onSelectAll": {
+      "componentSignature": "(selected: boolean) => void",
+      "pageHandler": "no direct handler, needs inline implementation",
+      "needsBridge": true,
+      "bridgeImplementation": "const handleSelectAll = (selected: boolean) => { setParsedOrders(orders => orders.map(o => ({ ...o, selected }))); }"
+    },
+    "onMappingChange": {
+      "componentSignature": "(mapping: Record<string, string> | ((prev: Record<string, string>) => Record<string, string>)) => void",
+      "pageHandler": "setColumnMapping only accepts Record<string, string>",
+      "needsBridge": true,
+      "bridgeImplementation": "const handleMappingChange: InputPanelProps['onMappingChange'] = (val) => { if (typeof val === 'function') { setColumnMapping(val); } else { setColumnMapping(val); } }"
+    }
+  }
+}

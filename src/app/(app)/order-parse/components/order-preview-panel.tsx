@@ -173,7 +173,7 @@ export function OrderPreviewPanel({
             )}
             {submitValidation.missingSupplierCount > 0 && (
               <Badge variant="outline" className="border-amber-300 bg-white text-amber-800">
-                发货供应商 {submitValidation.missingSupplierCount}
+                发货发货方 {submitValidation.missingSupplierCount}
               </Badge>
             )}
           </div>

@@ -9,7 +9,7 @@ import { ExcelUpload } from './excel-upload';
 import { ColumnMappingUI } from './column-mapping-ui';
 import { ParseButton } from './parse-button';
 
-interface InputPanelProps {
+export interface InputPanelProps {
   inputMode: 'text' | 'excel';
   onInputModeChange: (v: 'text' | 'excel') => void;
   // Text
@@ -43,6 +43,7 @@ interface InputPanelProps {
   onMappingChange: (mapping: Record<string, string> | ((prev: Record<string, string>) => Record<string, string>)) => void;
   onMappingAutoLoadedClear: () => void;
   onMappingCollapsedChange: (v: boolean) => void;
+  mappingCollapsed: boolean;
   onRemoveFile: () => void;
 }
 
@@ -76,6 +77,7 @@ export function InputPanel({
   onMappingChange,
   onMappingAutoLoadedClear,
   onMappingCollapsedChange,
+  mappingCollapsed,
   onRemoveFile,
 }: InputPanelProps) {
   const handleMappingChange = (
@@ -157,7 +159,7 @@ export function InputPanel({
                   variant="ghost"
                   size="sm"
                   className="h-6 px-2 text-xs shrink-0"
-                  onClick={() => onMappingCollapsedChange(!columnMapping)}
+                  onClick={() => onMappingCollapsedChange(true)}
                 >
                   <ChevronDown className="h-3 w-3 mr-1" />
                   收起
@@ -170,7 +172,7 @@ export function InputPanel({
                 preview={excelPreview}
                 headerRow={headerRow}
                 columnMapping={columnMapping}
-                collapsed={false}
+                collapsed={mappingCollapsed}
                 onCollapsedChange={onMappingCollapsedChange}
                 onMappingChange={handleMappingChange}
                 onAutoLoadedClear={onMappingAutoLoadedClear}

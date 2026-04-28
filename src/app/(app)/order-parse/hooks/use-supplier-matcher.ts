@@ -67,6 +67,9 @@ export function useSupplierMatcher() {
 
           if (item.recommendedSupplier) {
             onRecommended(orderId, item.recommendedSupplier.id);
+          } else if (item.allSupplierOptions && item.allSupplierOptions.length > 0) {
+            // 没有推荐发货方但有候选发货方时，自动选中第一个
+            onRecommended(orderId, item.allSupplierOptions[0].supplierId);
           }
           if (item.newProductHint) {
             onHint(item.newProductHint);
@@ -116,6 +119,9 @@ export function useSupplierMatcher() {
             };
             if (item.recommendedSupplier) {
               onRecommended(item.orderId, item.recommendedSupplier.id);
+            } else if (item.allSupplierOptions && item.allSupplierOptions.length > 0) {
+              // 没有推荐发货方但有候选发货方时，自动选中第一个
+              onRecommended(item.orderId, item.allSupplierOptions[0].supplierId);
             }
           }
           onResults(newResults);

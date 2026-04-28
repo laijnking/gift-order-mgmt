@@ -2,16 +2,16 @@
 
 import { useCallback, useState } from 'react';
 import { buildUserInfoHeaders } from '@/lib/auth';
-import { getColumnMappingDiagnostics } from '@/lib/column-mapping-diagnostics';
-import type { ColumnMappingDiagnostics } from '@/lib/column-mapping-diagnostics';
 import {
   autoDetectColumnMapping,
   normalizeHeadersForCompare,
   computeHeaderFingerprint,
+  getColumnMappingDiagnostics,
   COLUMN_OPTIONS,
   GROUPED_OPTIONS,
   COMMON_FIELDS,
 } from '@/lib/column-mapping-rules';
+import type { ColumnMappingDiagnostics } from '@/lib/column-mapping-rules';
 
 export {
   COLUMN_OPTIONS,

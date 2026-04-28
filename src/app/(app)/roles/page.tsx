@@ -59,7 +59,7 @@ const DATA_SCOPE_OPTIONS = [
 const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   '订单管理': FileText,
   '客户管理': Users,
-  '供应商管理': Truck,
+  '发货方管理': Truck,
   '商品管理': Package,
   '库存管理': Warehouse,
   '系统设置': Settings,
@@ -108,7 +108,7 @@ export default function RolesPage() {
     } catch (error) {
       console.error('获取权限失败:', error);
     }
-  }, []);
+  }, [authHeaders]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
