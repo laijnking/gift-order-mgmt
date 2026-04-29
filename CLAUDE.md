@@ -115,9 +115,30 @@ Next.js 16 (App Router) + React 19 + TypeScript 5 + shadcn/ui (Radix UI) + Tailw
 - 客户反馈导出必须还原客户原始列名，物流信息由系统追加
 - 编辑 `supabase/migrations/` 中已有迁移文件时需格外谨慎（可能影响生产数据）
 
+## 生产环境部署
+
+详见 [docs/deploy.md](docs/deploy.md)
+
+**服务器**: `ssh LP@1.95.139.195`  
+**项目目录**: `/data/project`  
+**服务管理**: systemd (`gift-order-mgmt.service`)  
+**构建脚本**: `scripts/build.sh`（Next.js build + tsup 编译 `src/server.ts` → `dist/server.js`）
+
+### 快速部署
+
+```bash
+ssh LP@1.95.139.195
+cd /data/project
+git pull origin feature/local-0424-merge   # 或其他分支
+pnpm install --prefer-frozen-lockfile --prefer-offline
+pnpm build
+sudo systemctl restart gift-order-mgmt
+```
+
 ## 参考文档
 
 - `AGENTS.md` — 完整的项目文档（模块交互、数据字典、状态流转、异常处理等）
 - `docs/Product/数据字典.md` — 26 张数据表的完整字段定义
 - `docs/Product/模块功能说明.md` — 各模块详细功能清单
 - `docs/Product/模块交互说明.md` — 模块间交互流程与 API 调用
+- `docs/deploy.md` — 生产环境部署文档
