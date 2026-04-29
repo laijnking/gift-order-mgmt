@@ -47,6 +47,7 @@ import {
   ORDER_STATUS_CANCELLED,
 } from '@/lib/order-status';
 
+import { buildUserInfoHeaders } from '@/lib/auth';
 import { useOrdersSession, type Order } from './hooks/use-orders-session';
 import { useOrdersFilters } from './hooks/use-orders-filters';
 import { useOrdersTable, filterOrders, useSelectedCounts } from './hooks/use-orders-table';
@@ -73,6 +74,20 @@ export default function OrdersPage() {
     fetchOrders, markAlertAsRead, markAllAlertsAsRead,
     _restored,
   } = session;
+
+  // --- Users data (for salesperson/operator selection) ---
+  const [users, setUsers] = useState<Array<{ id: string; username: string; realName?: string; name?: string; role: string }>>([]);
+
+  useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        const res = await fetch('/api/users', { headers: buildUserInfoHeaders() });
+        const data = await res.json();
+        if (data.success) setUsers(data.data || []);
+      } catch { /* silent */ }
+    };
+    loadUsers();
+  }, []);
 
   // --- Filter hook ---
   const filters = useOrdersFilters(_restored);
@@ -940,6 +955,9 @@ export default function OrdersPage() {
           productPickerOpen={createProductPickerOpen}
           setProductPickerOpen={setCreateProductPickerOpen}
           autoOrderNo={autoOrderNo}
+          customers={customers}
+          users={users}
+          suppliers={suppliers}
         />
 
         <OrderEditDialog

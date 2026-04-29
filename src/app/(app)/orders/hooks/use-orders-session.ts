@@ -137,6 +137,10 @@ export interface Supplier {
 export interface Customer {
   code: string;
   name: string;
+  salesUserId?: string;
+  salesUserName?: string;
+  operatorUserId?: string;
+  operatorUserName?: string;
 }
 
 export interface AlertRecord {
@@ -217,7 +221,7 @@ export function useOrdersSession() {
     try {
       const res = await fetch('/api/customers?isActive=false', { headers: authHeaders() });
       const data = await res.json();
-      if (data.success) setCustomers((data.data || []).filter((c: Customer) => c.code && c.name));
+      if (data.success) setCustomers((data.data || []).filter((c: Customer) => !!(String(c.code ?? '').trim() && String(c.name ?? '').trim())));
     } catch {
       console.error('获取客户失败');
     }
