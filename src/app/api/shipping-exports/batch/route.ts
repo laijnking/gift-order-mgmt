@@ -378,6 +378,9 @@ function rowsForOrder(
       productSpec: isSupplierTemplate
         ? (supplierProductSpec || (item.productSpec as string) || '')
         : ((item.productSpec as string) || supplierProductSpec || ''),
+      supplierProductCode: supplierProductCode || '',
+      supplierProductName: supplierProductName || '',
+      supplierProductSpec: supplierProductSpec || '',
       quantity: item.quantity || 1,
       unitCost: item.unitCost || '',
       warehouseName: (item.warehouseName as string) || '',

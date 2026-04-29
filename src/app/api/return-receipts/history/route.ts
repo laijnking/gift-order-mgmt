@@ -20,6 +20,9 @@ interface ImportedReceiptInput {
   quantity?: number;
   price?: number | null;
   remark?: string;
+  ['系统订单']?: string;
+  ['系统订单号']?: string;
+  ['系统订单号（请勿删除和修改）']?: string;
   ['客户订单号']?: string;
   ['发货方单据号']?: string;
   ['快递公司']?: string;
@@ -69,7 +72,11 @@ function normalizeImportedReceipt(record: ImportedReceiptInput): NormalizedRecei
   const rawFreight = record.freightCost || record.freight_cost || record['运费'] || record['运费成本'] || record['快递费'];
   
   return {
-    customerOrderNo: normalizeText(record.customerOrderNo || record.customer_order_no || record['客户订单号']),
+    customerOrderNo: normalizeText(
+      record.customerOrderNo || record.customer_order_no ||
+      record['系统订单'] || record['系统订单号'] || record['系统订单号（请勿删除和修改）'] ||
+      record['客户订单号']
+    ),
     supplierOrderNo: normalizeText(record.supplierOrderNo || record.supplier_order_no || record['发货方单据号']),
     expressCompany: normalizeText(record.expressCompany || record.express_company || record['快递公司']),
     trackingNo: normalizeText(record.trackingNo || record.tracking_no || record['快递单号'] || record['物流单号']),

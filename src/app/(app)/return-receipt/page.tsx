@@ -96,6 +96,9 @@ interface ImportedReceiptRow {
   price?: number | string | null;
   warehouse?: string;
   remark?: string;
+  ['系统订单']?: string;
+  ['系统订单号']?: string;
+  ['系统订单号（请勿删除和修改）']?: string;
   ['客户订单号']?: string;
   ['订单号']?: string;
   ['单据编号']?: string;
@@ -186,7 +189,7 @@ export default function ReturnReceiptPage() {
           : rawFreight ? Number(rawFreight) : undefined;
         
         return {
-          customerOrderNo: row['客户订单号'] || row['订单号'] || row.customerOrderNo || row.orderNo || row['单据编号'] || '',
+          customerOrderNo: row['系统订单'] || row['系统订单号'] || row['系统订单号（请勿删除和修改）'] || row['客户订单号'] || row['订单号'] || row.customerOrderNo || row.orderNo || row['单据编号'] || '',
           supplierOrderNo: row['发货方单据号'] || row.supplierOrderNo || '',
           expressCompany: row['快递公司'] || row.expressCompany || '',
           trackingNo: row['快递单号'] || row.trackingNo || row['物流单号'] || '',

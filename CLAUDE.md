@@ -73,12 +73,13 @@ Next.js 16 (App Router) + React 19 + TypeScript 5 + shadcn/ui (Radix UI) + Tailw
 
 规格匹配 > 编码匹配 > 条码匹配 > 名称匹配
 
-### 回单匹配优先级（4 级）
+### 回单匹配优先级（3 级）
 
-1. 快递单号精确匹配
-2. 订单号 + 收货人手机号
-3. 订单号 + 收货人姓名
-4. 收货人手机号 + 商品名称
+回单 Excel 中的系统订单号列（支持多种列名：`系统订单`、`系统订单号`、`系统订单号（请勿删除和修改）`、`客户订单号`、`订单号`、`单据编号`），对应回单的 `customer_order_no` 字段，按以下顺序在 `orders` 表中查找匹配：
+
+1. **系统订单号精确匹配** — `orders.sys_order_no = receipt.customer_order_no`，命中则立即返回，不继续
+2. **客户订单号精确匹配** — `orders.order_no = receipt.customer_order_no`，放入候选集
+3. **客户订单号模糊匹配** — `orders.order_no ILIKE %receipt.customer_order_no%`，仅当前两级都为空时执行
 
 多候选命中 → 标记为 `conflict`，进入人工复核池。
 
