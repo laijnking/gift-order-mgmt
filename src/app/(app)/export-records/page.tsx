@@ -50,6 +50,8 @@ interface ExportRecord {
   export_type: string;
   supplier_id: string | null;
   customer_id: string | null;
+  supplier_name: string | null;
+  customer_name: string | null;
   template_id: string | null;
   template_name: string;
   file_url: string;
@@ -73,6 +75,16 @@ interface ExportRecord {
     template_source?: 'explicit' | 'default' | 'first' | 'column_mapping';
   } | null;
   created_at: string;
+}
+
+interface Shipper {
+  id: string;
+  name: string;
+}
+
+interface Customer {
+  id: string;
+  name: string;
 }
 
 interface ExportDetail {
@@ -146,6 +158,12 @@ export default function ExportRecordsPage() {
   const [pageSize] = useState(20);
   const [exportType, setExportType] = useState<string>(searchParams.get('type') || 'all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [supplierId, setSupplierId] = useState('');
+  const [customerId, setCustomerId] = useState('');
+  const [shippers, setShippers] = useState<Shipper[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedRecord, setSelectedRecord] = useState<ExportRecord | null>(null);
   const [details, setDetails] = useState<ExportDetail[]>([]);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
@@ -155,6 +173,38 @@ export default function ExportRecordsPage() {
   const [autoOpenedRecordId, setAutoOpenedRecordId] = useState<string | null>(null);
 
   const authHeaders = () => buildUserInfoHeaders(user);
+
+  // 加载发货方列表
+  const loadShippers = async () => {
+    try {
+      const response = await fetch('/api/shippers?active=true', { headers: authHeaders() });
+      const data = await response.json();
+      if (data.success) {
+        setShippers(data.data || []);
+      }
+    } catch (error) {
+      console.error('加载发货方失败:', error);
+    }
+  };
+
+  // 加载客户列表
+  const loadCustomers = async () => {
+    try {
+      const response = await fetch('/api/customers?isActive=true', { headers: authHeaders() });
+      const data = await response.json();
+      if (data.success) {
+        setCustomers(data.data || []);
+      }
+    } catch (error) {
+      console.error('加载客户失败:', error);
+    }
+  };
+
+  // 初始化加载
+  useEffect(() => {
+    loadShippers();
+    loadCustomers();
+  }, []);
 
   const triggerBrowserDownload = (url: string, filename?: string) => {
     const link = document.createElement('a');
@@ -187,7 +237,7 @@ export default function ExportRecordsPage() {
   // 加载导出记录
   useEffect(() => {
     loadRecords();
-  }, [page, exportType]);
+  }, [page, exportType, startDate, endDate, supplierId, customerId]);
 
   useEffect(() => {
     const targetRecordId = searchParams.get('recordId');
@@ -211,10 +261,22 @@ export default function ExportRecordsPage() {
       if (exportType !== 'all') {
         url += `&exportType=${exportType}`;
       }
-      
+      if (startDate) {
+        url += `&startDate=${startDate}`;
+      }
+      if (endDate) {
+        url += `&endDate=${endDate}`;
+      }
+      if (supplierId) {
+        url += `&supplierId=${supplierId}`;
+      }
+      if (customerId) {
+        url += `&customerId=${customerId}`;
+      }
+
       const response = await fetch(url, { headers: authHeaders() });
       const data = await response.json();
-      
+
       if (data.success) {
         setRecords(data.data || []);
         setTotal(data.total || 0);
@@ -421,6 +483,49 @@ export default function ExportRecordsPage() {
                 <SelectItem value="customer_feedback">客户反馈</SelectItem>
               </SelectContent>
             </Select>
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                type="date"
+                placeholder="开始日期"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-[150px]"
+              />
+              <span className="text-muted-foreground">至</span>
+              <Input
+                type="date"
+                placeholder="结束日期"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-[150px]"
+              />
+            </div>
+            <Select value={supplierId} onValueChange={setSupplierId}>
+              <SelectTrigger className="w-full lg:w-[180px]">
+                <SelectValue placeholder="发货方" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">全部发货方</SelectItem>
+                {shippers.map((shipper) => (
+                  <SelectItem key={shipper.id} value={shipper.id}>
+                    {shipper.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={customerId} onValueChange={setCustomerId}>
+              <SelectTrigger className="w-full lg:w-[180px]">
+                <SelectValue placeholder="客户" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">全部客户</SelectItem>
+                {customers.map((customer) => (
+                  <SelectItem key={customer.id} value={customer.id}>
+                    {customer.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <div className="relative flex-1 lg:max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -434,6 +539,27 @@ export default function ExportRecordsPage() {
               共 {total} 条记录
             </div>
           </div>
+          {(startDate || endDate || supplierId || customerId) && (
+            <div className="mt-3 flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">当前筛选：</span>
+              {startDate && <Badge variant="secondary">开始日期: {startDate}</Badge>}
+              {endDate && <Badge variant="secondary">结束日期: {endDate}</Badge>}
+              {supplierId && <Badge variant="secondary">发货方: {shippers.find(s => s.id === supplierId)?.name || supplierId}</Badge>}
+              {customerId && <Badge variant="secondary">客户: {customers.find(c => c.id === customerId)?.name || customerId}</Badge>}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setStartDate('');
+                  setEndDate('');
+                  setSupplierId('');
+                  setCustomerId('');
+                }}
+              >
+                清除筛选
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -461,6 +587,7 @@ export default function ExportRecordsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>导出类型</TableHead>
+                  <TableHead>导出对象</TableHead>
                   <TableHead>文件名</TableHead>
                   <TableHead>模板</TableHead>
                   <TableHead className="text-right">导出数量</TableHead>
@@ -481,6 +608,11 @@ export default function ExportRecordsPage() {
                           <TypeIcon className="h-3 w-3 mr-1" />
                           {typeInfo.label}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {record.export_type === 'shipping_notice'
+                          ? record.supplier_name || '-'
+                          : record.customer_name || '-'}
                       </TableCell>
                       <TableCell className="font-medium">{record.file_name}</TableCell>
                       <TableCell>
