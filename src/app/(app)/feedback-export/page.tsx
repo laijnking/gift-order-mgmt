@@ -23,6 +23,7 @@ import {
   FileDown, Search, RefreshCw, CheckCircle2, Loader2,
   FileSpreadsheet, Clock, History, FileText
 } from 'lucide-react';
+import { HelpGuide, HelpSection, HelpSteps, HelpNote, HelpLinks } from '@/components/ui/help-guide';
 import { toast } from 'sonner';
 import { buildUserInfoHeaders, useAuth } from '@/lib/auth';
 
@@ -259,6 +260,33 @@ export default function FeedbackExportPage() {
           </div>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
+          <HelpGuide
+            title="反馈导出帮助"
+            docUrl="/docs/guides/feedback-export"
+          >
+            <HelpSection title="功能说明">
+              导出已回单订单给客户，使用客户导入时的原始列名。
+            </HelpSection>
+            <HelpSection title="核心原则">
+              <HelpNote type="info">
+                客户用什么列名导入，系统就用什么列名导出。物流信息（快递公司、运单号）由系统追加。
+              </HelpNote>
+            </HelpSection>
+            <HelpSection title="数据还原流程">
+              <HelpSteps steps={[
+                { title: "客户上传Excel" },
+                { title: "识别客户编码" },
+                { title: "计算表头指纹" },
+                { title: "命中历史映射" },
+                { title: "按原始列名导出" },
+              ]} />
+            </HelpSection>
+            <HelpLinks links={[
+              { label: "订单解析", href: "/order-parse", description: "订单录入" },
+              { label: "回单导入", href: "/return-receipt", description: "回单确认" },
+              { label: "核心业务流", href: "/docs/guides/business-flow", description: "模块数据流转" },
+            ]} />
+          </HelpGuide>
           <Button variant="outline" onClick={loadPending} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             刷新

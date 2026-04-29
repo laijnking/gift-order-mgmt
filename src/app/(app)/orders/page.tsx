@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { RefreshCw } from 'lucide-react';
+import { HelpGuide, HelpSection, HelpSteps, HelpNote, HelpLinks } from '@/components/ui/help-guide';
 import {
   Popover,
   PopoverContent,
@@ -33,6 +33,7 @@ import {
   FileDown,
   AlertCircle,
   X,
+  RefreshCw,
 } from 'lucide-react';
 import {
   getOrderStatusBadgeClass,
@@ -562,6 +563,37 @@ export default function OrdersPage() {
               <Plus className="w-4 h-4 mr-1" />
               新增订单
             </Button>
+            <HelpGuide
+              title="订单管理帮助"
+              docUrl="/docs/guides/orders"
+            >
+              <HelpSection title="功能说明">
+                订单中心是系统的核心模块，负责管理所有订单的生命周期，支持订单导入、状态流转、筛选搜索、批量派发和详情查看。
+              </HelpSection>
+              <HelpSection title="快速操作">
+                <HelpSteps steps={[
+                  { title: "筛选订单", description: "使用状态筛选和高级筛选" },
+                  { title: "查看详情", description: "点击订单行的眼睛图标" },
+                  { title: "批量派发", description: "勾选订单后点击派发" },
+                  { title: "回单确认", description: "勾选订单后点击回单" },
+                ]} />
+              </HelpSection>
+              <HelpSection title="订单状态">
+                <div className="text-xs space-y-1">
+                  <div>• pending（待派发）→ assigned（已派发）→ notified（通知发货）</div>
+                  <div>• notified → partial_returned（部分回单）/ returned（已回单）</div>
+                  <div>• returned → completed（已完成）</div>
+                </div>
+              </HelpSection>
+              <HelpNote type="tip">
+                提示：同一订单重复派发会复用既有记录，不会重复扣减库存
+              </HelpNote>
+              <HelpLinks links={[
+                { label: "订单解析", href: "/order-parse", description: "导入新订单" },
+                { label: "发货导出", href: "/shipping-export", description: "生成发货通知" },
+                { label: "核心业务流", href: "/docs/guides/business-flow", description: "模块数据流转" },
+              ]} />
+            </HelpGuide>
             {selectedOrders.size > 0 && (
               <Button
                 variant="destructive"

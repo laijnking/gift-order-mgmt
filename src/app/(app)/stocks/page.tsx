@@ -65,6 +65,7 @@ import {
   Check,
   X,
 } from 'lucide-react';
+import { HelpGuide, HelpSection, HelpSteps, HelpNote, HelpLinks } from '@/components/ui/help-guide';
 
 // Excel模板配置
 const IMPORT_TEMPLATE = {
@@ -688,6 +689,34 @@ export default function StocksPage() {
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <HelpGuide
+            title="库存管理帮助"
+            docUrl="/docs/guides/stocks"
+          >
+            <HelpSection title="功能说明">
+              提供库存查询、版本历史追踪、价格历史记录功能，支持库存导入和预警规则配置。
+            </HelpSection>
+            <HelpSection title="库存变更类型">
+              <div className="text-xs space-y-1">
+                <div>• import：批量导入</div>
+                <div>• order：订单派发扣减</div>
+                <div>• manual：手动调整</div>
+                <div>• adjust：系统调整</div>
+                <div>• return：退货入库</div>
+                <div>• transfer：调拨</div>
+              </div>
+            </HelpSection>
+            <HelpSection title="库存扣减时机">
+              <HelpNote type="info">
+                订单派发时（dispatch_only 或 dispatch_with_persistence 模式），系统自动扣减库存
+              </HelpNote>
+            </HelpSection>
+            <HelpLinks links={[
+              { label: "商品管理", href: "/products", description: "查看商品档案" },
+              { label: "发货方管理", href: "/suppliers-manage", description: "查看发货方档案" },
+              { label: "核心业务流", href: "/docs/guides/business-flow", description: "模块数据流转" },
+            ]} />
+          </HelpGuide>
           <Button variant="outline" onClick={() => { setShowLowStockOnly(!showLowStockOnly); }} className="w-full sm:w-auto">
             <AlertTriangle className={`mr-2 h-4 w-4 ${showLowStockOnly ? 'text-orange-500' : ''}`} />
             {showLowStockOnly ? '显示全部' : '只看预警'}

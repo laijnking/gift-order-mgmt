@@ -52,6 +52,7 @@ import {
   Plus,
   Trash2,
 } from 'lucide-react';
+import { HelpGuide, HelpSection, HelpSteps, HelpNote, HelpLinks } from '@/components/ui/help-guide';
 
 interface AlertRule {
   id: string;
@@ -396,6 +397,36 @@ export default function AlertsPage() {
             系统预警信息集中管理
           </p>
         </div>
+        <HelpGuide
+          title="预警中心帮助"
+          docUrl="/docs/guides/alerts"
+        >
+          <HelpSection title="功能说明">
+            统一管理所有业务预警，包括库存不足预警、待派发超时预警、回单超时预警。
+          </HelpSection>
+          <HelpSection title="预警类型">
+            <div className="text-xs space-y-1">
+              <div>• low_stock：库存 ≤ 阈值（默认 2 台）</div>
+              <div>• order_timeout：待派发超过 N 小时</div>
+              <div>• return_delay：回单超过 N 小时未回传</div>
+            </div>
+          </HelpSection>
+          <HelpSection title="执行器机制">
+            <HelpSteps steps={[
+              { title: "新增", description: "满足条件 + 无未处理预警" },
+              { title: "复用", description: "满足条件 + 已有未处理预警" },
+              { title: "自动关闭", description: "不满足条件 + 有未处理预警" },
+            ]} />
+          </HelpSection>
+          <HelpNote type="tip">
+            提示：当条件不再满足时，预警会自动关闭，无需手动处理
+          </HelpNote>
+          <HelpLinks links={[
+            { label: "库存管理", href: "/stocks", description: "查看库存" },
+            { label: "订单管理", href: "/orders", description: "处理待派发订单" },
+            { label: "核心业务流", href: "/docs/guides/business-flow", description: "模块数据流转" },
+          ]} />
+        </HelpGuide>
         <Button variant="outline" onClick={() => loadRecords()} className="w-full sm:w-auto">
           <RefreshCw className="mr-2 h-4 w-4" />
           刷新

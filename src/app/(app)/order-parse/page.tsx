@@ -202,6 +202,7 @@ import {
 } from 'lucide-react';
 import { ProductPickerDialog } from '@/components/product/product-picker-dialog';
 import type { ProductPickerItem } from '@/components/product/product-picker-dialog';
+import { HelpGuide, HelpSection, HelpSteps, HelpNote, HelpLinks } from '@/components/ui/help-guide';
 import { InputPanel } from './components/input-panel';
 import type { InputPanelProps } from './components/input-panel';
 import { CustomerSelector } from './components/customer-selector';
@@ -1538,18 +1539,50 @@ export default function OrderParsePage() {
              支持文本/Excel导入，AI自动识别并生成结构化订单
            </p>
          </div>
-         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-         {selectedCustomer && (
-             <Button
-               variant="outline"
-               size="sm"
-               onClick={() => setShowMappingDialog(true)}
-               className="w-full sm:w-auto"
-             >
-               <History className="h-4 w-4 mr-1" />
-               映射历史 ({mappingHistory.length})
-             </Button>
-           )}
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+          <HelpGuide
+            title="订单解析帮助"
+            docUrl="/docs/guides/order-parse"
+          >
+            <HelpSection title="功能说明">
+              支持通过 Excel 导入订单，自动解析表头、智能匹配商品和发货方、历史映射自动加载。
+            </HelpSection>
+            <HelpSection title="快速操作">
+              <HelpSteps steps={[
+                { title: "选择客户", description: "自动联动业务员/跟单员" },
+                { title: "上传 Excel", description: "支持 .xls/.xlsx 格式" },
+                { title: "配置列映射", description: "自动加载历史映射" },
+                { title: "解析并提交", description: "智能匹配商品" },
+              ]} />
+            </HelpSection>
+            <HelpSection title="商品匹配优先级">
+              <div className="text-xs space-y-1">
+                <div>1. 规格匹配（精确）</div>
+                <div>2. 编码匹配（精确）</div>
+                <div>3. 条码匹配（精确）</div>
+                <div>4. 名称匹配（模糊）</div>
+              </div>
+            </HelpSection>
+            <HelpNote type="tip">
+              提示：库存 ≤ 2 台时会显示尾货预警，请注意撞单风险
+            </HelpNote>
+            <HelpLinks links={[
+              { label: "订单管理", href: "/orders", description: "查看已提交订单" },
+              { label: "发货导出", href: "/shipping-export", description: "派发订单" },
+              { label: "核心业务流", href: "/docs/guides/business-flow", description: "模块数据流转" },
+            ]} />
+          </HelpGuide>
+          {selectedCustomer && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowMappingDialog(true)}
+              className="w-full sm:w-auto"
+            >
+              <History className="h-4 w-4 mr-1" />
+              映射历史 ({mappingHistory.length})
+            </Button>
+          )}
            <Button
              variant="outline"
              size="sm"

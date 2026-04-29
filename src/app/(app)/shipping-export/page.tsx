@@ -23,6 +23,7 @@ import {
   Package, FileDown, Search, RefreshCw, CheckCircle2, Loader2,
   FileSpreadsheet, Clock, History, AlertTriangle
 } from 'lucide-react';
+import { HelpGuide, HelpSection, HelpSteps, HelpNote, HelpLinks } from '@/components/ui/help-guide';
 import { toast } from 'sonner';
 import { buildUserInfoHeaders, useAuth } from '@/lib/auth';
 
@@ -334,6 +335,35 @@ export default function ShippingExportPage() {
           </div>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
+          <HelpGuide
+            title="发货导出帮助"
+            docUrl="/docs/guides/shipping-export"
+          >
+            <HelpSection title="功能说明">
+              按发货方生成派发单，支持自定义模板和三种派发模式。
+            </HelpSection>
+            <HelpSection title="派发模式">
+              <HelpSteps steps={[
+                { title: "预览", description: "仅生成预览内容，无副作用" },
+                { title: "仅派发", description: "派发订单、扣减库存、写派发记录" },
+                { title: "派发并留痕", description: "包含所有副作用+文件持久化" },
+              ]} />
+            </HelpSection>
+            <HelpSection title="模板优先级">
+              <div className="text-xs space-y-1">
+                <div>1. 发货方专属模板（优先）</div>
+                <div>2. 用户选择的模板</div>
+                <div>3. 默认模板（fallback）</div>
+              </div>
+            </HelpSection>
+            <HelpNote type="warning">
+              注意：派发会扣减库存，请确认后再执行
+            </HelpNote>
+            <HelpLinks links={[
+              { label: "回单导入", href: "/return-receipt", description: "导入回单" },
+              { label: "核心业务流", href: "/docs/guides/business-flow", description: "模块数据流转" },
+            ]} />
+          </HelpGuide>
           <Button variant="outline" onClick={() => activeTab === 'pending' ? loadPending() : loadExported()} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             刷新

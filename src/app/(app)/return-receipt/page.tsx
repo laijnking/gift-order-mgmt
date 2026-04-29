@@ -26,6 +26,7 @@ import {
   Upload, Loader2, CheckCircle2,
   AlertTriangle, FileText, RefreshCw, Package, Link2
 } from 'lucide-react';
+import { HelpGuide, HelpSection, HelpSteps, HelpNote, HelpLinks } from '@/components/ui/help-guide';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { PageGuard } from '@/components/auth/page-guard';
@@ -500,6 +501,35 @@ export default function ReturnReceiptPage() {
             <p className="text-sm text-muted-foreground">上传Excel自动匹配订单，无需选择发货方</p>
           </div>
         </div>
+        <HelpGuide
+          title="回单管理帮助"
+          docUrl="/docs/guides/return-receipt"
+        >
+          <HelpSection title="功能说明">
+            接收发货方回传的快递单号，支持直接上传 Excel 自动匹配订单。
+          </HelpSection>
+          <HelpSection title="匹配优先级">
+            <HelpSteps steps={[
+              { title: "系统订单号", description: "精确匹配" },
+              { title: "客户订单号", description: "精确匹配" },
+              { title: "模糊匹配", description: "订单号模糊匹配" },
+            ]} />
+          </HelpSection>
+          <HelpSection title="匹配结果处理">
+            <div className="text-xs space-y-1">
+              <div>• auto_matched：自动匹配成功，可直接确认</div>
+              <div>• conflict：冲突（多个候选），需手动选择</div>
+              <div>• pending：未匹配，需手动关联</div>
+            </div>
+          </HelpSection>
+          <HelpNote type="info">
+            部分回单：同一订单分批导入时，物流信息用 `;` 隔开追加
+          </HelpNote>
+          <HelpLinks links={[
+            { label: "客户反馈", href: "/feedback-export", description: "导出客户反馈" },
+            { label: "核心业务流", href: "/docs/guides/business-flow", description: "模块数据流转" },
+          ]} />
+        </HelpGuide>
         <Button variant="outline" onClick={loadRecords} disabled={loading} className="w-full sm:w-auto">
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
           刷新
