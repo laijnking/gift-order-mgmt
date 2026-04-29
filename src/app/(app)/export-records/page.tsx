@@ -144,7 +144,7 @@ export default function ExportRecordsPage() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
-  const [exportType, setExportType] = useState<string>('all');
+  const [exportType, setExportType] = useState<string>(searchParams.get('type') || 'all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRecord, setSelectedRecord] = useState<ExportRecord | null>(null);
   const [details, setDetails] = useState<ExportDetail[]>([]);

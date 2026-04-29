@@ -40,7 +40,7 @@ const menuItems: MenuItem[] = [
   { label: 'AI订单录入', href: '/order-parse', icon: Bot },
   { label: '发货通知单', href: '/shipping-export', icon: Truck },
   { label: '物流回单', href: '/return-receipt', icon: Package },
-  { label: '客户回单', href: '/export-records', icon: FileText },
+  { label: '客户反馈导出', href: '/feedback-export', icon: FileText },
   { label: '库存管理', href: '/stocks', icon: Warehouse },
   { label: '历史成本库', href: '/order-cost-history', icon: DollarSign },
   { label: '数据报表', href: '/reports', icon: BarChart3 },
