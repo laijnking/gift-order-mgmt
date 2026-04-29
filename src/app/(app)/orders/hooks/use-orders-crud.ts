@@ -17,6 +17,13 @@ export function useOrdersCrud({
   const [createForm, setCreateForm] = useState({
     orderNo: '',
     customerCode: '',
+    customerName: '',
+    salespersonId: '',
+    salespersonName: '',
+    operatorId: '',
+    operatorName: '',
+    supplierId: '',
+    supplierName: '',
     productName: '',
     productCode: '',
     productSpec: '',
@@ -83,11 +90,19 @@ export function useOrdersCrud({
         body: JSON.stringify({
           orderNo: createForm.orderNo,
           customerCode: createForm.customerCode || 'UNKNOWN',
+          customerName: createForm.customerName || '',
+          salespersonId: createForm.salespersonId || '',
+          salespersonName: createForm.salespersonName || '',
+          operatorId: createForm.operatorId || '',
+          operatorName: createForm.operatorName || '',
+          supplierId: createForm.supplierId || '',
+          supplierName: createForm.supplierName || '',
           items: [{
-            product_name: createForm.productName || '未指定商品',
-            product_code: createForm.productCode || '',
-            product_spec: createForm.productSpec || '',
-            product_brand: createForm.productBrand || '',
+            orderNo: createForm.orderNo,
+            productName: createForm.productName || '未指定商品',
+            productCode: createForm.productCode || '',
+            productSpec: createForm.productSpec || '',
+            productBrand: createForm.productBrand || '',
             quantity: createForm.quantity || 1,
           }],
           receiver: {
@@ -106,8 +121,11 @@ export function useOrdersCrud({
         toast.success('订单创建成功');
         setCreateDialogOpen(false);
         setCreateForm({
-          orderNo: '', customerCode: '', productName: '', productCode: '',
-          productSpec: '', productBrand: '', quantity: 1,
+          orderNo: '', customerCode: '', customerName: '',
+          salespersonId: '', salespersonName: '', operatorId: '', operatorName: '',
+          supplierId: '', supplierName: '',
+          productName: '', productCode: '', productSpec: '', productBrand: '',
+          quantity: 1,
           receiverName: '', receiverPhone: '', receiverAddress: '',
           receiverProvince: '', expressRequirement: '', remark: '',
         });
