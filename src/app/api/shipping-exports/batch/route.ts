@@ -194,6 +194,10 @@ async function dispatchPendingOrder(
       quantity: toNumber(item.quantity, 1),
       unitCost: toNumber(item.unitCost || item.unit_cost),
       warehouseName: itemText(item, 'warehouseName', 'warehouse_name'),
+      // 保留发货方商品字段（派发时快照），二次导出时优先使用
+      supplierProductCode: itemText(item, 'supplierProductCode') || itemText(item, 'productCode', 'product_code'),
+      supplierProductName: itemText(item, 'supplierProductName') || itemText(item, 'productName', 'product_name'),
+      supplierProductSpec: itemText(item, 'supplierProductSpec') || itemText(item, 'productSpec', 'product_spec'),
     }));
 
     const currentStatus = String(order.status || 'pending');
@@ -341,21 +345,30 @@ function rowsForOrder(
 ) {
   const items = dispatchItems && dispatchItems.length > 0
     ? dispatchItems
-    : parseItems(order.items).map((item) => ({
+    : parseItems(order.items).map((item) => {
       // 发货方专属模板优先取发货方商品信息；通用模板优先取系统商品信息
-      productCode: isSupplierTemplate
+      const resolvedProductCode = isSupplierTemplate
         ? itemText(item, 'cu_product_code', 'cuProductCode') || itemText(item, 'product_code', 'productCode')
-        : itemText(item, 'product_code', 'productCode') || itemText(item, 'cu_product_code', 'cuProductCode'),
-      productName: isSupplierTemplate
+        : itemText(item, 'product_code', 'productCode') || itemText(item, 'cu_product_code', 'cuProductCode');
+      const resolvedProductName = isSupplierTemplate
         ? itemText(item, 'cu_product_name', 'cuProductName') || itemText(item, 'product_name', 'productName')
-        : itemText(item, 'product_name', 'productName') || itemText(item, 'cu_product_name', 'cuProductName'),
-      productSpec: isSupplierTemplate
+        : itemText(item, 'product_name', 'productName') || itemText(item, 'cu_product_name', 'cuProductName');
+      const resolvedProductSpec = isSupplierTemplate
         ? itemText(item, 'cu_product_spec', 'cuProductSpec') || itemText(item, 'product_spec', 'productSpec')
-        : itemText(item, 'product_spec', 'productSpec') || itemText(item, 'cu_product_spec', 'cuProductSpec'),
-      quantity: toNumber(item.quantity, 1),
-      unitCost: toNumber(item.price || item.unit_price),
-      warehouseName: itemText(item, 'warehouse'),
-    }));
+        : itemText(item, 'product_spec', 'productSpec') || itemText(item, 'cu_product_spec', 'cuProductSpec');
+      return {
+        productCode: resolvedProductCode,
+        productName: resolvedProductName,
+        productSpec: resolvedProductSpec,
+        // 发货方商品信息默认使用系统字段兜底（如果没有派发快照）
+        supplierProductCode: resolvedProductCode,
+        supplierProductName: resolvedProductName,
+        supplierProductSpec: resolvedProductSpec,
+        quantity: toNumber(item.quantity, 1),
+        unitCost: toNumber(item.price || item.unit_price),
+        warehouseName: itemText(item, 'warehouse'),
+      };
+    });
 
   return items.map((item) => {
     // dispatchItems 已有发货方商品字段（派发时已优先保留 cu_product_*），直接用
