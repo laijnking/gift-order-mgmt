@@ -322,13 +322,13 @@ export default function ProductMappingsPage() {
         setMappings(mappingsData.data || []);
       }
       if (customersData.success) {
-        setCustomers((customersData.data || []).filter((c): c is Customer => c.code !== undefined && c.name !== undefined));
+        setCustomers((customersData.data || []).filter((c): c is Customer => !!c.code && !!c.name));
       }
       if (suppliersData.success) {
-        setSuppliers((suppliersData.data || []).filter((s): s is Supplier => s.id !== undefined && s.name !== undefined));
+        setSuppliers((suppliersData.data || []).filter((s): s is Supplier => !!s.id && !!s.name));
       }
       if (productsData.success) {
-        setProducts((productsData.data || []).filter((p): p is Product => p.code !== undefined && p.name !== undefined));
+        setProducts((productsData.data || []).filter((p): p is Product => !!p.code && !!p.name));
       }
     } catch {
       console.error('加载数据失败');
@@ -346,9 +346,9 @@ export default function ProductMappingsPage() {
   // 获取当前Tab的过滤值
   const getPartnerFilter = activeTab === 'customer' ? customerFilter : supplierFilter;
   const setPartnerFilter = activeTab === 'customer' ? setCustomerFilter : setSupplierFilter;
-  const getPartnerOptions = activeTab === 'customer' 
-    ? customers.map(c => ({ value: c.code, label: c.name }))
-    : suppliers.map(s => ({ value: s.id, label: s.name }));
+  const getPartnerOptions = (activeTab === 'customer'
+    ? customers.filter(c => c.code && c.code.trim()).map(c => ({ value: c.code, label: c.name }))
+    : suppliers.filter(s => s.id && s.id.trim()).map(s => ({ value: s.id, label: s.name })));
   const getPartnerName = (code: string) => {
     if (activeTab === 'customer') {
       return customers.find(c => c.code === code)?.name || code;
@@ -1177,7 +1177,7 @@ export default function ProductMappingsPage() {
                     <SelectValue placeholder="选择系统商品" />
                   </SelectTrigger>
                   <SelectContent>
-                    {products.map((p) => (
+                    {products.filter(p => p.code && p.code.trim()).map((p) => (
                       <SelectItem key={p.code} value={p.code}>
                         {p.name} ({p.code})
                       </SelectItem>
