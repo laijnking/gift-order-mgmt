@@ -188,8 +188,9 @@ CREATE INDEX IF NOT EXISTS idx_customers_order_taker ON customers(order_taker_id
 -- Performance indexes for customer list query optimization
 CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name);
 CREATE INDEX IF NOT EXISTS idx_customers_created_at ON customers(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_customers_is_active ON customers(is_active);
 CREATE INDEX IF NOT EXISTS idx_customers_status ON customers(status);
+CREATE INDEX IF NOT EXISTS idx_customers_contact_person ON customers(contact_person);
+CREATE INDEX IF NOT EXISTS idx_customers_contact_phone ON customers(contact_phone);
 
 -- =====================================================
 -- 6. 商品档案表 (products)
