@@ -436,8 +436,13 @@ export async function GET(request: NextRequest) {
   // 获取当前用户信息用于数据权限过滤
   const currentUser = getCurrentUser(request);
 
+  // Pagination params
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+  const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get('pageSize') || '50', 10)));
+  const offset = (page - 1) * pageSize;
+
   try {
-    let query = client.from('orders').select('*');
+    let query = client.from('orders').select('*', { count: 'exact' });
 
     // ==================== 数据权限过滤 ====================
     // 仅本人(self)：只看业务员或跟单员是自己的订单
@@ -505,9 +510,9 @@ export async function GET(request: NextRequest) {
       query = query.or(`order_no.ilike.%${search}%,sys_order_no.ilike.%${search}%,receiver_name.ilike.%${search}%,receiver_phone.ilike.%${search}%`);
     }
 
-    query = query.order('created_at', { ascending: false });
+    query = query.order('created_at', { ascending: false }).range(offset, offset + pageSize - 1);
 
-    const { data, error } = await query;
+    const { data, error, count } = await query;
     if (error) throw new Error(`查询订单失败: ${error.message}`);
 
     // 批量构建档案映射
@@ -522,10 +527,16 @@ export async function GET(request: NextRequest) {
       warehouseMap: relatedMaps.warehouseMap
     }));
 
+    const total = count ?? data?.length ?? 0;
+    const totalPages = Math.ceil(total / pageSize);
+
     return NextResponse.json({
       success: true,
       data: transformedData,
-      total: data?.length || 0
+      total,
+      page,
+      pageSize,
+      totalPages,
     });
   } catch (error) {
     console.error('获取订单失败:', error);

@@ -172,6 +172,12 @@ export function useOrdersSession() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [pageSize, setPageSize] = useState(50);
+
   // Reference data
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -186,24 +192,30 @@ export function useOrdersSession() {
   }), []);
 
   // Fetch orders
-  const fetchOrders = useCallback(async () => {
+  const fetchOrders = useCallback(async (page = 1) => {
+    setLoading(true);
     try {
-      const params = new URLSearchParams();
+      const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
       const importBatch = searchParams.get('importBatch')?.trim();
       const status = searchParams.get('status')?.trim();
       if (importBatch) params.set('importBatch', importBatch);
       if (status && status !== 'all') params.set('status', status);
-      const res = await fetch(`/api/orders${params.toString() ? `?${params.toString()}` : ''}`, {
+      const res = await fetch(`/api/orders?${params.toString()}`, {
         headers: buildUserInfoHeaders(),
       });
       const data = await res.json();
-      if (data.success) setOrders(data.data || []);
+      if (data.success) {
+        setOrders(data.data || []);
+        setTotalCount(data.total || 0);
+        setTotalPages(data.totalPages || 1);
+        setCurrentPage(data.page || 1);
+      }
     } catch {
       console.error('获取订单失败');
     } finally {
       setLoading(false);
     }
-  }, [searchParams]);
+  }, [searchParams, pageSize]);
 
   // Fetch suppliers
   const fetchSuppliers = useCallback(async () => {
@@ -348,6 +360,10 @@ export function useOrdersSession() {
     selectedOrderIds, setSelectedOrderIdsState,
     authHeaders,
     fetchOrders,
+    currentPage, setCurrentPage,
+    totalPages, setTotalPages,
+    totalCount, setTotalCount,
+    pageSize, setPageSize,
     fetchSuppliers,
     fetchCustomers,
     fetchAlerts,

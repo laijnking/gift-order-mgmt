@@ -3,6 +3,13 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { HelpGuide, HelpSection, HelpSteps, HelpNote, HelpLinks } from '@/components/ui/help-guide';
@@ -73,6 +80,11 @@ export default function OrdersPage() {
     selectedOrders, setSelectedOrders,
     fetchOrders, markAlertAsRead, markAllAlertsAsRead,
     _restored,
+    loading,
+    currentPage, setCurrentPage,
+    totalPages, setTotalPages,
+    totalCount, setTotalCount,
+    pageSize, setPageSize,
   } = session;
 
   // --- Users data (for salesperson/operator selection) ---
@@ -118,6 +130,11 @@ export default function OrdersPage() {
     quantityOp, quantityFilter,
     searchFields, advancedFields,
   });
+
+  // Reset to page 1 whenever filter state changes (search, status, customer, supplier, etc.)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const filterDeps = [statusFilter, selectedStatuses, customerFilter, supplierFilter, quantityOp, quantityFilter, JSON.stringify(searchFields), JSON.stringify(advancedFields)];
+  useEffect(() => { fetchOrders(1); }, filterDeps); // eslint-disable-line
 
   // --- Selected counts ---
   const selectedCounts = useSelectedCounts(selectedOrders);
@@ -507,7 +524,7 @@ export default function OrdersPage() {
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-            <Button variant="outline" size="sm" onClick={fetchOrders} className="w-full sm:w-auto">
+            <Button variant="outline" size="sm" onClick={() => fetchOrders(currentPage)} className="w-full sm:w-auto">
               <RefreshCw className="w-4 h-4 mr-1" />
               刷新
             </Button>
@@ -930,6 +947,65 @@ export default function OrdersPage() {
                 )}
               </TableBody>
             </Table>
+            {/* Pagination Bar */}
+            {!loading && totalCount > 0 && (
+              <div className="flex flex-col gap-3 border-t px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="text-sm text-muted-foreground">
+                  共 <span className="font-medium text-foreground">{totalCount}</span> 条，第{' '}
+                  <span className="font-medium text-foreground">{(currentPage - 1) * pageSize + 1}</span>-{' '}
+                  <span className="font-medium text-foreground">{Math.min(currentPage * pageSize, totalCount)}</span> 条
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); fetchOrders(1); }}>
+                    <SelectTrigger className="w-full sm:w-[100px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="20">20条/页</SelectItem>
+                      <SelectItem value="50">50条/页</SelectItem>
+                      <SelectItem value="100">100条/页</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <div className="flex flex-wrap items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fetchOrders(1)}
+                      disabled={currentPage === 1}
+                    >
+                      首页
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fetchOrders(currentPage - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      上一页
+                    </Button>
+                    <span className="px-3 text-sm">
+                      {currentPage} / {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fetchOrders(currentPage + 1)}
+                      disabled={currentPage >= totalPages}
+                    >
+                      下一页
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fetchOrders(totalPages)}
+                      disabled={currentPage >= totalPages}
+                    >
+                      末页
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
