@@ -188,12 +188,10 @@ export default function OrdersPage() {
 
   // --- Sticky state ---
   const [isStickyTop, setIsStickyTop] = useState(false);
-  const [isTableHeaderSticky, setIsTableHeaderSticky] = useState(false);
   useEffect(() => {
     const handleScroll = () => {
       const scrollY = window.scrollY;
       setIsStickyTop(scrollY > 100);
-      setIsTableHeaderSticky(scrollY > 180);
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll();
@@ -516,8 +514,6 @@ export default function OrdersPage() {
     );
   }
 
-  const unarchivedCount = orders.filter(o => o.status !== ORDER_STATUS_COMPLETED && o.status !== ORDER_STATUS_CANCELLED).length;
-
   return (
     <PageGuard permission="orders:view" title="无权查看订单" description="当前账号没有查看订单中心的权限。">
       <div className={`space-y-4 px-3 pb-4 transition-all duration-300 sm:px-4 ${alertPanelOpen ? 'lg:pr-80' : ''}`}>
@@ -528,9 +524,6 @@ export default function OrdersPage() {
               <Package className="h-6 w-6 text-primary" />
               订单管理
             </h1>
-            <p className="text-sm text-muted-foreground">
-              共 {orders.length} 条订单，其中 {unarchivedCount} 条未归档，{orders.filter(o => o.status === ORDER_STATUS_PENDING).length} 条待派发
-            </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <Button variant="outline" size="sm" onClick={() => fetchOrders(currentPage, dateRange)} className="w-full sm:w-auto">
@@ -799,7 +792,7 @@ export default function OrdersPage() {
         <div className="border rounded-md overflow-hidden">
           <div className="overflow-x-auto">
             <Table>
-              <TableHeader className={`${isTableHeaderSticky ? 'sticky z-20 bg-muted/95 backdrop-blur shadow-md' : 'bg-muted'} transition-all duration-200`} style={{ top: isTableHeaderSticky ? '85px' : '0px' }}>
+              <TableHeader className="bg-muted">
                 <TableRow>
                   <TableHead className="w-[50px]">
                     <input type="checkbox" checked={selectedOrders.size === filteredOrders.length && filteredOrders.length > 0} onChange={handleSelectAll} className="rounded" />
