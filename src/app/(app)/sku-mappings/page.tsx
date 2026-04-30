@@ -68,10 +68,10 @@ import {
 // ============================================================
 const CUSTOMER_IMPORT_CONFIG = {
   title: '客户商品映射',
-  fields: ['customerCode', 'customerProductName', 'customerSku', 'customerSpec', 'productCode', 'productName', 'priority', 'remark'],
-  fieldLabels: ['客户编码', '客户商品名称', '客户商品编码', '客户商品规格', '系统商品编码', '系统商品名称', '映射优先级', '备注'],
+  fields: ['customerName', 'customerProductName', 'customerSku', 'customerSpec', 'productCode', 'productName', 'priority', 'remark'],
+  fieldLabels: ['客户名称', '客户商品名称', '客户商品编码', '客户商品规格', '系统商品编码', '系统商品名称', '映射优先级', '备注'],
   template: [
-    { customerCode: 'KH-001', customerProductName: '苏泊尔ZMD绞肉机', customerSku: 'JRD05-U', customerSpec: 'JRD05-U', productCode: 'JRD05-U', productName: '苏泊尔ZMD安心系列绞肉机', priority: '1', remark: '' },
+    { customerName: '苏泊尔官方旗舰店', customerProductName: '苏泊尔ZMD绞肉机', customerSku: 'JRD05-U', customerSpec: 'JRD05-U', productCode: 'JRD05-U', productName: '苏泊尔ZMD安心系列绞肉机', priority: '1', remark: '' },
   ],
 };
 
@@ -80,10 +80,10 @@ const CUSTOMER_IMPORT_CONFIG = {
 // ============================================================
 const SUPPLIER_IMPORT_CONFIG = {
   title: '发货方商品映射',
-  fields: ['supplierCode', 'supplierProductName', 'supplierSku', 'supplierSpec', 'productCode', 'productName', 'price', 'remark'],
-  fieldLabels: ['发货方编码', '发货方商品名称', '发货方商品编码', '发货方商品规格', '系统商品编码', '系统商品名称', '价格', '备注'],
+  fields: ['supplierName', 'supplierProductName', 'supplierSku', 'supplierSpec', 'productCode', 'productName', 'price', 'remark'],
+  fieldLabels: ['发货方名称', '发货方商品名称', '发货方商品编码', '发货方商品规格', '系统商品编码', '系统商品名称', '价格', '备注'],
   template: [
-    { supplierCode: 'GYS-001', supplierProductName: '苏泊尔果蔬清洗机', supplierSku: 'GS10', supplierSpec: 'GS10', productCode: 'GS10', productName: '苏泊尔果蔬清洗机', price: '115.00', remark: '' },
+    { supplierName: '苏泊尔供应商', supplierProductName: '苏泊尔果蔬清洗机', supplierSku: 'GS10', supplierSpec: 'GS10', productCode: 'GS10', productName: '苏泊尔果蔬清洗机', price: '115.00', remark: '' },
   ],
 };
 
