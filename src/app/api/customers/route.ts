@@ -16,9 +16,20 @@ export async function GET(request: NextRequest) {
   const operatorUserId = searchParams.get('operatorUserId');
   const isActive = searchParams.get('isActive');
 
+  // Pagination params
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+  const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get('pageSize') || '50', 10)));
+  const offset = (page - 1) * pageSize;
+
   try {
     const schemaMode = await getCustomerSchemaMode(client);
-    let query = client.from('customers').select('*');
+
+    // Use specific columns for list query (excluding large text fields)
+    const listColumns = schemaMode === 'modern'
+      ? 'id,code,name,contact_person,contact_phone,contact_email,sales_user_id,sales_user_name,operator_user_id,operator_user_name,is_active,created_at,updated_at'
+      : 'id,code,name,contact,phone,region,status,salesperson_id,salesperson_name,order_taker_id,order_taker_name,created_at,updated_at';
+
+    let query = client.from('customers').select(listColumns, { count: 'exact' });
 
     if (search) {
       query = schemaMode === 'modern'
@@ -40,17 +51,22 @@ export async function GET(request: NextRequest) {
         : query.eq('status', 'active');
     }
 
-    query = query.order('created_at', { ascending: false });
+    query = query.order('created_at', { ascending: false }).range(offset, offset + pageSize - 1);
 
-    const { data, error } = await query;
+    const { data, error, count } = await query;
     if (error) throw new Error(`查询客户失败: ${error.message}`);
 
     const transformedData = (data || []).map((customer) => transformCustomerRecord(customer as Record<string, unknown>));
+    const total = count ?? data?.length ?? 0;
+    const totalPages = Math.ceil(total / pageSize);
 
     return NextResponse.json({
       success: true,
       data: transformedData,
-      total: data?.length || 0
+      total,
+      page,
+      pageSize,
+      totalPages,
     });
   } catch (error) {
     console.error('获取客户失败:', error);

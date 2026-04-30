@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { PageGuard } from '@/components/auth/page-guard';
 import { Card, CardContent } from '@/components/ui/card';
@@ -83,6 +83,11 @@ export default function CustomersPage() {
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0, success: 0, failed: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // 分页状态
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const pageSize = 50;
   // 高级筛选状态
   const [salesUserFilter, setSalesUserFilter] = useState<string>('');
   const [operatorUserFilter, setOperatorUserFilter] = useState<string>('');
@@ -111,12 +116,20 @@ export default function CustomersPage() {
 
   const authHeaders = useCallback(() => buildUserInfoHeaders(user), [user]);
 
-  const fetchCustomers = async () => {
+  const fetchCustomers = async (page = 1) => {
+    setLoading(true);
     try {
-      const res = await fetch('/api/customers?isActive=false', { headers: authHeaders() });
+      const params = new URLSearchParams({ isActive: 'false', page: String(page), pageSize: String(pageSize) });
+      if (searchTerm) params.set('search', searchTerm);
+      if (salesUserFilter) params.set('salesUserId', salesUserFilter);
+      if (operatorUserFilter) params.set('operatorUserId', operatorUserFilter);
+      const res = await fetch(`/api/customers?${params.toString()}`, { headers: authHeaders() });
       const data = await res.json();
       if (data.success) {
-        setCustomers(data.data);
+        setCustomers(data.data || []);
+        setTotalCount(data.total || 0);
+        setTotalPages(data.totalPages || 1);
+        setCurrentPage(data.page || 1);
       }
     } catch {
       console.error('获取客户失败');
@@ -137,29 +150,8 @@ export default function CustomersPage() {
     }
   };
 
-  const filteredCustomers = customers.filter(customer => {
-    // 关键词搜索
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      if (
-        !customer.code.toLowerCase().includes(term) &&
-        !customer.name.toLowerCase().includes(term) &&
-        !(customer.contactPerson?.toLowerCase().includes(term)) &&
-        !customer.contactPhone?.toString().includes(term)
-      ) {
-        return false;
-      }
-    }
-    // 按业务员筛选
-    if (salesUserFilter && customer.salesUserId !== salesUserFilter) {
-      return false;
-    }
-    // 按跟单员筛选
-    if (operatorUserFilter && customer.operatorUserId !== operatorUserFilter) {
-      return false;
-    }
-    return true;
-  });
+  // Server-side filtering and pagination — customers already contains the filtered, paginated result
+  const filteredCustomers = customers;
 
   const salesUsers = users.filter((user) => isSalesAssignableRole(user.role));
   const operatorUsers = users.filter((user) => isOperatorAssignableRole(user.role));
@@ -500,12 +492,13 @@ export default function CustomersPage() {
                 <Input
                   placeholder="搜索客户代码/名称/联系人/电话..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => { setSearchTerm(e.target.value); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') fetchCustomers(1); }}
                   className="pl-10"
                 />
               </div>
               {/* 业务员筛选 */}
-              <Select value={salesUserFilter || 'all'} onValueChange={(v) => setSalesUserFilter(v === 'all' ? '' : v)}>
+              <Select value={salesUserFilter || 'all'} onValueChange={(v) => { setSalesUserFilter(v === 'all' ? '' : v); fetchCustomers(1); }}>
                 <SelectTrigger className="w-full xl:w-[150px]">
                   <SelectValue placeholder="按业务员" />
                 </SelectTrigger>
@@ -519,7 +512,7 @@ export default function CustomersPage() {
                 </SelectContent>
               </Select>
               {/* 跟单员筛选 */}
-              <Select value={operatorUserFilter || 'all'} onValueChange={(v) => setOperatorUserFilter(v === 'all' ? '' : v)}>
+              <Select value={operatorUserFilter || 'all'} onValueChange={(v) => { setOperatorUserFilter(v === 'all' ? '' : v); fetchCustomers(1); }}>
                 <SelectTrigger className="w-full xl:w-[150px]">
                   <SelectValue placeholder="按跟单员" />
                 </SelectTrigger>
@@ -1003,6 +996,37 @@ export default function CustomersPage() {
                 )}
               </TableBody>
             </Table>
+            {/* Pagination Bar */}
+            {!loading && totalCount > 0 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t">
+                <div className="text-sm text-muted-foreground">
+                  共 <span className="font-medium text-foreground">{totalCount}</span> 条记录，第{' '}
+                  <span className="font-medium text-foreground">{currentPage}</span> /{' '}
+                  <span className="font-medium text-foreground">{totalPages}</span> 页
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fetchCustomers(currentPage - 1)}
+                    disabled={currentPage <= 1}
+                  >
+                    上一页
+                  </Button>
+                  <span className="text-sm px-2">
+                    {currentPage} / {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fetchCustomers(currentPage + 1)}
+                    disabled={currentPage >= totalPages}
+                  >
+                    下一页
+                  </Button>
+                </div>
+              </div>
+            )}
             </div>
           </CardContent>
         </Card>
