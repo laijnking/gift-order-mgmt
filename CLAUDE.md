@@ -115,6 +115,19 @@ Next.js 16 (App Router) + React 19 + TypeScript 5 + shadcn/ui (Radix UI) + Tailw
 - 客户反馈导出必须还原客户原始列名，物流信息由系统追加
 - 编辑 `supabase/migrations/` 中已有迁移文件时需格外谨慎（可能影响生产数据）
 
+## 部署规范
+
+**严格禁止未经同意部署生产环境。** 生产环境部署必须经用户明确同意。
+
+标准流程：
+1. **开发环境** — 本地修改代码，编译通过
+2. **验证** — 启动 dev server，实际测试功能正确性
+3. **提交推送** — `git commit` + `git push`
+4. **询问用户** — 明确告知改动内容，获得同意后才能部署
+5. **生产部署** — 用户同意后执行 `ssh LP@1.95.139.195 ... git pull ... pnpm build ... systemctl restart`
+
+> 不要在用户未明确同意的情况下直接操作生产服务器。
+
 ## 生产环境部署
 
 详见 [docs/deploy.md](docs/deploy.md)
