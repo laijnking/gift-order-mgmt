@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
       username: row.username || row['用户名'] || '',
       name: row.name || row['姓名'] || row.realName || row['真实姓名'] || '',
       role: row.role || row['角色'] || 'operator',
-      password: hashPassword(row.password || row['密码'] || '123456'),
+      password_hash: hashPassword(row.password || row['密码'] || '123456'),
       phone: row.phone || row['手机'] || null,
       email: row.email || row['邮箱'] || null,
       status: (row.isActive || row['状态']) === '禁用' ? 'inactive' : 'active',

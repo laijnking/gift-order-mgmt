@@ -195,7 +195,6 @@ export async function POST(request: NextRequest) {
     
     const userData = {
       username: body.username,
-      password: body.password || '123456',
       password_hash: hashPassword(body.password || '123456'),
       name: body.name || body.realName || body.username || '',
       real_name: body.realName || body.name || null,
