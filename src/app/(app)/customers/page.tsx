@@ -87,7 +87,7 @@ export default function CustomersPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
-  const pageSize = 50;
+  const [pageSize, setPageSize] = useState(50);
   // 高级筛选状态
   const [salesUserFilter, setSalesUserFilter] = useState<string>('');
   const [operatorUserFilter, setOperatorUserFilter] = useState<string>('');
@@ -998,32 +998,60 @@ export default function CustomersPage() {
             </Table>
             {/* Pagination Bar */}
             {!loading && totalCount > 0 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t">
+              <div className="flex flex-col gap-3 border-t px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
                 <div className="text-sm text-muted-foreground">
-                  共 <span className="font-medium text-foreground">{totalCount}</span> 条记录，第{' '}
-                  <span className="font-medium text-foreground">{currentPage}</span> /{' '}
-                  <span className="font-medium text-foreground">{totalPages}</span> 页
+                  共 <span className="font-medium text-foreground">{totalCount}</span> 条，第{' '}
+                  <span className="font-medium text-foreground">{(currentPage - 1) * pageSize + 1}</span>-{' '}
+                  <span className="font-medium text-foreground">{Math.min(currentPage * pageSize, totalCount)}</span> 条
                 </div>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => fetchCustomers(currentPage - 1)}
-                    disabled={currentPage <= 1}
-                  >
-                    上一页
-                  </Button>
-                  <span className="text-sm px-2">
-                    {currentPage} / {totalPages}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => fetchCustomers(currentPage + 1)}
-                    disabled={currentPage >= totalPages}
-                  >
-                    下一页
-                  </Button>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); fetchCustomers(1); }}>
+                    <SelectTrigger className="w-full sm:w-[100px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="20">20条/页</SelectItem>
+                      <SelectItem value="50">50条/页</SelectItem>
+                      <SelectItem value="100">100条/页</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <div className="flex flex-wrap items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fetchCustomers(1)}
+                      disabled={currentPage === 1}
+                    >
+                      首页
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fetchCustomers(currentPage - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      上一页
+                    </Button>
+                    <span className="px-3 text-sm">
+                      {currentPage} / {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fetchCustomers(currentPage + 1)}
+                      disabled={currentPage >= totalPages}
+                    >
+                      下一页
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fetchCustomers(totalPages)}
+                      disabled={currentPage >= totalPages}
+                    >
+                      末页
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}
