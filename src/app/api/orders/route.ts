@@ -432,6 +432,8 @@ export async function GET(request: NextRequest) {
   const supplierId = searchParams.get('supplierId');
   const search = searchParams.get('search');
   const importBatch = searchParams.get('importBatch');
+  const createdFrom = searchParams.get('createdFrom');
+  const createdTo = searchParams.get('createdTo');
 
   // 获取当前用户信息用于数据权限过滤
   const currentUser = getCurrentUser(request);
@@ -508,6 +510,13 @@ export async function GET(request: NextRequest) {
 
     if (search) {
       query = query.or(`order_no.ilike.%${search}%,sys_order_no.ilike.%${search}%,receiver_name.ilike.%${search}%,receiver_phone.ilike.%${search}%`);
+    }
+
+    if (createdFrom) {
+      query = query.gte('created_at', createdFrom);
+    }
+    if (createdTo) {
+      query = query.lte('created_at', createdTo);
     }
 
     query = query.order('created_at', { ascending: false }).range(offset, offset + pageSize - 1);

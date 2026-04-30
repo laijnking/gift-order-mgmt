@@ -40,6 +40,8 @@ interface OrderFilterPanelProps {
   orders: Order[];
   selectedOrders: Set<Order>;
   filteredCount: number;
+  statusCounts: Record<string, number>;
+  totalCount: number;
   // Filter state
   statusFilter: string;
   setStatusFilter: (v: string) => void;
@@ -63,6 +65,11 @@ interface OrderFilterPanelProps {
   setShowAdvancedFilter: (v: boolean) => void;
   advancedFields: Record<string, string>;
   setAdvancedFields: (v: Record<string, string> | ((prev: Record<string, string>) => Record<string, string>)) => void;
+  // Date range filter
+  createdFrom: string;
+  setCreatedFrom: (v: string) => void;
+  createdTo: string;
+  setCreatedTo: (v: string) => void;
   // Reference data
   customers: Customer[];
   suppliers: Supplier[];
@@ -77,6 +84,8 @@ export function OrderFilterPanel({
   orders,
   selectedOrders,
   filteredCount,
+  statusCounts,
+  totalCount,
   statusFilter,
   setStatusFilter,
   selectedStatuses,
@@ -99,6 +108,10 @@ export function OrderFilterPanel({
   setShowAdvancedFilter,
   advancedFields,
   setAdvancedFields,
+  createdFrom,
+  setCreatedFrom,
+  createdTo,
+  setCreatedTo,
   customers,
   suppliers,
   addAdvancedField,
@@ -128,10 +141,10 @@ export function OrderFilterPanel({
             全部订单
             <span className={`text-[10px] px-1 rounded-full ${
               !statusFilter && selectedStatuses.length === 0 ? 'bg-primary-foreground/20' : 'bg-muted-foreground/20'
-            }`}>{orders.length}</span>
+            }`}>{totalCount}</span>
           </button>
           {ORDER_STATUS_OPTIONS.map((option) => {
-            const count = orders.filter(o => o.status === option.value).length;
+            const count = statusCounts[option.value] ?? 0;
             const isActive = statusFilter === option.value && selectedStatuses.length === 0;
             const isMultiSelected = selectedStatuses.includes(option.value);
             return (
@@ -178,7 +191,7 @@ export function OrderFilterPanel({
               <Badge variant="secondary" className="text-xs">已选 {selectedOrders.size} 条</Badge>
             )}
             <span className="text-xs text-muted-foreground whitespace-nowrap">
-              {filteredCount} / {orders.length}
+              {filteredCount} / {totalCount}
             </span>
           </div>
         </div>
@@ -223,6 +236,28 @@ export function OrderFilterPanel({
                 value={searchFields.phone}
                 onChange={(e) => updateSearchField_('phone', e.target.value)}
                 className="pl-8 h-8 text-sm"
+              />
+            </div>
+          </div>
+
+          {/* Creation date range */}
+          <div className="space-y-1 min-w-0 flex-1">
+            <Label className="text-xs text-muted-foreground">创建时间</Label>
+            <div className="flex items-center gap-1">
+              <Input
+                type="date"
+                value={createdFrom}
+                onChange={(e) => setCreatedFrom(e.target.value)}
+                className="h-8 text-xs w-[130px]"
+                max={createdTo || undefined}
+              />
+              <span className="text-muted-foreground text-xs">至</span>
+              <Input
+                type="date"
+                value={createdTo}
+                onChange={(e) => setCreatedTo(e.target.value)}
+                className="h-8 text-xs w-[130px]"
+                min={createdFrom || undefined}
               />
             </div>
           </div>

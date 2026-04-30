@@ -85,6 +85,7 @@ export default function OrdersPage() {
     totalPages, setTotalPages,
     totalCount, setTotalCount,
     pageSize, setPageSize,
+    statusCounts, fetchStatusCounts,
   } = session;
 
   // --- Users data (for salesperson/operator selection) ---
@@ -115,6 +116,8 @@ export default function OrdersPage() {
     searchFields, setSearchFields,
     showAdvancedFilter, setShowAdvancedFilter,
     advancedFields, setAdvancedFields,
+    createdFrom, setCreatedFrom,
+    createdTo, setCreatedTo,
     addAdvancedField, removeAdvancedField,
     clearAllFilters, hasActiveFilters, applyBatchStatusFilter,
   } = filters;
@@ -131,10 +134,16 @@ export default function OrdersPage() {
     searchFields, advancedFields,
   });
 
-  // Reset to page 1 whenever filter state changes (search, status, customer, supplier, etc.)
+  // Date range for API calls
+  const dateRange = { createdFrom, createdTo };
+
+  // Reset to page 1 whenever filter state changes (search, status, customer, supplier, date range, etc.)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const filterDeps = [statusFilter, selectedStatuses, customerFilter, supplierFilter, quantityOp, quantityFilter, JSON.stringify(searchFields), JSON.stringify(advancedFields)];
-  useEffect(() => { fetchOrders(1); }, filterDeps); // eslint-disable-line
+  const filterDeps = [statusFilter, selectedStatuses, customerFilter, supplierFilter, quantityOp, quantityFilter, JSON.stringify(searchFields), JSON.stringify(advancedFields), createdFrom, createdTo];
+  useEffect(() => { fetchOrders(1, dateRange); }, filterDeps); // eslint-disable-line
+
+  // Re-fetch status counts when filters change
+  useEffect(() => { fetchStatusCounts(dateRange); }, filterDeps); // eslint-disable-line
 
   // --- Selected counts ---
   const selectedCounts = useSelectedCounts(selectedOrders);
@@ -524,7 +533,7 @@ export default function OrdersPage() {
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-            <Button variant="outline" size="sm" onClick={() => fetchOrders(currentPage)} className="w-full sm:w-auto">
+            <Button variant="outline" size="sm" onClick={() => fetchOrders(currentPage, dateRange)} className="w-full sm:w-auto">
               <RefreshCw className="w-4 h-4 mr-1" />
               刷新
             </Button>
@@ -772,8 +781,14 @@ export default function OrdersPage() {
           setShowAdvancedFilter={setShowAdvancedFilter}
           advancedFields={advancedFields}
           setAdvancedFields={setAdvancedFields}
+          createdFrom={createdFrom}
+          setCreatedFrom={setCreatedFrom}
+          createdTo={createdTo}
+          setCreatedTo={setCreatedTo}
           customers={customers}
           suppliers={suppliers}
+          statusCounts={statusCounts}
+          totalCount={totalCount}
           addAdvancedField={addAdvancedField}
           removeAdvancedField={removeAdvancedField}
           clearAllFilters={clearAllFilters}

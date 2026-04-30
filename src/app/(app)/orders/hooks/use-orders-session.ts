@@ -20,6 +20,8 @@ export interface OrdersSessionState {
   advancedFields: Record<string, string>;
   selectedOrderIds: string[];
   alertPanelOpen: boolean;
+  createdFrom: string;
+  createdTo: string;
   savedAt: number;
 }
 
@@ -45,6 +47,8 @@ export function saveOrdersSession(state: Partial<OrdersSessionState>) {
         advancedFields: state.advancedFields ?? prev?.advancedFields ?? {},
         selectedOrderIds: state.selectedOrderIds ?? prev?.selectedOrderIds ?? [],
         alertPanelOpen: state.alertPanelOpen ?? prev?.alertPanelOpen ?? true,
+        createdFrom: state.createdFrom ?? prev?.createdFrom ?? '',
+        createdTo: state.createdTo ?? prev?.createdTo ?? '',
         savedAt: Date.now(),
       };
       if (Date.now() - next.savedAt < 24 * 60 * 60 * 1000) {
@@ -178,6 +182,9 @@ export function useOrdersSession() {
   const [totalCount, setTotalCount] = useState(0);
   const [pageSize, setPageSize] = useState(50);
 
+  // Status counts for quick filter bar
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
+
   // Reference data
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -192,7 +199,7 @@ export function useOrdersSession() {
   }), []);
 
   // Fetch orders
-  const fetchOrders = useCallback(async (page = 1) => {
+  const fetchOrders = useCallback(async (page = 1, dateRange?: { createdFrom?: string; createdTo?: string }) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
@@ -200,6 +207,8 @@ export function useOrdersSession() {
       const status = searchParams.get('status')?.trim();
       if (importBatch) params.set('importBatch', importBatch);
       if (status && status !== 'all') params.set('status', status);
+      if (dateRange?.createdFrom) params.set('createdFrom', dateRange.createdFrom);
+      if (dateRange?.createdTo) params.set('createdTo', dateRange.createdTo);
       const res = await fetch(`/api/orders?${params.toString()}`, {
         headers: buildUserInfoHeaders(),
       });
@@ -216,6 +225,22 @@ export function useOrdersSession() {
       setLoading(false);
     }
   }, [searchParams, pageSize]);
+
+  // Fetch status counts for quick filter bar
+  const fetchStatusCounts = useCallback(async (dateRange?: { createdFrom?: string; createdTo?: string }) => {
+    try {
+      const params = new URLSearchParams();
+      const importBatch = searchParams.get('importBatch')?.trim();
+      if (importBatch) params.set('importBatch', importBatch);
+      if (dateRange?.createdFrom) params.set('createdFrom', dateRange.createdFrom);
+      if (dateRange?.createdTo) params.set('createdTo', dateRange.createdTo);
+      const res = await fetch(`/api/orders/counts?${params.toString()}`, { headers: authHeaders() });
+      const data = await res.json();
+      if (data.success) setStatusCounts(data.counts || {});
+    } catch {
+      console.error('获取订单统计失败');
+    }
+  }, [searchParams, authHeaders]);
 
   // Fetch suppliers
   const fetchSuppliers = useCallback(async () => {
@@ -364,6 +389,8 @@ export function useOrdersSession() {
     totalPages, setTotalPages,
     totalCount, setTotalCount,
     pageSize, setPageSize,
+    statusCounts,
+    fetchStatusCounts,
     fetchSuppliers,
     fetchCustomers,
     fetchAlerts,

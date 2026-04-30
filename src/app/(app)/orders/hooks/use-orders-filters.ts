@@ -48,6 +48,14 @@ export function useOrdersFilters(_restored: Record<string, unknown> | null) {
   const [showAdvancedFilter, setShowAdvancedFilter] = useState<boolean>((_restored?.showAdvancedFilter as boolean) ?? false);
   const [advancedFields, setAdvancedFieldsBase] = useState<Record<string, string>>((_restored?.advancedFields as Record<string, string>) ?? {});
 
+  // Date range filter for creation time (default: today)
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [createdFrom, setCreatedFromBase] = useState<string>((_restored?.createdFrom as string) ?? todayStr);
+  const [createdTo, setCreatedToBase] = useState<string>((_restored?.createdTo as string) ?? todayStr);
+
+  const setCreatedFrom: typeof setCreatedFromBase = (v) => setCreatedFromBase(v as string);
+  const setCreatedTo: typeof setCreatedToBase = (v) => setCreatedToBase(v as string);
+
   const setSearchFields: typeof setSearchFieldsBase = (v) => {
     setSearchFieldsBase(v as Record<string, string>);
   };
@@ -89,11 +97,14 @@ export function useOrdersFilters(_restored: Record<string, unknown> | null) {
       searchFields,
       showAdvancedFilter,
       advancedFields,
+      createdFrom,
+      createdTo,
     });
   }, [
     statusFilter, selectedStatuses, customerFilter, customerSearch,
     supplierFilter, supplierSearch, quantityOp, quantityFilter,
     searchFields, showAdvancedFilter, advancedFields,
+    createdFrom, createdTo,
   ]);
 
   const updateSearchField = useCallback((key: string, value: string) => {
@@ -127,7 +138,9 @@ export function useOrdersFilters(_restored: Record<string, unknown> | null) {
     setQuantityFilter('');
     setSearchFields({ orderNo: '', productName: '', phone: '' });
     setAdvancedFields({});
-  }, []);
+    setCreatedFrom(todayStr);
+    setCreatedTo(todayStr);
+  }, [todayStr]);
 
   const hasActiveFilters: boolean = Boolean(
     statusFilter ||
@@ -135,7 +148,9 @@ export function useOrdersFilters(_restored: Record<string, unknown> | null) {
     supplierFilter ||
     quantityFilter !== '' ||
     Object.values(searchFields).some(v => v.trim()) ||
-    Object.values(advancedFields).some(v => v.trim())
+    Object.values(advancedFields).some(v => v.trim()) ||
+    createdFrom !== todayStr ||
+    createdTo !== todayStr
   );
 
   const applyBatchStatusFilter = useCallback((statuses: string[]) => {
@@ -166,6 +181,8 @@ export function useOrdersFilters(_restored: Record<string, unknown> | null) {
     searchFields, setSearchFields,
     showAdvancedFilter, setShowAdvancedFilter,
     advancedFields, setAdvancedFields,
+    createdFrom, setCreatedFrom,
+    createdTo, setCreatedTo,
     // Actions
     updateSearchField,
     updateAdvancedField,
