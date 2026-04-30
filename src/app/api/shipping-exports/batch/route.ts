@@ -219,6 +219,7 @@ async function dispatchPendingOrder(
       dispatchBatch: String(order.assigned_batch || reusedBatchNo),
       reusedExistingDispatch: true,
       wasActuallyDispatched: false,
+      stockWarnings: [],
     };
   }
 
@@ -226,8 +227,12 @@ async function dispatchPendingOrder(
   const items = parseItems(order.items);
   if (items.length === 0) throw new Error(`订单 ${order.order_no || order.id} 没有商品明细`);
 
+  // 收集库存相关的 warning（不阻断派发）
+  const stockWarnings: string[] = [];
+
   for (const item of items) {
     const quantity = toNumber(item.quantity, 1);
+    const itemName = itemText(item, 'product_name', 'productName', 'cu_product_name', 'cuProductName') || '未知商品';
     // 虚拟发货方没有真实 supplier_id，跳过库存操作（虚拟发货方的订单通常已通过其他途径派发过）
     const stockQueryId = isSynthetic
       ? undefined
@@ -235,18 +240,39 @@ async function dispatchPendingOrder(
     const stock = stockQueryId
       ? await findStockForItem(client, stockQueryId, item)
       : null;
+
+    // 发货方商品映射信息
+    const supplierMapping = stockQueryId && stock?.product_id
+      ? await findSupplierProductMapping(client, stockQueryId, String(stock.product_id))
+      : null;
+
     if (!stock) {
-      throw new Error(`订单 ${order.order_no || order.id} 的商品「${itemText(item, 'product_name', 'productName', 'cu_product_name', 'cuProductName') || '未知商品'}」未找到发货方库存`);
+      // 无匹配库存：允许负库存发货，使用订单商品信息兜底
+      stockWarnings.push(`「${itemName}」未找到发货方库存，已按负库存发货（订单 ${order.order_no || order.id}）`);
+      const unitCost = toNumber(item.price || item.unit_price);
+      dispatchItems.push({
+        supplierProductCode: supplierMapping?.supplierProductCode || itemText(item, 'cu_product_code', 'cuProductCode') || itemText(item, 'product_code', 'productCode'),
+        supplierProductName: supplierMapping?.supplierProductName || itemText(item, 'cu_product_name', 'cuProductName') || itemText(item, 'product_name', 'productName'),
+        supplierProductSpec: supplierMapping?.supplierProductSpec || itemText(item, 'cu_product_spec', 'cuProductSpec') || itemText(item, 'product_spec', 'productSpec'),
+        productCode: itemText(item, 'product_code', 'productCode'),
+        productName: itemText(item, 'product_name', 'productName'),
+        productSpec: itemText(item, 'product_spec', 'productSpec'),
+        quantity,
+        unitCost,
+        warehouseName: '',
+      });
+      continue;
     }
 
     const beforeQuantity = toNumber(stock.quantity);
-    if (beforeQuantity < quantity) {
-      throw new Error(`库存不足：${stock.product_name || ''} 当前 ${beforeQuantity} 台，订单需要 ${quantity} 台`);
-    }
-
     const afterQuantity = beforeQuantity - quantity;
     const unitCost = toNumber(stock.unit_price || item.price || item.unit_price);
     const now = new Date().toISOString();
+
+    // 库存不足时记录 warning，仍允许负库存发货
+    if (beforeQuantity < quantity) {
+      stockWarnings.push(`「${itemName}」库存不足（当前 ${beforeQuantity} 台，需要 ${quantity} 台），已按负库存发货（订单 ${order.order_no || order.id}）`);
+    }
 
     const { error: stockError } = await client
       .from('stocks')
@@ -283,11 +309,6 @@ async function dispatchPendingOrder(
       unitCost,
       batchNo,
     });
-
-    // 派发时获取发货方商品映射信息
-    const supplierMapping = stockQueryId && stock.product_id
-      ? await findSupplierProductMapping(client, stockQueryId, String(stock.product_id))
-      : null;
 
     dispatchItems.push({
       // 发货方商品编码：优先取 product_mappings.supplier_product_code，没有则用系统商品编码
@@ -333,6 +354,7 @@ async function dispatchPendingOrder(
     dispatchBatch: batchNo,
     reusedExistingDispatch: false,
     wasActuallyDispatched: true,
+    stockWarnings,
   };
 }
 
@@ -471,6 +493,7 @@ export async function POST(request: NextRequest) {
     const allOrderIds: string[] = [];
     const supplierNames: string[] = [];
     const errors: string[] = [];
+    const warnings: string[] = [];
     let totalOrderCount = 0;
     let newDispatchCount = 0;
     let reusedDispatchCount = 0;
@@ -613,6 +636,10 @@ export async function POST(request: NextRequest) {
             }
             const exportBatchNo = dispatchResult?.dispatchBatch || batchNo;
             exportRows.push(...rowsForOrder(order, supplierExportFieldMappings, exportBatchNo, dispatchResult?.dispatchItems, isSupplierTemplate));
+            // 收集库存警告（无库存/库存不足等提示）
+            if (dispatchResult?.stockWarnings?.length) {
+              warnings.push(...dispatchResult.stockWarnings);
+            }
           }
           allOrderIds.push(String(order.id));
           supplierSuccessCount += 1;
@@ -699,6 +726,7 @@ export async function POST(request: NextRequest) {
           persistenceMode: resolvedPersistenceMode,
           details: results,
           errors,
+          warnings,
           dispatchMode: exportMode,
           supplierIds,
         },
@@ -739,6 +767,7 @@ export async function POST(request: NextRequest) {
           supplierIds,
           details: results,
           errors,
+          warnings,
         },
       });
     }
@@ -788,6 +817,7 @@ export async function POST(request: NextRequest) {
         template_source: templateSource,
         details: results,
         errors,
+        warnings,
       },
     });
     if (recordError) {
@@ -834,6 +864,7 @@ export async function POST(request: NextRequest) {
         supplierIds,
         details: results,
         errors,
+        warnings,
       },
     });
   } catch (error) {

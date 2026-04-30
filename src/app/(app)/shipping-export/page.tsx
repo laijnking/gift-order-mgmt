@@ -106,6 +106,7 @@ export default function ShippingExportPage() {
   const [exportSummary, setExportSummary] = useState<ExportSummary | null>(null);
   const [exportResults, setExportResults] = useState<ExportResult[]>([]);
   const [exportErrors, setExportErrors] = useState<ExportError[]>([]);
+  const [exportWarnings, setExportWarnings] = useState<string[]>([]);
   const [downloadingZip, setDownloadingZip] = useState(false);
 
   // 加载待导出发货方
@@ -255,15 +256,24 @@ export default function ShippingExportPage() {
         totalOrderCount: data.data.totalOrderCount,
       });
       setExportResults(data.data.details || []);
-      setExportErrors(data.data.errors || []);
+      setExportErrors((data.data.errors || []).map((e: unknown) => typeof e === 'string' ? { message: e } : e as ExportError));
+      setExportWarnings(data.data.warnings || []);
       setShowResultDialog(true);
 
-      // 根据是否有错误显示不同提示
+      const warningCount = data.data.warnings?.length || 0;
+
+      // 根据是否有错误/警告显示不同提示
       if (hasErrors) {
+        toast.error(
+          preview
+            ? `预览失败：${data.data.totalSupplierCount} 个发货方，${data.data.errors?.length} 条错误${warningCount ? `，${warningCount} 条警告` : ''}`
+            : `导出失败：${data.data.totalSupplierCount} 个发货方，${data.data.errors?.length} 条错误，${warningCount} 条警告`
+        );
+      } else if (warningCount > 0) {
         toast.warning(
           preview
-            ? `预览完成：${data.data.totalSupplierCount} 个发货方，共 ${data.data.totalOrderCount} 个订单（${data.data.errors?.length} 条失败）`
-            : `导出完成：${data.data.totalSupplierCount} 个发货方，共 ${data.data.totalOrderCount} 个订单（${data.data.errors?.length} 条失败）`
+            ? `预览完成：${data.data.totalSupplierCount} 个发货方，共 ${data.data.totalOrderCount} 个订单（${warningCount} 条库存警告）`
+            : `导出完成：${data.data.totalSupplierCount} 个发货方，共 ${data.data.totalOrderCount} 个订单（${warningCount} 条库存警告）`
         );
       } else {
         toast.success(
@@ -722,6 +732,21 @@ export default function ShippingExportPage() {
                 </Badge>
               </div>
             ))}
+
+            {/* 警告列表（库存不足等非阻断提示） */}
+            {exportWarnings.length > 0 && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
+                <div className="flex items-center gap-2 text-amber-700 font-medium">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <span>库存警告（{exportWarnings.length} 条）</span>
+                </div>
+                {exportWarnings.map((w, i) => (
+                  <div key={i} className="text-sm text-amber-600 pl-6">
+                    {w}
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* 错误列表 */}
             {exportErrors.length > 0 && (
