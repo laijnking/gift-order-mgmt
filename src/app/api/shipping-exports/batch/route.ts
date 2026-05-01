@@ -202,7 +202,7 @@ async function dispatchPendingOrder(
 
     const currentStatus = String(order.status || 'pending');
     const targetStatus = (currentStatus === 'pending' || currentStatus === 'assigned' || currentStatus === 'notified')
-      ? 'notified'
+      ? 'assigned'
       : currentStatus;
     await client
       .from('orders')
@@ -533,13 +533,14 @@ export async function POST(request: NextRequest) {
           targetName: isSynthetic ? supplierName : undefined,
         });
 
-      // 优先级：per-supplier 专属模板 > 用户选择的模板 > 默认模板
-      const actualTemplate = supplierTemplate || userSelectedTemplate || null;
+      // 优先级：per-supplier 专属模板 > 用户选择的模板 > 通用模板(fallback)
+      const isSupplierSpecific = supplierTemplateSource === 'target' || supplierTemplateSource === 'linked';
+      const actualTemplate = (supplierTemplate && isSupplierSpecific) ? supplierTemplate : (userSelectedTemplate || supplierTemplate || null);
       const actualTemplateId = actualTemplate?.id || null;
       const actualTemplateName = actualTemplate?.name || userSelectedTemplateName || '默认发货通知模板';
-      const actualTemplateSource = supplierTemplate
-        ? (supplierTemplateSource as 'target' | 'linked' | 'default' | 'first')
-        : (userSelectedTemplate ? 'explicit' : 'first');
+      const actualTemplateSource = (supplierTemplate && isSupplierSpecific)
+        ? (supplierTemplate.id === userSelectedTemplate?.id ? 'explicit' : (supplierTemplateSource as 'target' | 'linked' | 'default' | 'first'))
+        : (userSelectedTemplate ? 'explicit' : (supplierTemplateSource as 'target' | 'linked' | 'default' | 'first'));
       const supplierFieldMappings = supplierTemplate ? parseTemplateFieldMappingsArray(supplierTemplate) : DEFAULT_SHIPPING_FIELD_MAPPINGS;
       const supplierExportFieldMappings = supplierFieldMappings.length > 0 ? supplierFieldMappings : DEFAULT_SHIPPING_FIELD_MAPPINGS;
       // 判断当前应用的模板是否为该供应商的专属模板
@@ -558,7 +559,7 @@ export async function POST(request: NextRequest) {
           .from('orders')
           .select('*')
           .eq('supplier_name', supplierName)
-          .in('status', isReexport ? ['notified'] : ['pending', 'assigned']);
+          .in('status', isReexport ? ['assigned', 'notified'] : ['pending', 'assigned']);
         if (error) throw new Error(`按名称查询订单失败: ${error.message}`);
         orders = (data || []) as Record<string, unknown>[];
       } else {
@@ -566,7 +567,7 @@ export async function POST(request: NextRequest) {
           .from('orders')
           .select('*')
           .eq('supplier_id', supplierId)
-          .in('status', isReexport ? ['notified'] : ['pending', 'assigned']);
+          .in('status', isReexport ? ['assigned', 'notified'] : ['pending', 'assigned']);
 
         if (ordersErrorById) throw new Error(`查询订单失败: ${ordersErrorById.message}`);
 
@@ -575,7 +576,7 @@ export async function POST(request: NextRequest) {
           .select('*')
           .is('supplier_id', null)
           .eq('supplier_name', supplierName)
-          .in('status', isReexport ? ['notified'] : ['pending', 'assigned']);
+          .in('status', isReexport ? ['assigned', 'notified'] : ['pending', 'assigned']);
 
         if (ordersErrorByName) throw new Error(`按名称查询订单失败: ${ordersErrorByName.message}`);
 
@@ -616,7 +617,12 @@ export async function POST(request: NextRequest) {
             exportRows.push(...rowsForOrder(order, supplierExportFieldMappings, dispatchBatchNo, dispatchItems, isSupplierTemplate));
           } else {
             // 导出时：pending → notified（首次导出发货通知），已通知的订单幂等
-            const dispatchResult = exportMode === 'dispatch'
+            const orderAssignedBatch = String(order.assigned_batch || '');
+            const orderStatus = String(order.status || '');
+            // 已有 assigned_batch 且非 pending 的订单视为已派发，不再重新派发
+            const skipDispatch = orderAssignedBatch && orderStatus !== 'pending';
+
+            const dispatchResult = !skipDispatch && exportMode === 'dispatch'
               ? await dispatchPendingOrder(
                   client,
                   order,
@@ -624,7 +630,7 @@ export async function POST(request: NextRequest) {
                   batchNo,
                   isSynthetic ? undefined : supplierId,
                   isSynthetic,
-                  'notified'
+                  'assigned'
                 )
               : undefined;
             if (dispatchResult?.reusedExistingDispatch) {
@@ -634,7 +640,7 @@ export async function POST(request: NextRequest) {
             } else {
               assignedOnlyCount += 1;
             }
-            const exportBatchNo = dispatchResult?.dispatchBatch || batchNo;
+            const exportBatchNo = dispatchResult?.dispatchBatch || orderAssignedBatch || batchNo;
             exportRows.push(...rowsForOrder(order, supplierExportFieldMappings, exportBatchNo, dispatchResult?.dispatchItems, isSupplierTemplate));
             // 收集库存警告（无库存/库存不足等提示）
             if (dispatchResult?.stockWarnings?.length) {

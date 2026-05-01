@@ -505,7 +505,6 @@ export default function ExportRecordsPage() {
                 <SelectValue placeholder="发货方" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">全部发货方</SelectItem>
                 {shippers.map((shipper) => (
                   <SelectItem key={shipper.id} value={shipper.id}>
                     {shipper.name}
@@ -518,7 +517,6 @@ export default function ExportRecordsPage() {
                 <SelectValue placeholder="客户" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">全部客户</SelectItem>
                 {customers.map((customer) => (
                   <SelectItem key={customer.id} value={customer.id}>
                     {customer.name}

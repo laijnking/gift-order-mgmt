@@ -4,6 +4,9 @@ import {
   buildAuthedHeaders,
   DEFAULT_HOST,
   fetchJson,
+  startServer,
+  stopServer,
+  waitForServer,
   type MockUser,
 } from './lib/api-test-harness';
 
@@ -15,7 +18,7 @@ type ApiEnvelope<T = unknown> = {
   message?: string;
 };
 
-const PORT = 3000;
+const PORT = 5300;
 const BASE_URL = `http://${DEFAULT_HOST}:${PORT}`;
 
 const CUSTOMERS_VIEWER: MockUser = {
@@ -126,6 +129,12 @@ async function expectNotDenied(path: string, user: MockUser, init?: RequestInit)
 }
 
 async function run() {
+    console.log('Starting test server...');
+    const serverProcess = startServer(PORT);
+    await waitForServer(BASE_URL, serverProcess);
+    console.log(`Server is ready at ${BASE_URL}`);
+
+    try {
     await expectUnauthorized('/api/customers');
     logPass('customers GET requires user context');
 
@@ -241,11 +250,11 @@ async function run() {
     logPass('shippers POST blocks suppliers:view-only user');
 
     await expectForbidden('/api/shippers/batch', SUPPLIERS_VIEWER, {
-      method: 'PUT',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ shippers: [] }),
     });
-    logPass('shippers batch PUT blocks suppliers:view-only user');
+    logPass('shippers batch blocks suppliers:view-only user');
 
     // Warehouses (仓库) — 使用 SUPPLIERS_VIEWER
     await expectNotDenied('/api/warehouses', SUPPLIERS_VIEWER);
@@ -294,15 +303,15 @@ async function run() {
     logPass('shipping-exports/batch POST blocks orders:view-only user');
 
     // Return receipts — ORDERS_VIEWER 仅有 view
-    await expectNotDenied('/api/return-receipts', ORDERS_VIEWER);
-    logPass('return-receipts GET allows orders:view without auth denial');
+    await expectNotDenied('/api/return-receipts/history', ORDERS_VIEWER);
+    logPass('return-receipts/history GET allows orders:view without auth denial');
 
-    await expectForbidden('/api/return-receipts', ORDERS_VIEWER, {
+    await expectForbidden('/api/return-receipts/history', ORDERS_VIEWER, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ receipts: [] }),
     });
-    logPass('return-receipts POST blocks orders:view-only user');
+    logPass('return-receipts/history POST blocks orders:view-only user');
 
     // Stocks (库存) — ORDERS_VIEWER 无 stocks 权限
     await expectForbidden('/api/stocks', ORDERS_VIEWER);
@@ -336,6 +345,9 @@ async function run() {
     logPass('alert-records GET allows orders:view without auth denial');
 
     console.log('All permission regression checks passed.');
+    } finally {
+      await stopServer(serverProcess);
+    }
 }
 
 run().catch((error) => {

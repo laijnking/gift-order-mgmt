@@ -5,7 +5,7 @@ import { PERMISSIONS } from '@/lib/permissions';
 
 // 获取导出记录列表
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
+  const authError = requirePermission(request, PERMISSIONS.ORDERS_VIEW);
   if (authError) return authError;
 
   const client = getSupabaseClient();

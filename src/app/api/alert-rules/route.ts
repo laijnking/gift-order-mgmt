@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
 
 // 创建预警规则
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
+  const authError = requirePermission(request, PERMISSIONS.SETTINGS_EDIT);
   if (authError) return authError;
 
   const client = getSupabaseClient();
@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
 
 // 批量更新预警规则状态
 export async function PATCH(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
+  const authError = requirePermission(request, PERMISSIONS.SETTINGS_EDIT);
   if (authError) return authError;
 
   const client = getSupabaseClient();

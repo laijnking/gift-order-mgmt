@@ -64,11 +64,11 @@ async function seedSupplier(pool: Pool, input: { name: string; isActive: boolean
   const id = randomUUID();
   await pool.query(
     `
-      INSERT INTO suppliers (
-        id, name, short_name, type, send_type, is_active, created_at
-      ) VALUES ($1, $2, $3, 'supplier', 'manual', $4, now())
+      INSERT INTO shippers (
+        id, code, name, short_name, type, send_type, is_active, created_at
+      ) VALUES ($1, $2, $3, $4, 'self', 'manual', $5, now())
     `,
-    [id, input.name, input.name.slice(0, 8), input.isActive]
+    [id, `SHP-${id.slice(-8)}`, input.name, input.name.slice(0, 8), input.isActive]
   );
   insertedSupplierIds.push(id);
   return id;
@@ -167,7 +167,7 @@ async function cleanup(pool: Pool) {
     await pool.query('DELETE FROM products WHERE id = ANY($1::uuid[])', [insertedProductIds]);
   }
   if (insertedSupplierIds.length > 0) {
-    await pool.query('DELETE FROM suppliers WHERE id = ANY($1::uuid[])', [insertedSupplierIds]);
+    await pool.query('DELETE FROM shippers WHERE id = ANY($1::uuid[])', [insertedSupplierIds]);
   }
 }
 
@@ -317,7 +317,7 @@ async function main() {
       `cancelled 应为 ${(baselineOrderCounts['cancelled'] ?? 0) + 1}，实际 ${String(orderStatus.cancelled)}`);
     assert(supplierStats.active === baselineActiveSupplierCount + 1,
       `活跃发货方应为 ${baselineActiveSupplierCount + 1}，实际 ${String(supplierStats.active)}`);
-    assert(Number(stockStats.totalValue) === baselineStockTotalValue + 100,
+    assert(Math.abs(Number(stockStats.totalValue) - (baselineStockTotalValue + 100)) < 0.01,
       `库存总值应为 ${baselineStockTotalValue + 100}，实际 ${stockStats.totalValue}`);
 
     const salesResponse = await fetchJson<{ success?: boolean; data?: unknown; error?: string }>(

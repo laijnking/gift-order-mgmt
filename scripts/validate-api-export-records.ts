@@ -169,10 +169,10 @@ async function seedDatabase(pool: Pool) {
 
   await pool.query(
     `
-      insert into suppliers (id, name, type, send_type, is_active, created_at)
-      values ($1, $2, 'self', 'self', true, now())
+      insert into shippers (id, code, name, type, send_type, is_active, created_at)
+      values ($1, $2, $3, 'self', 'self', true, now())
     `,
-    [ids.supplierId, `API Validate Supplier ${runId}`]
+    [ids.supplierId, `VAL-SUP-${runId}`, `API Validate Supplier ${runId}`]
   );
 
   const orderItems = JSON.stringify([
@@ -337,7 +337,7 @@ async function cleanup(pool: Pool) {
     [ids.orderReturnedWithTrackingId, ids.orderReturnedPendingTrackingId],
   ]);
   await pool.query(`delete from customers where id = $1`, [ids.customerId]);
-  await pool.query(`delete from suppliers where id = $1`, [ids.supplierId]);
+  await pool.query(`delete from shippers where id = $1`, [ids.supplierId]);
   await rm(artifactDir, { recursive: true, force: true });
 }
 

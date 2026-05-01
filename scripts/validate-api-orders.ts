@@ -124,6 +124,7 @@ class MemoryQueryBuilder<T extends Row = Row> implements PromiseLike<QueryRespon
   private orGroups: Array<Array<{ column: string; operator: string; value: string }>> = [];
   private orderBy: { column: string; ascending: boolean } | null = null;
   private limitCount: number | null = null;
+  private offsetCount: number | null = null;
   private mutationData: Row[] = [];
   private expectSingle: 'single' | 'maybeSingle' | null = null;
 
@@ -200,6 +201,12 @@ class MemoryQueryBuilder<T extends Row = Row> implements PromiseLike<QueryRespon
     return this;
   }
 
+  range(from: number, to: number) {
+    this.offsetCount = from;
+    this.limitCount = to - from + 1;
+    return this;
+  }
+
   then<TResult1 = QueryResponse<T>, TResult2 = never>(
     onfulfilled?: ((value: QueryResponse<T>) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
@@ -265,7 +272,9 @@ class MemoryQueryBuilder<T extends Row = Row> implements PromiseLike<QueryRespon
       });
     }
 
-    const limitedRows = this.limitCount === null ? orderedRows : orderedRows.slice(0, this.limitCount);
+    const offset = this.offsetCount ?? 0;
+    const paginatedRows = offset > 0 ? orderedRows.slice(offset) : orderedRows;
+    const limitedRows = this.limitCount === null ? paginatedRows : paginatedRows.slice(0, this.limitCount);
 
     if (this.selectOptions.head && this.selectOptions.count === 'exact') {
       return {

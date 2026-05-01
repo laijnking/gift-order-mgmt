@@ -74,11 +74,11 @@ async function seedSupplier(pool: Pool) {
   const supplierId = randomUUID();
   await pool.query(
     `
-      INSERT INTO suppliers (
-        id, name, short_name, type, send_type, is_active, created_at
-      ) VALUES ($1, $2, $3, 'supplier', 'manual', true, now())
+      INSERT INTO shippers (
+        id, code, name, short_name, type, send_type, is_active, created_at
+      ) VALUES ($1, $2, $3, $4, 'self', 'manual', true, now())
     `,
-    [supplierId, `成本发货方-${RUN_ID}`, `成本发货方`]
+    [supplierId, `SHP-${RUN_ID.slice(-8)}`, `成本发货方-${RUN_ID}`, `成本发货方`]
   );
   insertedSupplierIds.push(supplierId);
   return supplierId;
@@ -200,7 +200,7 @@ async function cleanup(pool: Pool) {
     await pool.query('DELETE FROM products WHERE id = ANY($1::uuid[])', [insertedProductIds]);
   }
   if (insertedSupplierIds.length > 0) {
-    await pool.query('DELETE FROM suppliers WHERE id = ANY($1::uuid[])', [insertedSupplierIds]);
+    await pool.query('DELETE FROM shippers WHERE id = ANY($1::uuid[])', [insertedSupplierIds]);
   }
 }
 

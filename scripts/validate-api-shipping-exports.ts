@@ -194,7 +194,7 @@ function ensureArray(value: unknown, label: string) {
 
 async function assertFileExists(relativePath?: string | null) {
   assert(typeof relativePath === 'string' && relativePath.length > 0, '缺少 artifact.relative_path');
-  await access(path.resolve(process.cwd(), relativePath));
+  await access(path.resolve(artifactDir, relativePath));
 }
 
 async function seedBaseData(pool: Pool) {
