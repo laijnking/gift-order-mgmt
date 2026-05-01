@@ -72,7 +72,6 @@ interface Agent {
 
 export default function AiLogsPage() {
   const [logs, setLogs] = useState<AiLog[]>([]);
-  const [filteredLogs, setFilteredLogs] = useState<AiLog[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -81,41 +80,30 @@ export default function AiLogsPage() {
   const [selectedLog, setSelectedLog] = useState<AiLog | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
-  // 加载数据
+  // 分页相关状态
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+
+  // 加载数据（服务端分页）
   useEffect(() => {
     loadData();
-  }, []);
-
-  // 筛选数据
-  useEffect(() => {
-    let filtered = logs;
-
-    if (agentFilter !== 'all') {
-      filtered = filtered.filter(l => l.agent_code === agentFilter);
-    }
-
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(l => l.status === statusFilter);
-    }
-
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(l =>
-        l.input?.toLowerCase().includes(term) ||
-        l.output?.toLowerCase().includes(term) ||
-        l.agent_name?.toLowerCase().includes(term)
-      );
-    }
-
-    setFilteredLogs(filtered);
-  }, [logs, searchTerm, agentFilter, statusFilter]);
+  }, [currentPage, pageSize, agentFilter, statusFilter]);
 
   const loadData = async () => {
     setLoading(true);
     try {
       const headers = buildUserInfoHeaders();
+      const params = new URLSearchParams();
+      if (agentFilter !== 'all') params.set('agentId', agentFilter);
+      if (statusFilter !== 'all') params.set('status', statusFilter);
+      if (searchTerm) params.set('search', searchTerm);
+      params.set('page', String(currentPage));
+      params.set('pageSize', String(pageSize));
+
       const [logsRes, agentsRes] = await Promise.all([
-        fetch('/api/ai-logs?limit=100', { headers }),
+        fetch(`/api/ai-logs?${params.toString()}`, { headers }),
         fetch('/api/agent-configs', { headers }),
       ]);
 
@@ -124,6 +112,8 @@ export default function AiLogsPage() {
 
       if (logsData.success) {
         setLogs(logsData.data || []);
+        setTotalCount(logsData.total || 0);
+        setTotalPages(logsData.totalPages || 0);
       }
       if (agentsData.success) {
         setAgents(agentsData.data || []);
@@ -148,7 +138,7 @@ export default function AiLogsPage() {
 
   const handleExport = () => {
     const headers = ['时间', 'Agent', '状态', '耗时(ms)', '输入', '输出'];
-    const rows = filteredLogs.map(l => [
+    const rows = logs.map(l => [
       new Date(l.created_at).toLocaleString(),
       l.agent_name || l.agent_code,
       l.status,
@@ -333,14 +323,14 @@ export default function AiLogsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredLogs.length === 0 ? (
+              {logs.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                     {logs.length === 0 ? '暂无日志记录' : '未找到匹配的日志'}
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredLogs.map((log) => (
+                logs.map((log) => (
                   <TableRow key={log.id} className={log.status === 'failed' ? 'bg-red-50' : ''}>
                     <TableCell className="text-sm">
                       {new Date(log.created_at).toLocaleString()}
@@ -384,8 +374,27 @@ export default function AiLogsPage() {
         </CardContent>
       </Card>
 
-      <div className="text-sm text-muted-foreground">
-        共 {filteredLogs.length} 条日志
+      <div className="flex items-center justify-between px-2 py-3 border-t">
+        <div className="text-sm text-muted-foreground">
+          共 {totalCount} 条
+        </div>
+        <div className="flex items-center gap-1">
+          <Button variant="outline" size="sm" onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>首页</Button>
+          <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => p - 1)} disabled={currentPage === 1}>上一页</Button>
+          <span className="px-2 text-sm">{currentPage} / {totalPages}</span>
+          <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage === totalPages || totalPages === 0}>下一页</Button>
+          <Button variant="outline" size="sm" onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages || totalPages === 0}>末页</Button>
+        </div>
+        <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}>
+          <SelectTrigger className="w-[100px] h-8 text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="20">20条/页</SelectItem>
+            <SelectItem value="50">50条/页</SelectItem>
+            <SelectItem value="100">100条/页</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* 详情对话框 */}

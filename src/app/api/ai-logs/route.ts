@@ -13,10 +13,11 @@ export async function GET(request: NextRequest) {
   const agentCode = searchParams.get('agentCode');
   const agentId = searchParams.get('agentId');
   const status = searchParams.get('status');
-  const limit = parseInt(searchParams.get('limit') || '50');
+  const page = parseInt(searchParams.get('page') || '1');
+  const pageSize = parseInt(searchParams.get('pageSize') || '50');
 
   try {
-    let query = client.from('ai_logs').select('*');
+    let query = client.from('ai_logs').select('*', { count: 'exact' });
 
     if (agentCode) {
       query = query.eq('agent_code', agentCode);
@@ -30,15 +31,21 @@ export async function GET(request: NextRequest) {
       query = query.eq('status', status);
     }
 
-    query = query.order('created_at', { ascending: false }).limit(limit);
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+    query = query.order('created_at', { ascending: false }).range(from, to);
 
-    const { data, error } = await query;
+    const { data, error, count } = await query;
     if (error) throw new Error(`查询AI日志失败: ${error.message}`);
 
+    const total = count ?? (data?.length || 0);
     return NextResponse.json({
       success: true,
       data: data || [],
-      total: data?.length || 0
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
     });
   } catch (error) {
     console.error('获取AI日志失败:', error);

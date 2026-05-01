@@ -766,7 +766,31 @@ CREATE TABLE IF NOT EXISTS ai_logs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_ai_logs_agent ON ai_logs(agent_id);
-CREATE INDEX IF NOT EXISTS idx_ai_logs_created ON ai_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_ai_logs_created ON ai_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ai_logs_status ON ai_logs(status);
+
+-- =====================================================
+-- 分页优化索引
+-- =====================================================
+
+-- stocks 表: 仓库过滤 + 更新时间排序
+CREATE INDEX IF NOT EXISTS idx_stocks_warehouse ON stocks(warehouse_id);
+CREATE INDEX IF NOT EXISTS idx_stocks_updated_at ON stocks(updated_at DESC);
+
+-- product_mappings 表: 按发货方/类型/商品过滤
+CREATE INDEX IF NOT EXISTS idx_product_mappings_supplier ON product_mappings(supplier_id);
+CREATE INDEX IF NOT EXISTS idx_product_mappings_type ON product_mappings(mapping_type);
+CREATE INDEX IF NOT EXISTS idx_product_mappings_product ON product_mappings(product_id);
+
+-- return_receipt_records 表: 按导入时间排序
+CREATE INDEX IF NOT EXISTS idx_receipt_records_imported ON return_receipt_records(imported_at DESC);
+
+-- return_receipts 表: 按 record_id 关联
+CREATE INDEX IF NOT EXISTS idx_return_receipts_record ON return_receipts(record_id);
+
+-- shippers 表: 按类型/状态过滤
+CREATE INDEX IF NOT EXISTS idx_shippers_type ON shippers(type);
+CREATE INDEX IF NOT EXISTS idx_shippers_active ON shippers(is_active);
 
 -- =====================================================
 -- 32. 健康检查表 (health_check)

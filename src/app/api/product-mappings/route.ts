@@ -39,9 +39,11 @@ export async function GET(request: NextRequest) {
   const customerCode = searchParams.get('customerCode');
   const supplierId = searchParams.get('supplierId');
   const mappingType = searchParams.get('mappingType');
+  const page = parseInt(searchParams.get('page') || '1');
+  const pageSize = parseInt(searchParams.get('pageSize') || '50');
 
   try {
-    let query = client.from('product_mappings').select('*');
+    let query = client.from('product_mappings').select('*', { count: 'exact' });
 
     if (mappingType) {
       query = query.eq('mapping_type', mappingType);
@@ -63,17 +65,23 @@ export async function GET(request: NextRequest) {
       query = query.eq('supplier_id', supplierId);
     }
 
-    query = query.order('created_at', { ascending: false });
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+    query = query.order('created_at', { ascending: false }).range(from, to);
 
-    const { data, error } = await query;
+    const { data, error, count } = await query;
     if (error) throw new Error(`查询SKU映射失败: ${error.message}`);
 
     const transformedData = (data || []).map((mapping) => transformMapping(mapping as Record<string, unknown>));
+    const total = count ?? transformedData.length;
 
     return NextResponse.json({
       success: true,
       data: transformedData,
-      total: data?.length || 0
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
     });
   } catch (error) {
     console.error('获取SKU映射失败:', error);

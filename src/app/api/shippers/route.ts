@@ -44,9 +44,11 @@ export async function GET(request: NextRequest) {
   const type = searchParams.get('type');
   const active = searchParams.get('active');
   const sendType = searchParams.get('sendType');
+  const page = parseInt(searchParams.get('page') || '1');
+  const pageSize = parseInt(searchParams.get('pageSize') || '50');
 
   try {
-    let query = client.from('shippers').select('*');
+    let query = client.from('shippers').select('*', { count: 'exact' });
 
     if (search) {
       query = query.or(`code.ilike.%${search}%,name.ilike.%${search}%,short_name.ilike.%${search}%`);
@@ -64,17 +66,23 @@ export async function GET(request: NextRequest) {
       query = query.eq('is_active', true);
     }
 
-    query = query.order('created_at', { ascending: false });
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+    query = query.order('created_at', { ascending: false }).range(from, to);
 
-    const { data, error } = await query;
+    const { data, error, count } = await query;
     if (error) throw new Error(`查询发货方失败: ${error.message}`);
 
     const transformedData = (data || []).map((shipper) => transformShipper(shipper as Record<string, unknown>));
+    const total = count ?? transformedData.length;
 
     return NextResponse.json({
       success: true,
       data: transformedData,
-      total: data?.length || 0
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
     });
   } catch (error) {
     console.error('获取发货方失败:', error);

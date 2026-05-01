@@ -164,6 +164,12 @@ export default function StocksPage() {
   const [stats, setStats] = useState<StockStats>({ totalCount: 0, lowStockCount: 0, outOfStockCount: 0 });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingStock, setEditingStock] = useState<Stock | null>(null);
+
+  // 分页相关状态
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   
   // 版本历史相关状态
   const [isVersionDialogOpen, setIsVersionDialogOpen] = useState(false);
@@ -224,7 +230,7 @@ export default function StocksPage() {
   // 加载数据
   useEffect(() => {
     loadData();
-  }, [showLowStockOnly]);
+  }, [showLowStockOnly, currentPage, pageSize]);
 
   const authHeaders = useCallback(() => buildUserInfoHeaders(), []);
   const jsonHeaders = useCallback(
@@ -235,7 +241,7 @@ export default function StocksPage() {
     []
   );
 
-  // 筛选数据
+  // 筛选数据（仅供应商过滤，搜索和分页由服务端处理）
   useEffect(() => {
     let filtered = stocks;
 
@@ -262,6 +268,11 @@ export default function StocksPage() {
       if (showLowStockOnly) {
         params.set('lowStockOnly', 'true');
       }
+      params.set('page', String(currentPage));
+      params.set('pageSize', String(pageSize));
+      if (searchTerm) {
+        params.set('search', searchTerm);
+      }
 
       const [stocksRes, shippersRes, warehousesRes] = await Promise.all([
         fetch(`/api/stocks?${params.toString()}`, { headers: authHeaders() }),
@@ -278,6 +289,8 @@ export default function StocksPage() {
         if (stocksData.stats) {
           setStats(stocksData.stats);
         }
+        setTotalCount(stocksData.total || 0);
+        setTotalPages(stocksData.totalPages || 0);
       }
       if (shippersData.success) {
         setSuppliers((shippersData.data || []).filter((s: Supplier) => s.name));
@@ -1014,9 +1027,28 @@ export default function StocksPage() {
         </CardContent>
       </Card>
 
-      <div className="text-sm text-muted-foreground">
-        共 {filteredStocks.length} 条库存记录
-        {showLowStockOnly && ` (预警：${stats.lowStockCount} 条)`}
+      <div className="flex items-center justify-between px-2 py-3 border-t">
+        <div className="text-sm text-muted-foreground">
+          共 {totalCount} 条
+          {showLowStockOnly && ` (预警：${stats.lowStockCount} 条)`}
+        </div>
+        <div className="flex items-center gap-1">
+          <Button variant="outline" size="sm" onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>首页</Button>
+          <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => p - 1)} disabled={currentPage === 1}>上一页</Button>
+          <span className="px-2 text-sm">{currentPage} / {totalPages}</span>
+          <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage === totalPages || totalPages === 0}>下一页</Button>
+          <Button variant="outline" size="sm" onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages || totalPages === 0}>末页</Button>
+        </div>
+        <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}>
+          <SelectTrigger className="w-[100px] h-8 text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="20">20条/页</SelectItem>
+            <SelectItem value="50">50条/页</SelectItem>
+            <SelectItem value="100">100条/页</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* 添加/编辑对话框 */}

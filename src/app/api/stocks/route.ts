@@ -56,9 +56,11 @@ export async function GET(request: NextRequest) {
   const supplierName = searchParams.get('supplierName');
   const lowStockOnly = searchParams.get('lowStockOnly') === 'true';
   const warehouseId = searchParams.get('warehouseId');
+  const page = parseInt(searchParams.get('page') || '1');
+  const pageSize = parseInt(searchParams.get('pageSize') || '50');
 
   try {
-    let query = client.from('stocks').select('*');
+    let query = client.from('stocks').select('*', { count: 'exact' });
 
     if (search) {
       query = query.or(`product_code.ilike.%${search}%,product_name.ilike.%${search}%,supplier_name.ilike.%${search}%`);
@@ -68,14 +70,22 @@ export async function GET(request: NextRequest) {
     if (warehouseId) query = query.eq('warehouse_id', warehouseId);
     if (lowStockOnly) query = query.lte('quantity', LOW_STOCK_THRESHOLD);
 
-    const { data, error } = await query.order('updated_at', { ascending: false }).limit(1000);
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+    query = query.order('updated_at', { ascending: false }).range(from, to);
+
+    const { data, error, count } = await query;
     if (error) throw new Error(`查询库存失败: ${error.message}`);
 
     const enhancedData = (data || []).map((stock) => enhanceStock(stock as Record<string, unknown>));
+    const total = count ?? enhancedData.length;
     return NextResponse.json({
       success: true,
       data: enhancedData,
-      total: enhancedData.length,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
       stats: {
         lowStockCount: enhancedData.filter((s) => s.isLowStock).length,
         outOfStockCount: enhancedData.filter((s) => s.stockLevel === 'out').length,

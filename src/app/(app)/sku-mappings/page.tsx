@@ -206,6 +206,8 @@ interface Product {
 interface MappingData {
   success: boolean;
   data?: ProductMapping[];
+  total?: number;
+  totalPages?: number;
   error?: string;
 }
 
@@ -252,6 +254,12 @@ export default function ProductMappingsPage() {
   const [excelImportDialogOpen, setExcelImportDialogOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 分页相关状态
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   // 导入进度状态
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0, success: 0, failed: 0 });
   const [importErrors, setImportErrors] = useState<string[]>([]);
@@ -306,8 +314,14 @@ export default function ProductMappingsPage() {
     setLoading(true);
     try {
       const headers = buildUserInfoHeaders();
+      const params = new URLSearchParams();
+      if (mappingType) params.set('mappingType', mappingType);
+      if (searchTerm) params.set('search', searchTerm);
+      params.set('page', String(currentPage));
+      params.set('pageSize', String(pageSize));
+
       const [mappingsRes, customersRes, suppliersRes, productsRes] = await Promise.all([
-        fetch(`/api/product-mappings${mappingType ? `?mappingType=${mappingType}` : ''}`, { headers }),
+        fetch(`/api/product-mappings?${params.toString()}`, { headers }),
         fetch('/api/customers?isActive=false', { headers }),
         fetch('/api/suppliers?active=true', { headers }),
         fetch('/api/products', { headers }),
@@ -320,6 +334,8 @@ export default function ProductMappingsPage() {
 
       if (mappingsData.success) {
         setMappings(mappingsData.data || []);
+        setTotalCount(mappingsData.total || 0);
+        setTotalPages(mappingsData.totalPages || 0);
       }
       if (customersData.success) {
         setCustomers((customersData.data || []).filter((c): c is Customer => !!(String(c.code ?? '').trim() && String(c.name ?? '').trim())));
@@ -340,8 +356,15 @@ export default function ProductMappingsPage() {
 
   // Tab 切换时重新加载数据
   useEffect(() => {
+    setCurrentPage(1);
     loadData(activeTab);
   }, [activeTab]);
+
+  // 搜索时重置页码
+  useEffect(() => {
+    setCurrentPage(1);
+    loadData(activeTab);
+  }, [searchTerm]);
 
   // 获取当前Tab的过滤值
   const getPartnerFilter = activeTab === 'customer' ? customerFilter : supplierFilter;
@@ -1109,9 +1132,28 @@ export default function ProductMappingsPage() {
           </CardContent>
         </Card>
 
+      <div className="flex items-center justify-between px-2 py-3 border-t">
         <div className="text-sm text-muted-foreground">
-          共 {filteredMappings.length} 条映射
+          共 {totalCount} 条
         </div>
+        <div className="flex items-center gap-1">
+          <Button variant="outline" size="sm" onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>首页</Button>
+          <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => p - 1)} disabled={currentPage === 1}>上一页</Button>
+          <span className="px-2 text-sm">{currentPage} / {totalPages}</span>
+          <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage === totalPages || totalPages === 0}>下一页</Button>
+          <Button variant="outline" size="sm" onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages || totalPages === 0}>末页</Button>
+        </div>
+        <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}>
+          <SelectTrigger className="w-[100px] h-8 text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="20">20条/页</SelectItem>
+            <SelectItem value="50">50条/页</SelectItem>
+            <SelectItem value="100">100条/页</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
         {/* 添加/编辑对话框 */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

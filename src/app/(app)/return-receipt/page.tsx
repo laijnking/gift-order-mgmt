@@ -23,6 +23,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Upload, Loader2, CheckCircle2,
   AlertTriangle, FileText, RefreshCw, Package, Link2
 } from 'lucide-react';
@@ -139,6 +146,12 @@ export default function ReturnReceiptPage() {
   const [receiptFilter, setReceiptFilter] = useState<'all' | 'needs_review' | 'conflict' | 'matched'>('all');
   const [manualMatching, setManualMatching] = useState(false);
 
+  // 分页相关状态
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+
   const actorName = user?.realName || user?.username || 'system';
   const authHeaders = useCallback(() => buildUserInfoHeaders(user), [user]);
   const jsonHeaders = useCallback(
@@ -152,17 +165,22 @@ export default function ReturnReceiptPage() {
   const loadRecords = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/return-receipts/history', { headers: authHeaders() });
+      const params = new URLSearchParams();
+      params.set('page', String(currentPage));
+      params.set('pageSize', String(pageSize));
+      const response = await fetch(`/api/return-receipts/history?${params.toString()}`, { headers: authHeaders() });
       const data = await response.json();
       if (data.success) {
         setRecords(data.data || []);
+        setTotalCount(data.total || 0);
+        setTotalPages(data.totalPages || 0);
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '未知错误');
     } finally {
       setLoading(false);
     }
-  }, [authHeaders]);
+  }, [authHeaders, currentPage, pageSize]);
 
   // 文件上传处理（不再需要选择发货方）
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
@@ -264,6 +282,11 @@ export default function ReturnReceiptPage() {
       toast.error(`文件上传失败: ${errorMessage}`);
     }
   }, [fileRejections]);
+
+  // 初始加载记录
+  useEffect(() => {
+    loadRecords();
+  }, [loadRecords]);
 
   // 自动匹配回单
   const handleAutoMatch = async () => {
@@ -546,9 +569,28 @@ export default function ReturnReceiptPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full sm:max-w-xs"
             />
+          </div>
+          <div className="flex items-center justify-between px-2 py-3 border-t">
             <div className="text-sm text-muted-foreground">
-              共 {filteredRecords.length} 条记录
+              共 {totalCount} 条
             </div>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="sm" onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>首页</Button>
+              <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => p - 1)} disabled={currentPage === 1}>上一页</Button>
+              <span className="px-2 text-sm">{currentPage} / {totalPages}</span>
+              <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage === totalPages || totalPages === 0}>下一页</Button>
+              <Button variant="outline" size="sm" onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages || totalPages === 0}>末页</Button>
+            </div>
+            <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}>
+              <SelectTrigger className="w-[100px] h-8 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="20">20条/页</SelectItem>
+                <SelectItem value="50">50条/页</SelectItem>
+                <SelectItem value="100">100条/页</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
