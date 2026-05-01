@@ -7,7 +7,7 @@ import { isManagementRole } from '@/lib/roles';
 import { ORDER_STATUS_ASSIGNED, ORDER_STATUS_COMPLETED } from '@/lib/order-status';
 import { PERMISSIONS } from '@/lib/permissions';
 import { transformOrderItem, apiToDb } from '@/lib/order-adapter';
-import { generateSysOrderNo, bulkUpdateOrderStatus } from '@/lib/order-service';
+import { generateSysOrderNo, bulkUpdateOrderStatus, extractName, getUserRealNameByUsername, findUserIdByName, findCustomerIdByCode, findSupplierIdByName, findWarehouseIdByName, buildRelatedMaps } from '@/lib/order-service';
 
 interface DuplicateOrderDetail {
   orderNo: string;
@@ -144,155 +144,9 @@ function getCurrentUser(request: NextRequest): { username: string; role: string;
   return null;
 }
 
-// 根据 username 获取用户的真实姓名（用于数据权限过滤）
-async function getUserRealNameByUsername(client: ReturnType<typeof getSupabaseClient>, username: string): Promise<string | null> {
-  if (!username) return null;
-  
-  const { data: users } = await client
-    .from('users')
-    .select('real_name')
-    .eq('username', username)
-    .limit(1);
-  
-  return users?.[0]?.real_name || null;
-}
-
-// 提取纯姓名（去除括号内容，如 "张三（业务员）" -> "张三"）
-function extractName(realName: string): string {
-  // 去除括号及其内容
-  return realName.replace(/\s*[\（\(].*[\）\)].*$/, '').trim();
-}
-
-// 辅助函数：根据名称查找用户ID
-async function findUserIdByName(client: ReturnType<typeof getSupabaseClient>, name: string): Promise<string | null> {
-  if (!name) return null;
-  const pureName = extractName(name);
-  
-  // 优先精确匹配（去除括号后的姓名）
-  const { data: users } = await client
-    .from('users')
-    .select('id, real_name')
-    .ilike('real_name', `%${pureName}%`)
-    .limit(1);
-  
-  return users?.[0]?.id || null;
-}
-
-// 辅助函数：根据客户代码查找客户ID
-async function findCustomerIdByCode(client: ReturnType<typeof getSupabaseClient>, code: string): Promise<{ id: string; name: string } | null> {
-  if (!code) return null;
-  
-  const { data: customers } = await client
-    .from('customers')
-    .select('id, name')
-    .eq('code', code)
-    .limit(1);
-  
-  if (customers?.[0]) {
-    return { id: customers[0].id, name: customers[0].name };
-  }
-  
-  // 如果代码匹配不到，尝试模糊匹配名称
-  const { data: customersByName } = await client
-    .from('customers')
-    .select('id, name')
-    .ilike('name', `%${code}%`)
-    .limit(1);
-  
-  return customersByName?.[0] ? { id: customersByName[0].id, name: customersByName[0].name } : null;
-}
-
-// 辅助函数：根据发货方名称查找发货方ID（统一查询 shippers 表）
-async function findSupplierIdByName(client: ReturnType<typeof getSupabaseClient>, name: string): Promise<{ id: string; name: string } | null> {
-  if (!name) return null;
-  
-  const { data: shippers } = await client
-    .from('shippers')
-    .select('id, name')
-    .eq('is_active', true)
-    .ilike('name', `%${name}%`)
-    .limit(1);
-  
-  return shippers?.[0] ? { id: shippers[0].id, name: shippers[0].name } : null;
-}
-
-// 辅助函数：根据仓库名称查找仓库ID
-async function findWarehouseIdByName(client: ReturnType<typeof getSupabaseClient>, name: string): Promise<{ id: string; name: string } | null> {
-  if (!name) return null;
-  
-  const { data: warehouses } = await client
-    .from('warehouses')
-    .select('id, name')
-    .ilike('name', `%${name}%`)
-    .limit(1);
-  
-  return warehouses?.[0] ? { id: warehouses[0].id, name: warehouses[0].name } : null;
-}
-
-// 辅助函数：批量构建档案映射（用于transformOrder优化）
-async function buildRelatedMaps(client: ReturnType<typeof getSupabaseClient>, orders: Record<string, unknown>[]) {
-  // 收集所有需要查询的ID
-  const userIds = new Set<string>();
-  const customerCodes = new Set<string>();
-  const supplierIds = new Set<string>();
-  const warehouseIds = new Set<string>();
-  
-  for (const order of orders) {
-    if (order.salesperson_id) userIds.add(order.salesperson_id as string);
-    if (order.operator_id) userIds.add(order.operator_id as string);
-    if (order.customer_code) customerCodes.add(order.customer_code as string);
-    if (order.supplier_id) supplierIds.add(order.supplier_id as string);
-    if (order.warehouse_id) warehouseIds.add(order.warehouse_id as string);
-  }
-  
-  // 批量查询用户
-  const userMap: Record<string, { id: string; realName: string }> = {};
-  if (userIds.size > 0) {
-    const { data: users } = await client
-      .from('users')
-      .select('id, real_name')
-      .in('id', Array.from(userIds));
-    users?.forEach(u => { userMap[u.id] = { id: u.id, realName: u.real_name }; });
-  }
-  
-  // 批量查询客户
-  const customerMap: Record<string, { id: string; salesUserName: string; operatorUserName: string }> = {};
-  if (customerCodes.size > 0) {
-    const { data: customers } = await client
-      .from('customers')
-      .select('code, id, salesperson_name, order_taker_name')
-      .in('code', Array.from(customerCodes));
-    customers?.forEach(c => {
-      customerMap[c.code] = {
-        id: c.id,
-        salesUserName: c.salesperson_name || '',
-        operatorUserName: c.order_taker_name || '',
-      };
-    });
-  }
-  
-  // 批量查询发货方（统一查询 shippers 表）
-  const supplierMap: Record<string, { id: string; name: string }> = {};
-  if (supplierIds.size > 0) {
-    const { data: shippers } = await client
-      .from('shippers')
-      .select('id, name')
-      .in('id', Array.from(supplierIds));
-    shippers?.forEach(s => { supplierMap[s.id] = { id: s.id, name: s.name }; });
-  }
-  
-  // 批量查询仓库
-  const warehouseMap: Record<string, { id: string; name: string }> = {};
-  if (warehouseIds.size > 0) {
-    const { data: warehouses } = await client
-      .from('warehouses')
-      .select('id, name')
-      .in('id', Array.from(warehouseIds));
-    warehouses?.forEach(w => { warehouseMap[w.id] = { id: w.id, name: w.name }; });
-  }
-  
-  return { userMap, customerMap, supplierMap, warehouseMap };
-}
+// 以下函数已提取到 @/lib/order-service.ts：
+//   getUserRealNameByUsername, extractName, findUserIdByName,
+//   findCustomerIdByCode, findSupplierIdByName, findWarehouseIdByName, buildRelatedMaps
 
 // 商品匹配结果类型
 interface ProductMatchResult {
@@ -1117,10 +971,7 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const authError = requirePermission(request, PERMISSIONS.ORDERS_EDIT);
-    if (authError) {
-      debugInfo.authError = true;
-      return NextResponse.json({ success: false, error: 'auth failed', debug: debugInfo }, { status: 401 });
-    }
+    if (authError) return authError;
 
     const client = getSupabaseClient();
     const body = await request.json();

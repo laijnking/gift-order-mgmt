@@ -58,7 +58,17 @@ export async function GET(request: NextRequest) {
     }
 
     if (customerCode) {
-      query = query.eq('customer_code', customerCode);
+      // 优先解析 customer_id 后查询，customer_code 仅兼容
+      const { data: customer } = await client
+        .from('customers')
+        .select('id')
+        .eq('code', customerCode)
+        .maybeSingle();
+      if (customer?.id) {
+        query = query.eq('customer_id', customer.id);
+      } else {
+        query = query.eq('customer_code', customerCode);
+      }
     }
 
     if (supplierId) {
@@ -329,7 +339,7 @@ export async function PUT(request: NextRequest) {
 
     const { data, error } = await client
       .from('product_mappings')
-      .upsert(insertData, { onConflict: 'customer_sku,customer_code' })
+      .upsert(insertData, { onConflict: 'customer_id,customer_product_code' })
       .select();
     
     if (error) throw new Error(`批量导入SKU映射失败: ${error.message}`);

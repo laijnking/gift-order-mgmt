@@ -23,11 +23,23 @@ export async function GET(request: NextRequest) {
       ? 'id, version, header_row, is_active, created_at, created_by, remark, header_fingerprint, template_signature, source_headers, mapping_config, feedback_export_headers'
       : 'id, version, header_row, is_active, created_at, created_by, remark';
 
+    // 先解析 customer_id，优先使用 customer_id 查询
+    const { data: customer } = await client
+      .from('customers')
+      .select('id')
+      .eq('code', customerCode)
+      .maybeSingle();
+
     let query = client
       .from('column_mappings')
       .select(selectColumns)
-      .eq('customer_code', customerCode)
       .order('version', { ascending: false });
+
+    if (customer?.id) {
+      query = query.eq('customer_id', customer.id);
+    } else {
+      query = query.eq('customer_code', customerCode);
+    }
 
     // 按 fingerprint 精确过滤（用于自动加载历史映射）
     if (fingerprint && hasMeta) {

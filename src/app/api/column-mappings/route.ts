@@ -57,14 +57,27 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: '缺少customerCode参数' }, { status: 400 });
     }
 
-    const { data, error } = await client
+    // 先解析 customer_id，优先使用 customer_id 查询
+    const { data: customer } = await client
+      .from('customers')
+      .select('id')
+      .eq('code', customerCode)
+      .maybeSingle();
+
+    let query = client
       .from('column_mappings')
       .select('*')
-      .eq('customer_code', customerCode)
       .eq('is_active', true)
       .order('version', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
+
+    if (customer?.id) {
+      query = query.eq('customer_id', customer.id);
+    } else {
+      query = query.eq('customer_code', customerCode);
+    }
+
+    const { data, error } = await query.maybeSingle();
 
     if (error) throw new Error(`查询字段映射失败: ${error.message}`);
 
@@ -135,24 +148,44 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 获取当前最新版本号
-    const { data: existing } = await client
+    // 解析 customer_id（优先使用 ID 查询）
+    const { data: customer } = await client
+      .from('customers')
+      .select('id')
+      .eq('code', customerCode)
+      .maybeSingle();
+    const customerId = customer?.id || null;
+
+    // 获取当前最新版本号（优先 customer_id，fallback customer_code）
+    let existingQuery = client
       .from('column_mappings')
       .select('version')
-      .eq('customer_code', customerCode)
-      .eq('is_active', true)
-      .single();
+      .eq('is_active', true);
+
+    if (customerId) {
+      existingQuery = existingQuery.eq('customer_id', customerId);
+    } else {
+      existingQuery = existingQuery.eq('customer_code', customerCode);
+    }
+    const { data: existing } = await existingQuery.single();
 
     const newVersion = (existing?.version || 0) + 1;
 
-    // 先将旧的配置标记为非活跃
-    await client
+    // 先将旧的配置标记为非活跃（优先 customer_id）
+    let deactivateQuery = client
       .from('column_mappings')
       .update({ is_active: false })
-      .eq('customer_code', customerCode)
       .eq('is_active', true);
 
+    if (customerId) {
+      deactivateQuery = deactivateQuery.eq('customer_id', customerId);
+    } else {
+      deactivateQuery = deactivateQuery.eq('customer_code', customerCode);
+    }
+    await deactivateQuery;
+
     const insertPayload: Record<string, unknown> = {
+      customer_id: customerId,
       customer_code: customerCode,
       mapping_config: mappingConfig,
       header_row: headerRow ?? 0,

@@ -23,7 +23,7 @@ export type MatchPriorityType = typeof MATCH_PRIORITY[number];
 export const SKU_MAPPING_FIELDS: Record<MatchPriorityType, string> = {
   code: 'customer_sku',
   barcode: 'customer_barcode',
-  spec: 'customer_product_name',
+  spec: 'customer_product_spec',
   name: 'customer_product_name',
 };
 
@@ -48,7 +48,7 @@ export const PRODUCT_MATCH_SCORES = {
 export const SKU_MATCH_ORDER: Array<{ type: MatchPriorityType; field: string }> = [
   { type: 'code', field: 'customer_sku' },
   { type: 'barcode', field: 'customer_barcode' },
-  { type: 'spec', field: 'customer_product_name' },
+  { type: 'spec', field: 'customer_product_spec' },
   { type: 'name', field: 'customer_product_name' },
 ];
 

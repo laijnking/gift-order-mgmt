@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission } from '@/lib/server-auth';
 import { isManagementRole } from '@/lib/roles';
+import { extractName, getUserRealNameByUsername } from '@/lib/order-service';
 import { PERMISSIONS } from '@/lib/permissions';
 
 // 获取订单状态统计（用于快捷筛选数量）
@@ -87,11 +88,5 @@ function getCurrentUser(request: NextRequest): { username: string; role: string;
   }
 }
 
-async function getUserRealNameByUsername(client: ReturnType<typeof getSupabaseClient>, username: string): Promise<string | null> {
-  const { data } = await client.from('users').select('real_name').eq('username', username).single();
-  return data?.real_name || null;
-}
+// getUserRealNameByUsername, extractName 已提取到 @/lib/order-service.ts
 
-function extractName(name: string): string {
-  return name.replace(/[（(].*[)）]/g, '').trim();
-}
