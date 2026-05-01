@@ -255,7 +255,7 @@ export function useOrdersSession() {
   // Fetch customers
   const fetchCustomers = useCallback(async () => {
     try {
-      const res = await fetch('/api/customers?isActive=false', { headers: authHeaders() });
+      const res = await fetch('/api/customers?isActive=false&pageSize=100', { headers: authHeaders() });
       const data = await res.json();
       if (data.success) setCustomers((data.data || []).filter((c: Customer) => !!(String(c.code ?? '').trim() && String(c.name ?? '').trim())));
     } catch {

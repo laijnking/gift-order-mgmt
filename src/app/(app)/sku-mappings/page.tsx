@@ -245,6 +245,9 @@ export default function ProductMappingsPage() {
   const [supplierFilter, setSupplierFilter] = useState<string>('');
   const [customerSearch, setCustomerSearch] = useState('');
   const [supplierSearch, setSupplierSearch] = useState('');
+  const [customerSearchResults, setCustomerSearchResults] = useState<Customer[]>([]);
+  const [customerSearchLoading, setCustomerSearchLoading] = useState(false);
+  const customerSearchTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingMapping, setEditingMapping] = useState<ProductMapping | null>(null);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
@@ -282,6 +285,35 @@ export default function ProductMappingsPage() {
     price: 0,
     isActive: true,
   });
+
+  // 客户服务端搜索（防抖 300ms）
+  useEffect(() => {
+    if (customerSearchTimerRef.current) clearTimeout(customerSearchTimerRef.current);
+    if (!customerSearch.trim()) {
+      setCustomerSearchResults([]);
+      setCustomerSearchLoading(false);
+      return;
+    }
+    setCustomerSearchLoading(true);
+    customerSearchTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/customers?search=${encodeURIComponent(customerSearch)}&isActive=false&pageSize=50`, {
+          headers: buildUserInfoHeaders(),
+        });
+        const data = await res.json();
+        if (data.success) {
+          setCustomerSearchResults((data.data || []).filter((c: Customer) => !!(String(c.code ?? '').trim() && String(c.name ?? '').trim())));
+        }
+      } catch {
+        // ignore
+      } finally {
+        setCustomerSearchLoading(false);
+      }
+    }, 300);
+    return () => {
+      if (customerSearchTimerRef.current) clearTimeout(customerSearchTimerRef.current);
+    };
+  }, [customerSearch]);
 
   // 筛选数据
   useEffect(() => {
@@ -324,7 +356,7 @@ export default function ProductMappingsPage() {
 
       const [mappingsRes, customersRes, suppliersRes, productsRes] = await Promise.all([
         fetch(`/api/product-mappings?${params.toString()}`, { headers }),
-        fetch('/api/customers?isActive=false', { headers }),
+        fetch('/api/customers?isActive=false&pageSize=100', { headers }),
         fetch('/api/suppliers?active=true', { headers }),
         fetch('/api/products', { headers }),
       ]);
@@ -1054,17 +1086,31 @@ export default function ProductMappingsPage() {
                   >
                     全部客户
                   </button>
-                  {customers
-                    .filter(c => c.name.toLowerCase().includes(customerSearch.toLowerCase()) || c.code.toLowerCase().includes(customerSearch.toLowerCase()))
-                    .map((c) => (
-                      <button
-                        key={c.code}
-                        onClick={() => { setCustomerFilter(c.code); setCustomerSearch(''); }}
-                        className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-muted cursor-pointer truncate ${customerFilter === c.code ? 'bg-primary/10 text-primary' : ''}`}
-                      >
-                        {c.name}
-                      </button>
-                    ))}
+                  {customerSearch.trim()
+                    ? (customerSearchLoading
+                        ? <div className="px-2 py-3 text-sm text-muted-foreground text-center">搜索中...</div>
+                        : customerSearchResults.length === 0
+                          ? <div className="px-2 py-3 text-sm text-muted-foreground text-center">未找到匹配的客户</div>
+                          : customerSearchResults.map((c) => (
+                              <button
+                                key={c.code}
+                                onClick={() => { setCustomerFilter(c.code); setCustomerSearch(''); }}
+                                className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-muted cursor-pointer truncate ${customerFilter === c.code ? 'bg-primary/10 text-primary' : ''}`}
+                              >
+                                {c.name}
+                              </button>
+                            ))
+                      )
+                    : customers.map((c) => (
+                        <button
+                          key={c.code}
+                          onClick={() => { setCustomerFilter(c.code); setCustomerSearch(''); }}
+                          className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-muted cursor-pointer truncate ${customerFilter === c.code ? 'bg-primary/10 text-primary' : ''}`}
+                        >
+                          {c.name}
+                        </button>
+                      ))
+                  }
                 </div>
               </PopoverContent>
             </Popover>
