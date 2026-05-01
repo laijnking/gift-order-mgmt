@@ -41,8 +41,8 @@ Next.js 16 (App Router) + React 19 + TypeScript 5 + shadcn/ui (Radix UI) + Tailw
 - **`orders.items` 是 JSONB 数组**，直接包含商品明细，不存在独立的 `order_items` 表
 - **`supplier_id` 类型是 `VARCHAR(36)`**，不是 UUID — 但其他外键通常是 UUID
 - 订单号有两条：`order_no`（客户原始订单号，可能重复）和 `sys_order_no`（系统唯一，格式 `SYS-YYYYMMDD-XXXX-TIMESTAMP`）
-- 状态流转：`pending → assigned → partial_returned/returned → completed`，以及 `cancelled`
-- `feedbacked` 不是独立状态，已并入"回单阶段"统计
+- 状态流转：`pending → assigned → partial_returned/returned → feedbacked → completed`，以及 `cancelled`
+- `feedbacked` 是独立状态，表示已反馈客户但尚未最终归档
 
 ### 派发机制
 

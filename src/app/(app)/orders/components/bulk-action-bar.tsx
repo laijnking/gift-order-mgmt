@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Send, Bell, Truck, MessageSquare, Archive, FileInput, HelpCircle } from 'lucide-react';
+import { Send, Bell, Truck, MessageSquare, Archive, FileInput, HelpCircle, FileDown, FileSpreadsheet } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
   BULK_ACTIONS,
@@ -15,28 +15,36 @@ import {
 import type { Order } from '../hooks/use-orders-session';
 
 interface BulkActionBarProps {
-  selectedOrders: Set<Order>;
+  selectedOrderIds: string[];
+  orders: Order[];
   onAssign: () => void;
   onShipNotice: () => void;
   onReturn: () => void;
   onFeedback: () => void;
   onExportKingdee: () => void;
   onDelete: () => void;
+  onExportReturned?: () => void;
+  onExportPartial?: () => void;
 }
 
 export function BulkActionBar({
-  selectedOrders,
+  selectedOrderIds,
+  orders,
   onAssign,
   onShipNotice,
   onReturn,
   onFeedback,
   onExportKingdee,
   onDelete,
+  onExportReturned,
+  onExportPartial,
 }: BulkActionBarProps) {
   const router = useRouter();
 
-  // 从已选订单计算上下文
-  const ctx = computeBulkActionContext(Array.from(selectedOrders));
+  // 从已选订单 ID 和当前订单列表计算上下文
+  const selectedIdSet = new Set(selectedOrderIds);
+  const selectedOrders = orders.filter(o => selectedIdSet.has(o.id));
+  const ctx = computeBulkActionContext(selectedOrders);
 
   // 获取禁用原因的显示文本
   const getDisabledReasonText = (reason: DisabledReason): string | null => {
@@ -49,6 +57,7 @@ export function BulkActionBar({
     if (reason.noReturnable) return reason.noReturnable;
     if (reason.noFeedbackable) return reason.noFeedbackable;
     if (reason.noReturned) return reason.noReturned;
+    if (reason.noPartialReturned) return reason.noPartialReturned;
     if (reason.multipleStatuses) return reason.multipleStatuses;
     
     // 返回第一个非空原因
@@ -197,6 +206,38 @@ export function BulkActionBar({
             )}
           </ActionButton>
 
+          {/* 导出已回单 */}
+          {onExportReturned && (
+            <ActionButton
+              actionKey="export_returned"
+              onClick={onExportReturned}
+              icon={FileDown}
+            >
+              导出已回单
+              {ctx.returnedCount > 0 && (
+                <Badge variant="secondary" className="ml-1.5 h-5 px-1.5 text-xs">
+                  {ctx.returnedCount}
+                </Badge>
+              )}
+            </ActionButton>
+          )}
+
+          {/* 导出部分回单 */}
+          {onExportPartial && (
+            <ActionButton
+              actionKey="export_partial"
+              onClick={onExportPartial}
+              icon={FileSpreadsheet}
+            >
+              导出部分回单
+              {ctx.partialReturnedCount > 0 && (
+                <Badge variant="secondary" className="ml-1.5 h-5 px-1.5 text-xs">
+                  {ctx.partialReturnedCount}
+                </Badge>
+              )}
+            </ActionButton>
+          )}
+
           {/* 帮助说明 */}
           <Tooltip>
             <TooltipTrigger asChild>
@@ -212,6 +253,8 @@ export function BulkActionBar({
                 <p>物流回单：选中已派发/通知发货订单后可用</p>
                 <p>反馈给客户：选中已回单/部分回单订单后可用</p>
                 <p>导出金蝶：选中已回单/已反馈订单后可用</p>
+                <p>导出已回单：选中已回单订单后可用</p>
+                <p>导出部分回单：选中部分回单订单后可用</p>
               </div>
             </TooltipContent>
           </Tooltip>

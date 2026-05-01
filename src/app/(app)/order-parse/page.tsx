@@ -209,6 +209,8 @@ import { CustomerSelector } from './components/customer-selector';
 import { OrderPreviewPanel } from './components/order-preview-panel';
 import { ImportResultDialog } from './components/import-result-dialog';
 import { MappingHistoryDialog } from './components/mapping-history-dialog';
+import { useOrderSubmit } from './hooks/use-order-submit';
+import type { DuplicateSummary, MatchStatsSummary } from './hooks/use-order-submit';
 
 // 字段选项定义
 const COLUMN_OPTIONS = [
@@ -337,28 +339,6 @@ interface SubmitValidationSummary {
   missingSupplierCount: number;
 }
 
-interface DuplicateSummary {
-  totalSkipped: number;
-  batchDuplicateCount: number;
-  existingDuplicateCount: number;
-  details: Array<{
-    orderNo: string;
-    receiverName: string;
-    reason: 'batch_duplicate' | 'existing_order';
-    existingSysOrderNo?: string;
-  }>;
-}
-
-interface MatchStatsSummary {
-  total: number;
-  bySpec: number;
-  byName: number;
-  byMapping: number;
-  none: number;
-  matched: number;
-  matchRate: string;
-}
-
 function normalizeBundleDraftsForPage(
   bundles: Array<Record<string, unknown>>
 ): ParsedOrderDetail[] {
@@ -478,7 +458,7 @@ export default function OrderParsePage() {
   } | null>(_restored?.parseStats ?? null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { isSubmitting, submitOrders } = useOrderSubmit();
   const [parseResult, setParseResult] = useState<{
     duration: number;
     rawOutput?: string;
@@ -1308,132 +1288,27 @@ export default function OrderParsePage() {
       );
     }
 
-    setIsSubmitting(true);
-
-    try {
-      const orderData = {
-        customerCode: selectedCustomer,
-        customerName: customers.find(c => c.code === selectedCustomer)?.name || '',
-        salespersonId: salespersonId || '',
-        salespersonName: salespersonName || selectedOrders[0]?.salesperson || '',
-        operatorId: operatorId || '',
-        operatorName: operatorName || selectedOrders[0]?.operator || '',
-        items: selectedOrders.map(o => {
-          const price = o.price ?? o.customerPrice ?? 0;
-          return {
-            orderNo: o.orderNo || o.customerOrderNo || o.billNo || '',
-            customerOrderNo: o.customerOrderNo || o.orderNo || '',
-            billNo: o.billNo || '',
-            billDate: o.billDate || '',
-            supplierOrderNo: o.supplierOrderNo || '',
-            // 客户商品信息
-            productName: o.product_name,           // 客户商品名称
-            productCode: o.product_code || '',    // 客户商品编码
-            productSpec: o.product_spec || '',     // 客户规格型号
-            // 系统商品信息（自动匹配）
-            systemProductCode: o.mappedProductCode || '',  // 系统商品编码
-            systemProductName: o.mappedProductName || '',  // 系统商品名称
-            systemProductSpec: o.mappedProductSpec || '',   // 系统规格型号
-            systemProductBrand: o.mappedProductBrand || '',  // 系统商品品牌
-            systemProductId: o.systemProductId || '',      // 系统商品ID
-            quantity: o.quantity,
-            price,
-            amount: o.amount ?? null,
-            discount: o.discount ?? null,
-            taxRate: o.taxRate ?? null,
-            warehouse: o.warehouse ?? null,
-            remark: o.remark ?? '',
-            supplierId: o.supplierId || '',
-            supplierName: o.supplierName || '',
-            receiver_name: o.receiver_name || '',
-            receiver_phone: o.receiver_phone || '',
-            receiver_address: o.receiver_address || '',
-            express_company: o.express_company ?? null,
-            tracking_no: o.tracking_no ?? null,
-            invoice_required: o.invoice_required ?? null,
-            income_name: o.income_name ?? null,
-            income_amount: o.income_amount ?? null,
-            salespersonId: o.salespersonId || '',
-            salesperson: o.salesperson ?? '',
-            operatorId: o.operatorId || '',
-            operator: o.operator ?? '',
-            extFields: o.extFields || {},
-          };
-        }),
-      };
-
-      const res = await fetch('/api/orders', {
-        method: 'POST',
-        headers: {
-          ...buildUserInfoHeaders(),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(orderData),
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        const sysOrderNos = (data.data || []).map((o: Record<string, unknown>) => o.sys_order_no).filter(Boolean);
-        const createdCount = data.total || 0;
-        const skippedCount = data.duplicateSummary?.totalSkipped || 0;
-
-        // 所有选中的订单都是重复的，没有创建任何新订单
-        if (createdCount === 0 && skippedCount > 0) {
-          setIsSubmitting(false);
-          toast.error(
-            `所选订单均已在系统中存在，共 ${skippedCount} 条，无法重复录入`
-          );
-          return;
-        }
-
-        setImportResult({
-          open: true,
-          success: true,
-          total: createdCount,
-          importBatch: data.importBatch || '',
-          sysOrderNos,
-          message: data.message || `成功创建 ${createdCount} 条订单`,
-          customerName: customers.find(c => c.code === selectedCustomer)?.name || selectedCustomer,
-          duplicateSummary: data.duplicateSummary,
-          matchStats: data.matchStats,
-        });
-        // 订单保存成功后：自动将当前映射保存到该客户（异步，不阻塞）
-        if (selectedCustomer && Object.keys(columnMapping).length > 0) {
-          fetch('/api/column-mappings', {
-            method: 'POST',
-            headers: {
-              ...buildUserInfoHeaders(),
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              customerCode: selectedCustomer,
-              mappingConfig: columnMapping,
-              headerRow,
-              sourceHeaders: (excelPreview[headerRow] || []) as string[],
-              feedbackExportHeaderOverrides: {},
-            }),
-          }).then(res => res.json()).then(result => {
-            if (result.success) {
-              toast.success('列映射已自动保存，下次导入将自动复用');
-            } else {
-              toast.warning(`自动保存映射失败：${result.error || '未知错误'}`);
-            }
-          }).catch(err => {
-            console.warn('自动保存映射失败:', err);
-            toast.warning('自动保存映射失败，可手动保存');
-          });
-        }
+    submitOrders(parsedOrders, {
+      customerCode: selectedCustomer,
+      customerName: customers.find(c => c.code === selectedCustomer)?.name || '',
+      salespersonId: salespersonId || '',
+      salespersonName: salespersonName || '',
+      operatorId: operatorId || '',
+      operatorName: operatorName || '',
+      columnMapping,
+      headerRow,
+      excelPreview,
+      onSuccess: (result) => {
+        setImportResult(result);
         handleClear();
-      } else {
-        toast.error(data.error || '创建订单失败');
-      }
-    } catch (error) {
-      console.error('创建订单失败:', error);
-      toast.error('创建订单失败');
-    } finally {
-      setIsSubmitting(false);
-    }
+      },
+      onError: (message) => {
+        toast.error(message);
+      },
+      onFinally: () => {
+        // isSubmitting is managed by the hook
+      },
+    });
   };
 
   // 过滤映射历史

@@ -33,7 +33,7 @@ interface OrderAssignDialogProps {
   assigningOrderId: string | null;
   orders: Order[];
   suppliers: Supplier[];
-  selectedOrders: Set<Order>;
+  selectedOrderIds: string[];
   matchResults: Record<string, SupplierMatchResult>;
   setMatchResults: React.Dispatch<React.SetStateAction<Record<string, SupplierMatchResult>>>;
   selectedSupplierId: string;
@@ -52,7 +52,7 @@ export function OrderAssignDialog({
   assigningOrderId,
   orders,
   suppliers,
-  selectedOrders,
+  selectedOrderIds,
   matchResults,
   setMatchResults,
   selectedSupplierId,
@@ -115,7 +115,7 @@ export function OrderAssignDialog({
             <DialogDescription>
               {assigningOrderId
                 ? '选择有库存的发货方，显示商品、库存和历史成本'
-                : `将 ${selectedOrders.size} 条订单派发给发货方`}
+                : `将 ${selectedOrderIds.length} 条订单派发给发货方`}
             </DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-hidden flex flex-col gap-4 py-4">

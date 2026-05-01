@@ -261,11 +261,14 @@ export function useOrdersCrud({
     return null;
   };
 
-  const canDeleteOrder = (order: Order): boolean =>
-    !['assigned', 'partial_returned', 'returned', 'feedbacked', 'completed'].includes(order.status);
-
+  // 根据 order-workflow-config 的 EDITABLE_FIELDS_BY_STATUS：
+  // pending 全可编辑，assigned/notified 仅可编辑备注，其余状态不可编辑
   const canEditOrder = (order: Order): boolean =>
-    order.status !== 'completed';
+    ['pending', 'assigned', 'notified'].includes(order.status);
+
+  // 根据 order-workflow-config 的 BULK_ACTIONS.delete：仅 pending 可删除
+  const canDeleteOrder = (order: Order): boolean =>
+    order.status === 'pending';
 
   return {
     // Create

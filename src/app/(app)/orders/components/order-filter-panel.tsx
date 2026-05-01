@@ -38,7 +38,7 @@ const FILTERABLE_FIELDS = [
 
 interface OrderFilterPanelProps {
   orders: Order[];
-  selectedOrders: Set<Order>;
+  selectedOrderIds: string[];
   filteredCount: number;
   statusCounts: Record<string, number>;
   totalCount: number;
@@ -82,7 +82,7 @@ interface OrderFilterPanelProps {
 
 export function OrderFilterPanel({
   orders,
-  selectedOrders,
+  selectedOrderIds,
   filteredCount,
   statusCounts,
   totalCount,
@@ -187,8 +187,8 @@ export function OrderFilterPanel({
                 清除筛选
               </Button>
             )}
-            {selectedOrders.size > 0 && (
-              <Badge variant="secondary" className="text-xs">已选 {selectedOrders.size} 条</Badge>
+            {selectedOrderIds.length > 0 && (
+              <Badge variant="secondary" className="text-xs">已选 {selectedOrderIds.length} 条</Badge>
             )}
             <span className="text-xs text-muted-foreground whitespace-nowrap">
               {filteredCount} / {totalCount}

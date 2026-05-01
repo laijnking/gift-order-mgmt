@@ -206,7 +206,7 @@ export const BULK_ACTIONS: Record<string, BulkActionConfig> = {
     enabled: (ctx) => {
       if (ctx.selectedCount === 0) return { noSelection: '请先选择订单' };
       // 只有 pending, assigned, notified 状态可取消
-      const cancellableCount = ctx.pendingCount + ctx.assignedCount;
+      const cancellableCount = ctx.pendingCount + ctx.assignedCount + ctx.notifiedCount;
       if (cancellableCount === 0) {
         return { noCancellable: '仅待派发、已派发、通知发货状态可取消' };
       }

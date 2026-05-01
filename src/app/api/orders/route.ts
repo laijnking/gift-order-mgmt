@@ -6,6 +6,8 @@ import { requirePermission } from '@/lib/server-auth';
 import { isManagementRole } from '@/lib/roles';
 import { ORDER_STATUS_ASSIGNED, ORDER_STATUS_COMPLETED } from '@/lib/order-status';
 import { PERMISSIONS } from '@/lib/permissions';
+import { transformOrderItem, apiToDb } from '@/lib/order-adapter';
+import { generateSysOrderNo, bulkUpdateOrderStatus } from '@/lib/order-service';
 
 interface DuplicateOrderDetail {
   orderNo: string;
@@ -52,28 +54,31 @@ function transformOrder(dbOrder: Record<string, unknown>, options?: {
   const warehouseName = dbOrder.warehouse as string ||
     options?.warehouseMap?.[warehouseId || '']?.name || '';
 
-  // 转换items，处理新旧两种格式
+  // 转换items，处理新旧两种格式（通过 order-adapter 统一兼容逻辑）
   const rawItems = typeof dbOrder.items === 'string' ? JSON.parse(dbOrder.items as string) : (dbOrder.items || []);
-  const items = rawItems.map((item: Record<string, unknown>) => ({
-    // 客户原始商品信息（从Excel映射获取）
-    cuProductName: item.cu_product_name as string || item.product_name as string || '',
-    cuProductCode: item.cu_product_code as string || '',
-    cuProductSpec: item.cu_product_spec as string || '',
-    // 系统商品档案信息（自动匹配或手动指定）
-    productId: item.product_id as string || item.systemProductId as string || null,
-    productName: item.product_name as string || item.systemProductName as string || '',
-    productSpec: item.product_spec as string || item.systemProductSpec as string || '',
-    productCode: item.product_code as string || item.systemProductCode as string || '',
-    productBrand: item.product_brand as string || item.systemProductBrand as string || '',
-    unitPrice: item.unit_price as number | null || null,
-    // 订单商品信息
-    quantity: item.quantity as number || 1,
-    price: item.price as number | null || null,
-    remark: item.remark as string || '',
-    // 匹配信息
-    matchType: item.match_type as string || '',
-    matchHint: item.match_hint as string || '',
-  }));
+  const items = rawItems.map((item: Record<string, unknown>) => {
+    const normalized = transformOrderItem(item);
+    return {
+      // 客户原始商品信息（从Excel映射获取）
+      cuProductName: (normalized.customerProductName || normalized.cu_product_name || item.product_name || '') as string,
+      cuProductCode: (normalized.customerProductCode || normalized.cu_product_code || '') as string,
+      cuProductSpec: (normalized.customerProductSpec || normalized.cu_product_spec || '') as string,
+      // 系统商品档案信息（自动匹配或手动指定）
+      productId: (normalized.systemProductId || normalized.product_id || item.systemProductId || null) as string | null,
+      productName: (normalized.systemProductName || normalized.product_name || item.systemProductName || '') as string,
+      productSpec: (normalized.systemProductSpec || normalized.product_spec || item.systemProductSpec || '') as string,
+      productCode: (normalized.systemProductCode || normalized.product_code || item.systemProductCode || '') as string,
+      productBrand: (normalized.systemProductBrand || normalized.product_brand || item.systemProductBrand || '') as string,
+      unitPrice: item.unit_price as number | null || null,
+      // 订单商品信息
+      quantity: item.quantity as number || 1,
+      price: item.price as number | null || null,
+      remark: item.remark as string || '',
+      // 匹配信息
+      matchType: item.match_type as string || '',
+      matchHint: item.match_hint as string || '',
+    };
+  });
 
   return {
     id: dbOrder.id,
@@ -124,27 +129,6 @@ function transformOrder(dbOrder: Record<string, unknown>, options?: {
     expressRequirement: dbOrder.express_requirement as string | undefined,
     extFields: Object.keys(extFields).length > 0 ? extFields : undefined,
   };
-}
-
-// 生成系统订单号: SYS-YYYYMMDD-XXXX + 随机后缀 (确保高并发唯一性)
-async function generateSysOrderNo(client: ReturnType<typeof getSupabaseClient>): Promise<string> {
-  const today = new Date();
-  const dateStr = today.getFullYear().toString() +
-    String(today.getMonth() + 1).padStart(2, '0') +
-    String(today.getDate()).padStart(2, '0');
-  
-  // 查询当天已有订单数
-  const startOfDay = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}T00:00:00`;
-  const { count } = await client
-    .from('orders')
-    .select('*', { count: 'exact', head: true })
-    .gte('created_at', startOfDay);
-  
-  // 使用微秒时间戳 + 随机数确保唯一性
-  const timestamp = Date.now().toString(36).toUpperCase();
-  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-  const seq = (count || 0) + 1;
-  return `SYS-${dateStr}-${String(seq).padStart(4, '0')}-${timestamp}${random}`;
 }
 
 // 获取当前用户信息（从请求头）
@@ -519,7 +503,8 @@ export async function GET(request: NextRequest) {
       query = query.lte('created_at', createdTo);
     }
 
-    query = query.order('created_at', { ascending: false }).range(offset, offset + pageSize - 1);
+    query = query.order('created_at', { ascending: false });
+    query = query.range(offset, offset + pageSize - 1);
 
     const { data, error, count } = await query;
     if (error) throw new Error(`查询订单失败: ${error.message}`);

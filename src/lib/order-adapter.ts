@@ -20,20 +20,27 @@ import type { Order } from '@/types/order';
 
 /** API 返回字段（camelCase）到数据库字段（snake_case）的映射 */
 export const API_TO_DB_FIELD_MAP: Record<string, string> = {
+  // 订单核心
   orderNo: 'order_no',
   customerOrderNo: 'customer_order_no',
   billNo: 'bill_no',
   billDate: 'bill_date',
   supplierOrderNo: 'supplier_order_no',
+  // 客户
   customerCode: 'customer_code',
   customerId: 'customer_id',
   customerName: 'customer_name',
+  // 发货方
   supplierId: 'supplier_id',
   supplierName: 'supplier_name',
+  // 人员
   salesperson: 'salesperson',
   salespersonId: 'salesperson_id',
+  salespersonName: 'salesperson_name',
   operator: 'operator',
   operatorId: 'operator_id',
+  operatorName: 'operator_name',
+  // 商品
   productName: 'product_name',
   productCode: 'product_code',
   productSpec: 'product_spec',
@@ -43,21 +50,41 @@ export const API_TO_DB_FIELD_MAP: Record<string, string> = {
   systemProductSpec: 'system_product_spec',
   systemProductBrand: 'system_product_brand',
   systemProductPrice: 'system_product_price',
+  // 收货信息
   receiverName: 'receiver_name',
   receiverPhone: 'receiver_phone',
   receiverAddress: 'receiver_address',
+  province: 'province',
+  city: 'city',
+  district: 'district',
+  // 物流
   expressCompany: 'express_company',
   trackingNo: 'tracking_no',
+  expressRequirement: 'express_requirement',
+  // 发票
   invoiceRequired: 'invoice_required',
   incomeName: 'income_name',
   incomeAmount: 'income_amount',
+  // 费用
   discount: 'discount',
   taxRate: 'tax_rate',
+  amount: 'amount',
+  // 仓库
   warehouse: 'warehouse',
+  warehouseId: 'warehouse_id',
+  warehouseName: 'warehouse_name',
+  // 状态/时间
+  status: 'status',
+  remark: 'remark',
   isActive: 'is_active',
+  assignedAt: 'assigned_at',
   completedAt: 'completed_at',
   createdAt: 'created_at',
   updatedAt: 'updated_at',
+  // 导入相关
+  importBatch: 'import_batch',
+  assignedBatch: 'assigned_batch',
+  source: 'source',
 };
 
 /** 数据库字段（snake_case）到 API 返回字段（camelCase）的映射 */

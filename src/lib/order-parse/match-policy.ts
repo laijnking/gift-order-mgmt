@@ -8,8 +8,11 @@
  */
 
 /**
- * 商品匹配优先级（以代码实际为准）
+ * 商品匹配优先级（SSOT）
  * 优先级从高到低：编码 > 条码 > 规格 > 名称
+ *
+ * 注意：MATCH_PRIORITY 声明了优先级顺序，PRODUCT_MATCH_SCORES 和 excel/route.ts 的
+ * if/else 链必须与此顺序保持一致，否则会出现声明与实现不符的 bug。
  */
 export const MATCH_PRIORITY = ['code', 'barcode', 'spec', 'name'] as const;
 export type MatchPriorityType = typeof MATCH_PRIORITY[number];
@@ -28,8 +31,8 @@ export const SKU_MAPPING_FIELDS: Record<MatchPriorityType, string> = {
  * 商品档案匹配时的评分权重
  */
 export const PRODUCT_MATCH_SCORES = {
-  BARCODE_EXACT: 100,
-  CODE_EXACT: 95,
+  CODE_EXACT: 100,
+  BARCODE_EXACT: 95,
   SPEC_EXACT: 90,
   NAME_EXACT: 85,
   NAME_CONTAINS: 75,

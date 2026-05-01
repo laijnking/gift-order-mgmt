@@ -15,7 +15,7 @@ type ApiEnvelope<T = unknown> = {
   message?: string;
 };
 
-const PORT = 3001;
+const PORT = 3000;
 const BASE_URL = `http://${DEFAULT_HOST}:${PORT}`;
 
 const CUSTOMERS_VIEWER: MockUser = {

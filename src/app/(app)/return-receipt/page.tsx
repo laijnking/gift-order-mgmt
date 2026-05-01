@@ -70,6 +70,8 @@ interface Receipt {
   shipDate: string | null;
   freightCost?: number | null;
   matchStatus: 'pending' | 'auto_matched' | 'manual_matched' | 'conflict';
+  confidence?: number;  // 匹配置信度 0-100
+  matchRule?: string;   // 命中的匹配规则
   orderId: string | null;
   orderNo: string | null;
   createdAt: string;
@@ -77,6 +79,25 @@ interface Receipt {
   reviewStatus?: 'matched' | 'needs_review' | 'conflict';
   reviewReason?: 'matched' | 'unmatched' | 'conflict';
 }
+
+/** 匹配置信度颜色 */
+function getConfidenceColor(score: number | undefined): string {
+  if (score === undefined) return 'text-muted-foreground';
+  if (score >= 90) return 'text-green-600';
+  if (score >= 60) return 'text-yellow-600';
+  return 'text-red-600';
+}
+
+/** 匹配规则中文标签 */
+const MATCH_RULE_LABELS: Record<string, string> = {
+  sys_order_no_exact: '系统订单号精确匹配',
+  order_no_exact: '客户订单号精确匹配',
+  order_no_fuzzy: '客户订单号模糊匹配',
+  tracking_no_exact: '快递单号精确匹配',
+  receiver_phone: '订单号+收货人手机号',
+  receiver_name: '订单号+收货人姓名',
+  phone_product: '手机号+商品名称',
+};
 
 interface MatchResultPayload {
   totalCount: number;
@@ -842,6 +863,7 @@ export default function ReturnReceiptPage() {
                         <TableHead>运费</TableHead>
                         <TableHead>发货日期</TableHead>
                         <TableHead>匹配状态</TableHead>
+                        <TableHead>置信度</TableHead>
                         <TableHead>关联订单</TableHead>
                         <TableHead className="text-center">操作</TableHead>
                       </TableRow>
@@ -885,6 +907,16 @@ export default function ReturnReceiptPage() {
                             )}
                           </TableCell>
                           <TableCell>
+                            <span className={`text-xs font-medium ${getConfidenceColor(receipt.confidence)}`}>
+                              {receipt.confidence !== undefined ? `${receipt.confidence}%` : '-'}
+                            </span>
+                            {receipt.matchRule && (
+                              <div className="text-xs text-muted-foreground">
+                                {MATCH_RULE_LABELS[receipt.matchRule] || receipt.matchRule}
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell>
                             {receipt.orderNo ? (
                               <span className="font-mono text-sm">{receipt.orderNo}</span>
                             ) : (
@@ -918,7 +950,7 @@ export default function ReturnReceiptPage() {
         </div>
       </div>
 
-      {/* 自动匹配对话框 */}
+      {/* 自动匹配对话框（含预览） */}
       <Dialog open={showMatchDialog} onOpenChange={setShowMatchDialog}>
         <DialogContent className="w-[calc(100vw-1.5rem)] max-w-lg">
           <DialogHeader>
@@ -927,13 +959,39 @@ export default function ReturnReceiptPage() {
               系统将根据订单号自动匹配回单与订单，未命中或冲突的记录会进入人工复核池
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
+          <div className="py-4 space-y-3">
+            {/* 匹配预览统计 */}
+            {currentRecord && (
+              <div className="grid grid-cols-3 gap-3">
+                <div className="p-3 bg-blue-50 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {receipts.filter(r => r.reviewStatus === undefined || r.reviewStatus === 'needs_review').length}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">待匹配</div>
+                </div>
+                <div className="p-3 bg-green-50 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-green-600">
+                    {receipts.filter(r => r.reviewStatus === 'matched').length}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">已匹配</div>
+                </div>
+                <div className="p-3 bg-red-50 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-red-600">
+                    {receipts.filter(r => r.reviewStatus === 'conflict').length}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">冲突</div>
+                </div>
+              </div>
+            )}
             <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
               <AlertTriangle className="h-5 w-5 text-yellow-500" />
               <div>
-                <p className="text-sm font-medium">即将进行自动匹配</p>
+                <p className="text-sm font-medium">匹配规则优先级</p>
                 <p className="text-xs text-muted-foreground">
-                  匹配规则：系统订单号精确匹配 &gt; 客户订单号精确匹配 &gt; 模糊匹配
+                  系统订单号精确匹配 &gt; 客户订单号精确匹配 &gt; 模糊匹配
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  自动匹配仅处理唯一命中项，多候选自动标记为冲突进入人工复核
                 </p>
               </div>
             </div>

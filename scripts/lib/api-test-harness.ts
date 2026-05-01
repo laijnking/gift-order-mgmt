@@ -1,6 +1,20 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
+import { rmSync, existsSync } from 'fs';
+import { join } from 'path';
 
 export const DEFAULT_HOST = '127.0.0.1';
+
+/** 清理 Next.js dev lock 以允许多个测试实例并行运行 */
+function cleanNextDevLock() {
+  const lockPath = join(process.cwd(), '.next', 'dev', 'lock');
+  try {
+    if (existsSync(lockPath)) {
+      rmSync(lockPath, { force: true });
+    }
+  } catch {
+    // 忽略清理失败
+  }
+}
 
 export type MockUser = {
   id: string;
@@ -50,6 +64,8 @@ export async function wait(ms: number) {
 }
 
 export function startServer(port: number) {
+  cleanNextDevLock();
+
   const child = spawn(process.execPath, ['--import', 'tsx', 'src/server.ts'], {
     cwd: process.cwd(),
     env: {

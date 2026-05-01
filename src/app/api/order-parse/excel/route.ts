@@ -148,16 +148,16 @@ async function matchSystemProduct(
       let score = 0;
       let matchType = '';
 
-      // 使用 match-policy.ts 中的评分常量
-      // 1. 条码精确匹配（最高优先级）
-      if (barcode && pBarcode && (str(barcode) === pBarcode || safeIncludes(pBarcode, str(barcode)) || safeIncludes(str(barcode), pBarcode))) {
-        score = PRODUCT_MATCH_SCORES.BARCODE_EXACT;
-        matchType = 'barcode';
-      }
-      // 2. 商品编码精确匹配
-      else if (productCode && pCode && (str(productCode) === pCode || safeIncludes(pCode, str(productCode)) || safeIncludes(str(productCode), pCode))) {
+      // 匹配优先级严格按照 MATCH_PRIORITY: code > barcode > spec > name
+      // 1. 商品编码精确匹配（最高优先级）
+      if (productCode && pCode && (str(productCode) === pCode || safeIncludes(pCode, str(productCode)) || safeIncludes(str(productCode), pCode))) {
         score = PRODUCT_MATCH_SCORES.CODE_EXACT;
         matchType = 'code';
+      }
+      // 2. 条码精确匹配
+      else if (barcode && pBarcode && (str(barcode) === pBarcode || safeIncludes(pBarcode, str(barcode)) || safeIncludes(str(barcode), pBarcode))) {
+        score = PRODUCT_MATCH_SCORES.BARCODE_EXACT;
+        matchType = 'barcode';
       }
       // 3. 规格型号精确匹配
       else if (productSpec && pSpec && (str(productSpec) === pSpec || safeIncludes(pSpec, str(productSpec)) || safeIncludes(str(productSpec), pSpec))) {

@@ -189,9 +189,8 @@ export function useOrdersSession() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
 
-  // Selection
-  const [selectedOrders, setSelectedOrders] = useState<Set<Order>>(new Set());
-  const [selectedOrderIds, setSelectedOrderIdsState] = useState<string[]>(_restored?.selectedOrderIds ?? []);
+  // Selection (使用 string[] 确保分页/刷新后勾选稳定)
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>(_restored?.selectedOrderIds ?? []);
 
   const authHeaders = useCallback(() => ({
     'Content-Type': 'application/json',
@@ -327,49 +326,27 @@ export function useOrdersSession() {
     });
   }, []);
 
-  // Restore selected orders when orders load
-  useEffect(() => {
-    const ids = _restored?.selectedOrderIds;
-    if (!ids?.length) return;
-    setSelectedOrders(prev => {
-      const next = new Set(prev);
-      orders.forEach(order => {
-        if (ids.includes(order.id)) next.add(order);
-      });
-      return next;
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orders]);
-
-  // Selection mutations
+  // Selection mutations (使用 string[] 确保分页/刷新后勾选稳定)
   const selectAllOrders = useCallback((ordersToSelect: Order[]) => {
-    setSelectedOrders(new Set(ordersToSelect));
-    setSelectedOrderIdsState(ordersToSelect.map(o => o.id));
+    setSelectedOrderIds(ordersToSelect.map(o => o.id));
   }, []);
 
   const toggleOrder = useCallback((order: Order) => {
-    setSelectedOrders(prev => {
-      const next = new Set(prev);
-      if (next.has(order)) next.delete(order);
-      else next.add(order);
-      return next;
-    });
-    setSelectedOrderIdsState(prev => {
+    setSelectedOrderIds(prev => {
       if (prev.includes(order.id)) return prev.filter(id => id !== order.id);
       return [...prev, order.id];
     });
   }, []);
 
   const clearSelection = useCallback(() => {
-    setSelectedOrders(new Set());
-    setSelectedOrderIdsState([]);
+    setSelectedOrderIds([]);
   }, []);
 
   // Selection → sessionStorage (debounced via saveOrdersSession)
   useEffect(() => {
     if (_applyingUrlParams.current) return;
     saveOrdersSession({ selectedOrderIds });
-  }, [selectedOrderIds]);
+  }, [selectedOrderIds, saveOrdersSession]);
 
   return {
     _restored,
@@ -381,8 +358,7 @@ export function useOrdersSession() {
     alerts, setAlerts,
     alertPanelOpen, setAlertPanelOpen,
     unreadAlertCount, setUnreadAlertCount,
-    selectedOrders, setSelectedOrders,
-    selectedOrderIds, setSelectedOrderIdsState,
+    selectedOrderIds, setSelectedOrderIds,
     authHeaders,
     fetchOrders,
     currentPage, setCurrentPage,

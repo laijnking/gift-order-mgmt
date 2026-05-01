@@ -164,12 +164,16 @@ export function useOrderCounts(orders: Order[]) {
 }
 
 // Selected order counts by status
-export function useSelectedCounts(selectedOrders: Set<Order>) {
-  return useMemo(() => ({
-    pending: Array.from(selectedOrders).filter(o => o.status === ORDER_STATUS_PENDING).length,
-    assigned: Array.from(selectedOrders).filter(o => o.status === ORDER_STATUS_ASSIGNED).length,
-    returnable: Array.from(selectedOrders).filter(o => o.status === ORDER_STATUS_RETURNED).length,
-    feedbacked: Array.from(selectedOrders).filter(o => o.status === ORDER_STATUS_FEEDBACKED).length,
-    total: selectedOrders.size,
-  }), [selectedOrders]);
+export function useSelectedCounts(selectedOrderIds: string[], orders: Order[]) {
+  return useMemo(() => {
+    const selectedSet = new Set(selectedOrderIds);
+    const selectedOrders = orders.filter(o => selectedSet.has(o.id));
+    return {
+      pending: selectedOrders.filter(o => o.status === ORDER_STATUS_PENDING).length,
+      assigned: selectedOrders.filter(o => o.status === ORDER_STATUS_ASSIGNED).length,
+      returnable: selectedOrders.filter(o => o.status === ORDER_STATUS_RETURNED).length,
+      feedbacked: selectedOrders.filter(o => o.status === ORDER_STATUS_FEEDBACKED).length,
+      total: selectedOrderIds.length,
+    };
+  }, [selectedOrderIds, orders]);
 }

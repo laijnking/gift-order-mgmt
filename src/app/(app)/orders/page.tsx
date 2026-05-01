@@ -77,7 +77,7 @@ export default function OrdersPage() {
   const {
     orders, suppliers, customers,
     alerts, alertPanelOpen, setAlertPanelOpen, unreadAlertCount,
-    selectedOrders, setSelectedOrders,
+    selectedOrderIds, setSelectedOrderIds,
     fetchOrders, markAlertAsRead, markAllAlertsAsRead,
     _restored,
     loading,
@@ -86,7 +86,11 @@ export default function OrdersPage() {
     totalCount, setTotalCount,
     pageSize, setPageSize,
     statusCounts, fetchStatusCounts,
+    selectAllOrders, toggleOrder, clearSelection,
   } = session;
+
+  // 从 selectedOrderIds 派生（确保分页/刷新后勾选稳定）
+  const selectedOrderSet = useMemo(() => new Set(selectedOrderIds), [selectedOrderIds]);
 
   // --- Users data (for salesperson/operator selection) ---
   const [users, setUsers] = useState<Array<{ id: string; username: string; realName?: string; name?: string; role: string }>>([]);
@@ -146,7 +150,7 @@ export default function OrdersPage() {
   useEffect(() => { fetchStatusCounts(dateRange); }, filterDeps); // eslint-disable-line
 
   // --- Selected counts ---
-  const selectedCounts = useSelectedCounts(selectedOrders);
+  const selectedCounts = useSelectedCounts(selectedOrderIds, orders);
 
   // --- CRUD hook ---
   const crud = useOrdersCrud({
@@ -202,22 +206,17 @@ export default function OrdersPage() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
-  // --- Selection actions ---
+  // --- Selection actions (使用 session 函数确保勾选稳定) ---
   const handleSelectAll = () => {
-    if (selectedOrders.size === filteredOrders.length) {
-      setSelectedOrders(new Set());
+    if (selectedOrderIds.length === filteredOrders.length) {
+      clearSelection();
     } else {
-      setSelectedOrders(new Set(filteredOrders));
+      selectAllOrders(filteredOrders);
     }
   };
 
   const handleSelectOrder = (order: Order) => {
-    setSelectedOrders(prev => {
-      const next = new Set(prev);
-      if (next.has(order)) next.delete(order);
-      else next.add(order);
-      return next;
-    });
+    toggleOrder(order);
   };
 
   const handleViewDetails = (order: Order) => {
@@ -229,7 +228,7 @@ export default function OrdersPage() {
   const doSmartMatch = useCallback(async () => {
     const targetIds = assigningOrderId
       ? [assigningOrderId]
-      : Array.from(selectedOrders).map(o => o.id);
+      : selectedOrderIds;
     if (targetIds.length === 0) {
       toast.error('请选择要分配的订单');
       return;
@@ -278,7 +277,7 @@ export default function OrdersPage() {
     } finally {
       setIsMatching(false);
     }
-  }, [assigningOrderId, selectedOrders, session.authHeaders, setMatchResults, setSelectedSupplierId, setIsMatching]);
+  }, [assigningOrderId, selectedOrderIds, session.authHeaders, setMatchResults, setSelectedSupplierId, setIsMatching]);
 
   // --- Batch assign ---
   const handleBatchAssignFromMatch_ = useCallback(async () => {
@@ -312,8 +311,8 @@ export default function OrdersPage() {
   const handleBatchReturn_ = useCallback(async () => {
     const lines = returnTrackingNos.trim().split('\n').filter(l => l.trim());
     if (lines.length === 0) { toast.error('请输入快递单号'); return; }
-    const targetIds = selectedOrders.size > 0
-      ? Array.from(selectedOrders).map(o => o.id)
+    const targetIds = selectedOrderIds.length > 0
+      ? selectedOrderIds
       : orders.filter(o => o.status === ORDER_STATUS_ASSIGNED || o.status === 'partial_returned').map(o => o.id);
     try {
       let matched = 0;
@@ -344,12 +343,12 @@ export default function OrdersPage() {
     } catch {
       toast.error('回单失败');
     }
-  }, [returnTrackingNos, returnExpressCompany, selectedOrders, orders, session.authHeaders, fetchOrders, setReturnDialogOpen, setReturnTrackingNos, setReturnExpressCompany]);
+  }, [returnTrackingNos, returnExpressCompany, selectedOrderIds, orders, session.authHeaders, fetchOrders, setReturnDialogOpen, setReturnTrackingNos, setReturnExpressCompany]);
 
   // --- Ship notice ---
   const handleShipNotice = () => {
-    const hasAssigned = selectedOrders.size > 0
-      ? Array.from(selectedOrders).some(o => o.status === ORDER_STATUS_ASSIGNED)
+    const hasAssigned = selectedOrderIds.length > 0
+      ? orders.filter(o => selectedOrderSet.has(o.id)).some(o => o.status === ORDER_STATUS_ASSIGNED)
       : filteredOrders.some(o => o.status === ORDER_STATUS_ASSIGNED);
     if (!hasAssigned) { toast.error('请先选择已派发给发货方的订单'); return; }
     toast.info('正在打开发货通知单页面...');
@@ -358,8 +357,8 @@ export default function OrdersPage() {
 
   // --- Feedback ---
   const handleFeedback = useCallback(async () => {
-    const targetIds = selectedOrders.size > 0
-      ? Array.from(selectedOrders).map(o => o.id)
+    const targetIds = selectedOrderIds.length > 0
+      ? selectedOrderIds
       : filteredOrders.filter(o => o.status === ORDER_STATUS_RETURNED).map(o => o.id);
     if (targetIds.length === 0) { toast.error('没有可反馈的订单（需已回单状态）'); return; }
     const targetOrders = orders.filter(o => targetIds.includes(o.id) && o.status === ORDER_STATUS_RETURNED);
@@ -380,17 +379,17 @@ export default function OrdersPage() {
       const dataArr = await Promise.all(results.map(r => r.json()));
       const successCount = dataArr.filter(d => d.success).length;
       toast.success(`已复制 ${targetOrders.length} 条订单信息，并标记 ${successCount} 条为已反馈`);
-      setSelectedOrders(new Set());
+      clearSelection();
       fetchOrders();
     } catch {
       toast.warning('已复制反馈内容，但状态标记失败，请稍后重试');
     }
-  }, [selectedOrders, filteredOrders, orders, session.authHeaders, fetchOrders, setSelectedOrders]);
+  }, [selectedOrderIds, filteredOrders, orders, session.authHeaders, fetchOrders, setSelectedOrderIds]);
 
   // --- Export Kingdee ---
   const handleExportKingdee = useCallback(async () => {
-    const targetIds: string[] = selectedOrders.size > 0
-      ? Array.from(selectedOrders).map(o => o.id)
+    const targetIds: string[] = selectedOrderIds.length > 0
+      ? selectedOrderIds
       : filteredOrders.filter(o => o.status === ORDER_STATUS_FEEDBACKED).map(o => o.id);
     if (targetIds.length === 0) { toast.error('没有可导出金蝶的订单（需已反馈状态）'); return; }
 
@@ -427,17 +426,17 @@ export default function OrdersPage() {
       const dataArr = await Promise.all(results.map(r => r.json()));
       const successCount = dataArr.filter(d => d.success).length;
       toast.success(`已导出金蝶并归档 ${successCount} 条订单`);
-      setSelectedOrders(new Set());
+      clearSelection();
       fetchOrders();
     } catch (error) {
       console.error('导出金蝶失败:', error);
       toast.error('导出金蝶失败，请稍后重试');
     }
-  }, [selectedOrders, filteredOrders, orders, session.authHeaders, fetchOrders, setSelectedOrders]);
+  }, [selectedOrderIds, filteredOrders, orders, session.authHeaders, fetchOrders, setSelectedOrderIds]);
 
   // --- Export ---
   const handleExport = () => {
-    const orderIds = selectedOrders.size > 0 ? Array.from(selectedOrders).map(o => o.id) : [];
+    const orderIds = selectedOrderIds.length > 0 ? selectedOrderIds : [];
     const targetOrders = orderIds.length > 0 ? filteredOrders.filter(o => orderIds.includes(o.id)) : filteredOrders;
     if (targetOrders.length === 0) { toast.error('没有可导出的订单'); return; }
     const header = '系统单号\t客户单号\t客户\t收货人\t电话\t地址\t商品\t数量\t单价\t业务员\t跟单员\t状态\t发货方\t快递公司\t快递单号\t创建时间';
@@ -461,21 +460,20 @@ export default function OrdersPage() {
     toast.success(`已导出 ${targetOrders.length} 条订单`);
   };
 
-  // --- Helpers ---
+  // 从 order-workflow-config EDITABLE_FIELDS_BY_STATUS 驱动
   const getEditDisabledReason = (order: Order): string | null => {
     if (order.status === ORDER_STATUS_COMPLETED) return '订单已导出金蝶归档，无法编辑';
-    if (order.status === ORDER_STATUS_FEEDBACKED) return '订单已反馈客户，建议仅做财务归档处理';
-    if (order.status === 'partial_returned') return '订单正在回单处理中，编辑功能受限';
+    if (order.status === ORDER_STATUS_FEEDBACKED) return '订单已反馈客户，无法编辑';
+    if (order.status === 'partial_returned') return '订单正在回单处理中，无法编辑';
+    if (order.status === ORDER_STATUS_RETURNED) return '订单已回单，无法编辑';
+    if (order.status === ORDER_STATUS_CANCELLED) return '订单已取消，无法编辑';
     return null;
   };
 
   const getEditableFieldsHint = (order: Order): string => {
     if (order.status === ORDER_STATUS_PENDING) return '可编辑所有信息';
-    if (order.status === ORDER_STATUS_ASSIGNED) return '可编辑：发货方、状态、物流信息、收货信息';
-    if (order.status === 'partial_returned') return '可编辑：发货方、状态、物流信息、收货信息';
-    if (order.status === ORDER_STATUS_RETURNED) return '仅可编辑收货信息';
-    if (order.status === ORDER_STATUS_FEEDBACKED) return '仅可编辑收货信息';
-    if (order.status === ORDER_STATUS_CANCELLED) return '可编辑所有信息';
+    if (order.status === ORDER_STATUS_ASSIGNED) return '仅可编辑备注';
+    if (order.status === 'notified') return '仅可编辑备注';
     return '';
   };
 
@@ -616,7 +614,9 @@ export default function OrdersPage() {
                 <div className="text-xs space-y-1">
                   <div>• pending（待派发）→ assigned（已派发）→ notified（通知发货）</div>
                   <div>• notified → partial_returned（部分回单）/ returned（已回单）</div>
-                  <div>• returned → completed（已完成）</div>
+                  <div>• returned → feedbacked（已反馈客户）/ completed（已完成）</div>
+                  <div>• partial_returned → returned / feedbacked / completed</div>
+                  <div>• feedbacked → completed</div>
                 </div>
               </HelpSection>
               <HelpNote type="tip">
@@ -628,16 +628,16 @@ export default function OrdersPage() {
                 { label: "核心业务流", href: "/docs/guides/business-flow", description: "模块数据流转" },
               ]} />
             </HelpGuide>
-            {selectedOrders.size > 0 && (
+            {selectedOrderIds.length > 0 && (
               <Button
                 variant="destructive"
                 size="sm"
                 className="w-full sm:w-auto"
-                onClick={() => openDeleteConfirm(Array.from(selectedOrders).map(o => o.id))}
-                disabled={Array.from(selectedOrders).some(o => !canDeleteOrder(o))}
+                onClick={() => openDeleteConfirm(selectedOrderIds)}
+                disabled={orders.filter(o => selectedOrderSet.has(o.id)).some(o => !canDeleteOrder(o))}
               >
                 <Trash2 className="w-4 h-4 mr-1" />
-                删除 ({selectedOrders.size})
+                删除 ({selectedOrderIds.length})
               </Button>
             )}
           </div>
@@ -733,20 +733,21 @@ export default function OrdersPage() {
         {/* Bulk action bar */}
         <div className={`transition-all duration-200 ${isStickyTop ? 'sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-md -mx-1 px-1 py-2 rounded-lg' : ''}`}>
           <BulkActionBar
-            selectedOrders={selectedOrders}
+            selectedOrderIds={selectedOrderIds}
+            orders={orders}
             onAssign={() => openAssignDialog(null)}
             onShipNotice={handleShipNotice}
             onReturn={() => setReturnDialogOpen(true)}
             onFeedback={handleFeedback}
             onExportKingdee={handleExportKingdee}
-            onDelete={() => openDeleteConfirm(Array.from(selectedOrders).map(o => o.id))}
+            onDelete={() => openDeleteConfirm(selectedOrderIds)}
           />
         </div>
 
         {/* Filter panel */}
         <OrderFilterPanel
           orders={orders}
-          selectedOrders={selectedOrders}
+          selectedOrderIds={selectedOrderIds}
           filteredCount={filteredOrders.length}
           statusFilter={statusFilter}
           setStatusFilter={setStatusFilter}
@@ -791,7 +792,7 @@ export default function OrdersPage() {
               <TableHeader className="bg-muted">
                 <TableRow>
                   <TableHead className="w-[50px]">
-                    <input type="checkbox" checked={selectedOrders.size === filteredOrders.length && filteredOrders.length > 0} onChange={handleSelectAll} className="rounded" />
+                    <input type="checkbox" checked={selectedOrderIds.length === filteredOrders.length && filteredOrders.length > 0} onChange={handleSelectAll} className="rounded" />
                   </TableHead>
                   {visibleColumns.sysOrderNo && <TableHead>系统单号</TableHead>}
                   {visibleColumns.customerCode && <TableHead>客户单号</TableHead>}
@@ -818,9 +819,9 @@ export default function OrdersPage() {
                   </TableRow>
                 ) : (
                   filteredOrders.map((order) => (
-                    <TableRow key={order.id} className={selectedOrders.has(order) ? 'bg-primary/5' : ''}>
+                    <TableRow key={order.id} className={selectedOrderSet.has(order.id) ? 'bg-primary/5' : ''}>
                       <TableCell>
-                        <input type="checkbox" checked={selectedOrders.has(order)} onChange={() => handleSelectOrder(order)} className="rounded" />
+                        <input type="checkbox" checked={selectedOrderSet.has(order.id)} onChange={() => handleSelectOrder(order)} className="rounded" />
                       </TableCell>
                       {visibleColumns.sysOrderNo && (
                         <TableCell className="font-mono text-xs text-muted-foreground max-w-[80px] truncate" title={order.sysOrderNo || '-'}>
@@ -1070,7 +1071,7 @@ export default function OrdersPage() {
           expressCompany={returnExpressCompany}
           setExpressCompany={setReturnExpressCompany}
           onSubmit={handleBatchReturn_}
-          selectedCount={selectedOrders.size}
+          selectedCount={selectedOrderIds.length}
         />
 
         <OrderAssignDialog
@@ -1079,7 +1080,7 @@ export default function OrdersPage() {
           assigningOrderId={assigningOrderId}
           orders={orders}
           suppliers={suppliers}
-          selectedOrders={selectedOrders}
+          selectedOrderIds={selectedOrderIds}
           matchResults={matchResults}
           setMatchResults={setMatchResults}
           selectedSupplierId={selectedSupplierId}
