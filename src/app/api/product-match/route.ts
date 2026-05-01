@@ -3,6 +3,16 @@ import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { PERMISSIONS } from '@/lib/permissions';
 
+/**
+ * @deprecated 
+ * 此接口已废弃，请使用 /api/order-parse/excel 进行商品匹配。
+ * 保留此接口仅用于向后兼容。
+ * 
+ * SKU映射口径变更通知（2026-05-01）：
+ * - 原使用 customer_code 查询 SKU 映射
+ * - 现统一使用 customer_id 查询（通过 customers 表关联）
+ */
+
 // 系统商品匹配接口
 export async function POST(request: NextRequest) {
   const authError = requirePermission(request, PERMISSIONS.PRODUCTS_VIEW);
@@ -21,11 +31,24 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // 1. 首先查询客户SKU映射表，查找是否有对应的映射记录
+    // 1. 首先查询客户商品映射表
+    // 重要变更：统一使用 customer_id 关联（通过 customers 表获取）
     let mappingsQuery = client.from('product_mappings').select('*');
     
     if (customerCode) {
-      mappingsQuery = mappingsQuery.eq('customer_code', customerCode);
+      // 先获取 customer_id
+      const { data: customer } = await client
+        .from('customers')
+        .select('id')
+        .eq('code', customerCode)
+        .maybeSingle();
+      
+      if (customer?.id) {
+        mappingsQuery = mappingsQuery.eq('customer_id', customer.id);
+      } else {
+        // 兼容旧逻辑：如果找不到客户，返回空
+        mappingsQuery = mappingsQuery.eq('customer_id', 'LEGACY_NO_MATCH');
+      }
     }
     
     const { data: mappings, error: mappingsError } = await mappingsQuery;
@@ -215,9 +238,18 @@ export async function PUT(request: NextRequest) {
     }
 
     // 获取客户SKU映射表
+    // 重要变更：统一使用 customer_id 关联（通过 customers 表获取）
     let mappingsQuery = client.from('product_mappings').select('*');
     if (customerCode) {
-      mappingsQuery = mappingsQuery.eq('customer_code', customerCode);
+      const { data: customer } = await client
+        .from('customers')
+        .select('id')
+        .eq('code', customerCode)
+        .maybeSingle();
+      
+      if (customer?.id) {
+        mappingsQuery = mappingsQuery.eq('customer_id', customer.id);
+      }
     }
     const { data: mappings } = await mappingsQuery;
 

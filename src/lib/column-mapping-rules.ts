@@ -450,3 +450,24 @@ export function getColumnMappingDiagnostics(
     unrecognizedHeaders,
   };
 }
+
+/**
+ * 中文列名到内部字段的映射（用于 Excel 列名识别）
+ * 本配置与 excel/route.ts 中的 CHINESE_COLUMN_MAPPING 保持同步
+ * 使用 column-mapping-rules.ts 中的 PATTERNS 构建
+ */
+export function buildChineseColumnMapping(): Record<string, string[]> {
+  const mapping: Record<string, string[]> = {};
+  
+  for (const [field, patterns] of Object.entries(PATTERNS)) {
+    const aliases = patterns
+      .filter(p => p.exact)
+      .map(p => p.regex.source.replace(/^\^/, '').replace(/\$$/, ''));
+    
+    if (aliases.length > 0) {
+      mapping[field] = aliases;
+    }
+  }
+  
+  return mapping;
+}

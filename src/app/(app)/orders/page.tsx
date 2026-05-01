@@ -734,10 +734,6 @@ export default function OrdersPage() {
         <div className={`transition-all duration-200 ${isStickyTop ? 'sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-md -mx-1 px-1 py-2 rounded-lg' : ''}`}>
           <BulkActionBar
             selectedOrders={selectedOrders}
-            pendingCount={selectedCounts.pending}
-            assignedCount={selectedCounts.assigned}
-            returnableCount={selectedCounts.returnable}
-            feedbackedCount={selectedCounts.feedbacked}
             onAssign={() => openAssignDialog(null)}
             onShipNotice={handleShipNotice}
             onReturn={() => setReturnDialogOpen(true)}

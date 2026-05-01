@@ -1413,7 +1413,16 @@ export default function OrderParsePage() {
               sourceHeaders: (excelPreview[headerRow] || []) as string[],
               feedbackExportHeaderOverrides: {},
             }),
-          }).catch(err => console.warn('自动保存映射失败:', err));
+          }).then(res => res.json()).then(result => {
+            if (result.success) {
+              toast.success('列映射已自动保存，下次导入将自动复用');
+            } else {
+              toast.warning(`自动保存映射失败：${result.error || '未知错误'}`);
+            }
+          }).catch(err => {
+            console.warn('自动保存映射失败:', err);
+            toast.warning('自动保存映射失败，可手动保存');
+          });
         }
         handleClear();
       } else {

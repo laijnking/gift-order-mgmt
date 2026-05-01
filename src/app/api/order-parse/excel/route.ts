@@ -1,98 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
-import { extractAddressParts, getColumnMappingDiagnostics } from '@/lib/column-mapping-rules';
+import { extractAddressParts, getColumnMappingDiagnostics, autoDetectColumnMapping, buildChineseColumnMapping, COLUMN_OPTIONS } from '@/lib/column-mapping-rules';
+import { MATCH_PRIORITY, SKU_MATCH_ORDER, PRODUCT_MATCH_SCORES, MATCH_TYPE_LABELS } from '@/lib/order-parse/match-policy';
 import { requirePermission } from '@/lib/server-auth';
 import { PERMISSIONS } from '@/lib/permissions';
 import type {
   ParsedOrderBundleDraft,
   ParsedOrderDraftItem,
 } from '@/types/order-parse';
-
-// 中文列名自动映射配置（简化为最常用的精确匹配，避免冲突）
-const CHINESE_COLUMN_MAPPING: Record<string, string[]> = {
-  // 基础信息
-  order_no: ['订单号'],
-  customer_order_no: ['客户单据编号', '序号', '客户订单号', '订单编号', '商户订单号', '来源订单'],
-  bill_date: ['单据日期', '订单日期', '订单创建日期', '创建日期', '下单时间'],
-  bill_no: ['单据编号'],
-  supplier_order_no: ['发货方单据号', '发货方订单号'],
-  customer_code: ['客户代码', '客户编码'],
-  customer_name: ['客户名称', '客户姓名'],
-  // 客户商品信息（使用 customer_product_* 作为内部字段名）
-  customer_product_name: ['商品', '商品名称', '商品名', '货品名称', '品名', '客户商品名称', '客户商品名', '客户货品名称'],
-  customer_product_code: ['商品编码', '商品代码', '货号', '客户商品编码', '客户商品代码', '客户货号'],
-  customer_product_spec: ['商品规格', '规格/型号', '规格型号', '型号规格', '规格名称', '规格', '型号', '商品型号', '客户商品规格', '客户规格型号', '客户型号规格'],
-  quantity: ['商品数量', '下单数量', '数量', '件数', '台数'],
-  price: ['单价', '售价'],
-  amount: ['价税合计', '含税金额', '金额'],
-  discount: ['单台折让', '每台折让'],
-  tax_rate: ['增值税税率'],
-  warehouse: ['仓库', '仓库名称'],
-  remark: ['备注', '商品行备注'],
-  // 收货信息
-  receiver_name: ['收件人姓名', '收货人姓名', '收货人', '收件人', '会员昵称'],
-  receiver_phone: ['电话', '收件人手机', '收货人手机号', '收货人电话', '收件人电话', '收货电话', '收件电话', '手机号码', '联系电话'],
-  receiver_address: ['收件人地址', '收货详细地址', '收货人地址', '收货地址', '收件地址', '详细地址', '省市区详细地址'],
-  // 快递信息
-  express_company: ['物流公司', '快递公司', '承运商'],
-  tracking_no: ['物流单号', '快递单号', '运单号', '快递号'],
-  // 发票信息
-  invoice_required: ['需要开票'],
-  income_name: ['收入名称'],
-  income_amount: ['应收金额', '收入金额'],
-};
-
-// 自动检测Excel列名并生成映射（优先匹配最长名称）
-function autoDetectColumnMapping(headers: string[]): Record<string, string> {
-  const mapping: Record<string, string> = {};
-  
-  // 将所有别名扁平化并按长度降序排列
-  const allAliases: { alias: string; field: string; length: number }[] = [];
-  for (const [field, aliases] of Object.entries(CHINESE_COLUMN_MAPPING)) {
-    for (const alias of aliases) {
-      allAliases.push({ alias, field, length: alias.length });
-    }
-  }
-  // 按长度降序排列，优先匹配长名称
-  allAliases.sort((a, b) => b.length - a.length);
-  
-  headers.forEach((header, index) => {
-    if (!header) {
-      mapping[index] = 'ignore';
-      return;
-    }
-    
-    const headerTrim = header.trim();
-    let matched = false;
-    
-    // 遍历所有别名，优先匹配最长的
-    for (const { alias, field } of allAliases) {
-      if (headerTrim === alias) {
-        mapping[index] = field;
-        matched = true;
-        break;
-      }
-    }
-    
-    // 如果没有精确匹配，尝试模糊匹配（表头包含别名）
-    if (!matched) {
-      const headerLower = headerTrim.toLowerCase();
-      for (const { alias, field } of allAliases) {
-        if (alias.length >= 2 && headerLower.includes(alias.toLowerCase())) {
-          mapping[index] = field;
-          matched = true;
-          break;
-        }
-      }
-    }
-    
-    if (!matched) {
-      mapping[index] = 'ignore';
-    }
-  });
-  
-  return mapping;
-}
 
 // 匹配系统商品
 async function matchSystemProduct(
@@ -128,6 +43,7 @@ async function matchSystemProduct(
   const safeIncludes = (s1: string, s2: string): boolean => s1.includes(s2);
 
   // 1. 先查找客户商品映射。当前真实库按 customer_id 关联，不再查询旧字段 customer_code/source_id。
+  // 使用 match-policy.ts 中的 SKU_MATCH_ORDER 配置
   let mappings: Record<string, unknown>[] = [];
   if (customerCode) {
     const { data: customer } = await client
@@ -146,22 +62,21 @@ async function matchSystemProduct(
     }
   }
 
-  const matchOrder = [
-    { type: 'code', value: str(productCode), field: 'customer_sku' },
-    { type: 'barcode', value: str(barcode), field: 'customer_barcode' },
-    { type: 'spec', value: str(productSpec), field: 'customer_product_name' },
-    { type: 'name', value: str(productName), field: 'customer_product_name' },
-  ];
-
-  for (const match of matchOrder) {
-    if (!match.value) continue;
+  // 使用 match-policy.ts 中的统一匹配顺序
+  for (const match of SKU_MATCH_ORDER) {
+    const matchValue = match.type === 'code' ? str(productCode)
+      : match.type === 'barcode' ? str(barcode)
+      : match.type === 'spec' ? str(productSpec)
+      : str(productName);
+    
+    if (!matchValue) continue;
 
     const mapping = mappings.find((m: Record<string, unknown>) => {
       const fieldValue = str(m[match.field]);
       if (!fieldValue) return false;
-      return fieldValue === match.value ||
-             safeIncludes(fieldValue, match.value) ||
-             safeIncludes(match.value, fieldValue);
+      return fieldValue === matchValue ||
+             safeIncludes(fieldValue, matchValue) ||
+             safeIncludes(matchValue, fieldValue);
     });
 
     if (mapping) {
@@ -208,6 +123,7 @@ async function matchSystemProduct(
   }
 
   // 2. 如果没有找到映射，直接在商品档案中匹配
+  // 使用 match-policy.ts 中的 PRODUCT_MATCH_SCORES 配置
   if (!result.productId) {
     // 获取所有活跃商品
     const { data: products } = await client
@@ -232,39 +148,40 @@ async function matchSystemProduct(
       let score = 0;
       let matchType = '';
 
+      // 使用 match-policy.ts 中的评分常量
       // 1. 条码精确匹配（最高优先级）
       if (barcode && pBarcode && (str(barcode) === pBarcode || safeIncludes(pBarcode, str(barcode)) || safeIncludes(str(barcode), pBarcode))) {
-        score = 100;
+        score = PRODUCT_MATCH_SCORES.BARCODE_EXACT;
         matchType = 'barcode';
       }
       // 2. 商品编码精确匹配
       else if (productCode && pCode && (str(productCode) === pCode || safeIncludes(pCode, str(productCode)) || safeIncludes(str(productCode), pCode))) {
-        score = 95;
+        score = PRODUCT_MATCH_SCORES.CODE_EXACT;
         matchType = 'code';
       }
       // 3. 规格型号精确匹配
       else if (productSpec && pSpec && (str(productSpec) === pSpec || safeIncludes(pSpec, str(productSpec)) || safeIncludes(str(productSpec), pSpec))) {
-        score = 90;
+        score = PRODUCT_MATCH_SCORES.SPEC_EXACT;
         matchType = 'spec';
       }
       // 4. 商品名称精确匹配
       else if (productName && pName && str(productName) === pName) {
-        score = 85;
+        score = PRODUCT_MATCH_SCORES.NAME_EXACT;
         matchType = 'name';
       }
       // 5. 商品名称包含匹配
       else if (productName && pName && (safeIncludes(pName, str(productName)) || safeIncludes(str(productName), pName))) {
-        score = 75;
+        score = PRODUCT_MATCH_SCORES.NAME_CONTAINS;
         matchType = 'name';
       }
       // 6. 规格型号关键词匹配（提取规格中的关键部分）
       else if (productSpec && pSpec && (safeIncludes(pSpec, str(productSpec)) || safeIncludes(str(productSpec), pSpec))) {
-        score = 65;
+        score = PRODUCT_MATCH_SCORES.SPEC_CONTAINS;
         matchType = 'spec';
       }
       // 7. 商品编码部分匹配
       else if (productCode && pCode && (safeIncludes(pCode, str(productCode)) || safeIncludes(str(productCode), pCode))) {
-        score = 60;
+        score = PRODUCT_MATCH_SCORES.CODE_CONTAINS;
         matchType = 'code';
       }
       // 8. 品牌+品类关键词匹配
@@ -273,7 +190,7 @@ async function matchSystemProduct(
         const key1 = str(productName).slice(0, Math.min(4, str(productName).length));
         const key2 = pName.slice(0, Math.min(4, pName.length));
         if (key1 && key2 && (safeIncludes(pName, key1) || safeIncludes(str(productName), key2))) {
-          score = 40;
+          score = PRODUCT_MATCH_SCORES.KEYWORD;
           matchType = 'keyword';
         }
       }
@@ -284,7 +201,7 @@ async function matchSystemProduct(
     }
 
     // 只有匹配分数超过阈值才采用
-    if (bestMatch && bestMatch.score >= 40) {
+    if (bestMatch && bestMatch.score >= PRODUCT_MATCH_SCORES.MIN_THRESHOLD) {
       const p = bestMatch.product;
       result.productId = p.id as string;
       result.productName = p.name as string;
@@ -293,7 +210,7 @@ async function matchSystemProduct(
       result.brand = p.brand as string;
       result.price = p.retail_price as number;
       result.matchType = bestMatch.matchType;
-      result.matchHint = `通过商品档案${bestMatch.matchType}匹配 (${bestMatch.score}%)`;
+      result.matchHint = `通过商品档案${MATCH_TYPE_LABELS[bestMatch.matchType] || bestMatch.matchType}匹配 (${bestMatch.score}%)`;
     }
   }
 
@@ -635,12 +552,13 @@ export async function GET(request: NextRequest) {
     const mapping = autoDetectColumnMapping(headerList);
     
     // 转换为更友好的格式
+    const chineseColumnMapping = buildChineseColumnMapping();
     const suggestions = headerList.map((header, index) => ({
       column: index,
       originalHeader: header,
       suggestedField: mapping[index] === 'ignore' ? null : mapping[index],
       suggestions: mapping[index] === 'ignore' 
-        ? Object.entries(CHINESE_COLUMN_MAPPING)
+        ? Object.entries(chineseColumnMapping)
             .filter(([, aliases]) => aliases.some(a => header.toLowerCase().includes(a.toLowerCase())))
             .map(([field]) => field)
         : [],
@@ -651,7 +569,7 @@ export async function GET(request: NextRequest) {
       data: {
         mapping,
         suggestions,
-        fieldOptions: Object.keys(CHINESE_COLUMN_MAPPING),
+        fieldOptions: Object.keys(chineseColumnMapping),
       },
     });
   } catch (error) {

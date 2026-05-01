@@ -59,6 +59,11 @@ interface ExportSummary {
   templateName?: string;
   totalCustomerCount: number;
   totalOrderCount: number;
+  /** 导出来源信息 */
+  sourceInfo?: {
+    templateSource: string;
+    templateSourceLabel: string;
+  };
 }
 
 export default function FeedbackExportPage() {
@@ -84,6 +89,12 @@ export default function FeedbackExportPage() {
   // 导出
   const [exporting, setExporting] = useState(false);
   const [showResultDialog, setShowResultDialog] = useState(false);
+  const [showPreviewDialog, setShowPreviewDialog] = useState(false);
+  const [exportPreview, setExportPreview] = useState<{
+    customerCount: number;
+    orderCount: number;
+    templateSource: string;
+  } | null>(null);
   const [exportSummary, setExportSummary] = useState<ExportSummary | null>(null);
   const [exportResults, setExportResults] = useState<ExportResult[]>([]);
   const [exportErrors, setExportErrors] = useState<ExportError[]>([]);
@@ -242,6 +253,39 @@ export default function FeedbackExportPage() {
       case 'first': return '兜底模板';
       case 'default': return '默认模板';
       default: return source || '';
+    }
+  };
+
+  // 导出预览
+  const handlePreview = async () => {
+    if (selectedCustomers.length === 0) {
+      toast.error('请至少选择一个客户');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/export-feedback/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({
+          customerIds: selectedCustomers,
+          templateId: templateId || null,
+        }),
+      });
+      const data = await res.json();
+
+      if (!data.success) {
+        throw new Error(data.error || '预览失败');
+      }
+
+      setExportPreview({
+        customerCount: data.data.customerCount,
+        orderCount: data.data.orderCount,
+        templateSource: data.data.templateSource,
+      });
+      setShowPreviewDialog(true);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '预览失败');
     }
   };
 
@@ -419,6 +463,14 @@ export default function FeedbackExportPage() {
               </div>
               <div className="flex gap-2">
                 <Button
+                  variant="outline"
+                  onClick={() => void handlePreview()}
+                  disabled={selectedCustomers.length === 0 || exporting}
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  预览导出
+                </Button>
+                <Button
                   onClick={() => void handleExport()}
                   disabled={selectedCustomers.length === 0 || exporting}
                 >
@@ -449,6 +501,53 @@ export default function FeedbackExportPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* 导出预览对话框 */}
+      <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>导出预览</DialogTitle>
+            <DialogDescription>
+              确认以下导出信息后点击"确认导出"
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="rounded-lg border bg-muted/50 p-4 space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">客户数量</span>
+                <span className="font-semibold">{exportPreview?.customerCount}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">订单数量</span>
+                <span className="font-semibold">{exportPreview?.orderCount}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">列来源</span>
+                <Badge variant="outline">{getTemplateSourceLabel(exportPreview?.templateSource)}</Badge>
+              </div>
+            </div>
+
+            <p className="text-sm text-muted-foreground">
+              本次将使用 <strong>{getTemplateSourceLabel(exportPreview?.templateSource)}</strong> 导出
+              <strong>{exportPreview?.orderCount}</strong> 个已回单订单。
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPreviewDialog(false)}>
+              取消
+            </Button>
+            <Button onClick={() => {
+              setShowPreviewDialog(false);
+              void handleExport();
+            }}>
+              <FileDown className="h-4 w-4 mr-2" />
+              确认导出
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* 导出结果对话框 */}
       <Dialog open={showResultDialog} onOpenChange={setShowResultDialog}>
