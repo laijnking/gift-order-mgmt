@@ -607,27 +607,36 @@ export default function ProductMappingsPage() {
 
   const handleExport = () => {
     const partnerLabel = activeTab === 'customer' ? '客户' : '发货方';
-    const headers = [partnerLabel + '商品名称', partnerLabel + '商品编码', '系统商品编码', '系统商品名称', '价格', '状态'];
-    const rows = filteredMappings.map(m => [
-      m.customerProductName || '',
-      m.customerSku || '',
-      m.productCode || '',
-      m.productName || '',
-      m.price || 0,
-      m.isActive ? '启用' : '禁用',
-    ]);
+    const headers = [partnerLabel + '名称', partnerLabel + '编码', partnerLabel + '商品名称', partnerLabel + '商品编码', '系统商品编码', '系统商品名称', '价格', '状态'];
+    const rows = filteredMappings.map(m => {
+      const partnerName = activeTab === 'customer'
+        ? (customers.find(c => c.code === m.customerCode)?.name || m.customerName || m.customerCode || '')
+        : (suppliers.find(s => s.id === m.supplierId)?.name || m.supplierName || '');
+      const partnerCode = activeTab === 'customer' ? (m.customerCode || '') : (m.supplierId || '');
+      return [
+        partnerName,
+        partnerCode,
+        m.customerProductName || '',
+        m.customerSku || '',
+        m.productCode || '',
+        m.productName || '',
+        m.price || 0,
+        m.isActive ? '启用' : '禁用',
+      ];
+    });
 
-    const csv = [headers, ...rows]
-      .map(row => row.map(cell => `"${cell}"`).join(','))
-      .join('\n');
-
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = (activeTab === 'customer' ? '客户' : '发货方') + `SKU映射_${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const wsData = [headers, ...rows];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, partnerLabel + 'SKU映射');
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+    const linkSource = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${wbout}`;
+    const downloadLink = document.createElement('a');
+    downloadLink.href = linkSource;
+    downloadLink.download = partnerLabel + `SKU映射_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
     toast.success('导出成功');
   };
 
@@ -1132,8 +1141,8 @@ export default function ProductMappingsPage() {
                     <TableRow key={mapping.id} className={!mapping.isActive ? 'opacity-50' : ''}>
                       <TableCell>
                         <Badge variant="outline">
-                          {activeTab === 'customer' 
-                            ? (customers.find(c => c.code === mapping.customerCode)?.name || mapping.customerCode || '-')
+                          {activeTab === 'customer'
+                            ? (customers.find(c => c.code === mapping.customerCode)?.name || mapping.customerName || mapping.customerCode || '-')
                             : (suppliers.find(s => s.id === mapping.supplierId)?.name || mapping.supplierName || '-')
                           }
                         </Badge>
