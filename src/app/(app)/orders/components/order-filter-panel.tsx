@@ -1,11 +1,13 @@
 'use client';
 
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Search, ChevronDown, ChevronUp, SlidersHorizontal, X, Plus } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, SlidersHorizontal, X, Plus, Loader2 } from 'lucide-react';
+import { buildUserInfoHeaders } from '@/lib/auth';
 import {
   Popover,
   PopoverContent,
@@ -119,6 +121,39 @@ export function OrderFilterPanel({
   clearAllFilters,
   hasActiveFilters,
 }: OrderFilterPanelProps) {
+  const [customerSearchResults, setCustomerSearchResults] = useState<Customer[]>([]);
+  const [customerSearchLoading, setCustomerSearchLoading] = useState(false);
+  const customerSearchTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // 客户服务端搜索（防抖 300ms）
+  useEffect(() => {
+    if (customerSearchTimerRef.current) clearTimeout(customerSearchTimerRef.current);
+    if (!customerSearch.trim()) {
+      setCustomerSearchResults([]);
+      setCustomerSearchLoading(false);
+      return;
+    }
+    setCustomerSearchLoading(true);
+    customerSearchTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/customers?search=${encodeURIComponent(customerSearch)}&isActive=false&pageSize=50`, {
+          headers: buildUserInfoHeaders(),
+        });
+        const data = await res.json();
+        if (data.success) {
+          setCustomerSearchResults((data.data || []).filter((c: Customer) => !!(String(c.code ?? '').trim() && String(c.name ?? '').trim())));
+        }
+      } catch {
+        // ignore
+      } finally {
+        setCustomerSearchLoading(false);
+      }
+    }, 300);
+    return () => {
+      if (customerSearchTimerRef.current) clearTimeout(customerSearchTimerRef.current);
+    };
+  }, [customerSearch]);
+
   const updateSearchField_ = (key: string, value: string) =>
     setSearchFields(prev => ({ ...prev, [key]: value }));
 
@@ -292,17 +327,31 @@ export function OrderFilterPanel({
                   >
                     全部客户
                   </button>
-                  {customers
-                    .filter(c => c.name.toLowerCase().includes(customerSearch.toLowerCase()) || c.code.toLowerCase().includes(customerSearch.toLowerCase()))
-                    .map((c) => (
-                      <button
-                        key={c.code}
-                        onClick={() => { setCustomerFilter(c.code); setCustomerSearch(''); }}
-                        className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-muted cursor-pointer truncate ${customerFilter === c.code ? 'bg-primary/10 text-primary' : ''}`}
-                      >
-                        {c.name}
-                      </button>
-                    ))}
+                  {customerSearch.trim()
+                    ? (customerSearchLoading
+                        ? <div className="flex items-center justify-center px-2 py-3 text-sm text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin mr-1" />搜索中...</div>
+                        : customerSearchResults.length === 0
+                          ? <div className="px-2 py-3 text-sm text-muted-foreground text-center">未找到匹配的客户</div>
+                          : customerSearchResults.map((c) => (
+                              <button
+                                key={c.code}
+                                onClick={() => { setCustomerFilter(c.code); setCustomerSearch(''); }}
+                                className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-muted cursor-pointer truncate ${customerFilter === c.code ? 'bg-primary/10 text-primary' : ''}`}
+                              >
+                                {c.name}
+                              </button>
+                            ))
+                      )
+                    : customers.map((c) => (
+                        <button
+                          key={c.code}
+                          onClick={() => { setCustomerFilter(c.code); setCustomerSearch(''); }}
+                          className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-muted cursor-pointer truncate ${customerFilter === c.code ? 'bg-primary/10 text-primary' : ''}`}
+                        >
+                          {c.name}
+                        </button>
+                      ))
+                  }
                 </div>
               </PopoverContent>
             </Popover>
