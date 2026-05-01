@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { buildUserInfoHeaders } from '@/lib/auth';
 import {
   Select,
   SelectContent,
@@ -76,6 +77,38 @@ export function CustomerSelector({
 }: CustomerSelectorProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [searchResults, setSearchResults] = useState<Customer[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // 服务端搜索（防抖 300ms）
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    if (!search.trim()) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      return;
+    }
+    setSearchLoading(true);
+    searchTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/customers?search=${encodeURIComponent(search)}&isActive=false&pageSize=50`, {
+          headers: buildUserInfoHeaders(),
+        });
+        const data = await res.json();
+        if (data.success) {
+          setSearchResults((data.data || []).filter((c: Customer) => !!(String(c.code ?? '').trim() && String(c.name ?? '').trim())));
+        }
+      } catch {
+        // ignore
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 300);
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
+  }, [search]);
 
   const salesUsers = users.filter((u) => isSalesAssignableRole(u.role));
   const operatorUsers = users.filter((u) => isOperatorAssignableRole(u.role));
@@ -118,41 +151,51 @@ export function CustomerSelector({
             />
           </div>
           <div className="p-1 max-h-[300px] overflow-y-auto">
-            {customers
-              .filter(
-                (c) =>
-                  c.name.toLowerCase().includes(search.toLowerCase()) ||
-                  c.code.toLowerCase().includes(search.toLowerCase())
-              )
-              .slice(0, 50)
-              .map((c) => (
-                <button
-                  key={c.code}
-                  onClick={() => {
-                    onCustomerChange(c.code, c);
-                    setSearch('');
-                    setSearchOpen(false);
-                  }}
-                  className={cn(
-                    'w-full text-left px-3 py-2 text-sm rounded hover:bg-muted cursor-pointer truncate',
-                    selectedCustomer === c.code && 'bg-primary/10 text-primary'
-                  )}
-                >
-                  <div className="flex flex-col">
-                    <span className="font-medium truncate">{c.name}</span>
-                    <span className="text-xs text-muted-foreground">编码: {c.code}</span>
-                  </div>
-                </button>
-              ))}
-            {customers.filter(
-              (c) =>
-                c.name.toLowerCase().includes(search.toLowerCase()) ||
-                c.code.toLowerCase().includes(search.toLowerCase())
-            ).length === 0 && (
-              <div className="px-3 py-6 text-center text-sm text-muted-foreground">
-                未找到匹配的客户
-              </div>
-            )}
+            {search.trim()
+              ? (searchLoading
+                  ? <div className="px-3 py-6 text-center text-sm text-muted-foreground">搜索中...</div>
+                  : searchResults.length === 0
+                    ? <div className="px-3 py-6 text-center text-sm text-muted-foreground">未找到匹配的客户</div>
+                    : searchResults.map((c) => (
+                        <button
+                          key={c.code}
+                          onClick={() => {
+                            onCustomerChange(c.code, c);
+                            setSearch('');
+                            setSearchOpen(false);
+                          }}
+                          className={cn(
+                            'w-full text-left px-3 py-2 text-sm rounded hover:bg-muted cursor-pointer truncate',
+                            selectedCustomer === c.code && 'bg-primary/10 text-primary'
+                          )}
+                        >
+                          <div className="flex flex-col">
+                            <span className="font-medium truncate">{c.name}</span>
+                            <span className="text-xs text-muted-foreground">编码: {c.code}</span>
+                          </div>
+                        </button>
+                      ))
+                )
+              : customers.map((c) => (
+                  <button
+                    key={c.code}
+                    onClick={() => {
+                      onCustomerChange(c.code, c);
+                      setSearch('');
+                      setSearchOpen(false);
+                    }}
+                    className={cn(
+                      'w-full text-left px-3 py-2 text-sm rounded hover:bg-muted cursor-pointer truncate',
+                      selectedCustomer === c.code && 'bg-primary/10 text-primary'
+                    )}
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-medium truncate">{c.name}</span>
+                      <span className="text-xs text-muted-foreground">编码: {c.code}</span>
+                    </div>
+                  </button>
+                ))
+            }
           </div>
         </PopoverContent>
       </Popover>
