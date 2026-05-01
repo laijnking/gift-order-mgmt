@@ -241,8 +241,10 @@ export default function ProductMappingsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [customerFilter, setCustomerFilter] = useState<string>('all');
-  const [supplierFilter, setSupplierFilter] = useState<string>('all');
+  const [customerFilter, setCustomerFilter] = useState<string>('');
+  const [supplierFilter, setSupplierFilter] = useState<string>('');
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [supplierSearch, setSupplierSearch] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingMapping, setEditingMapping] = useState<ProductMapping | null>(null);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
@@ -289,11 +291,11 @@ export default function ProductMappingsPage() {
     filtered = filtered.filter(m => m.mappingType === activeTab);
 
     // 按客户/发货方过滤
-    if (activeTab === 'customer' && customerFilter !== 'all') {
+    if (activeTab === 'customer' && customerFilter) {
       filtered = filtered.filter(m => m.customerCode === customerFilter);
     }
 
-    if (activeTab === 'supplier' && supplierFilter !== 'all') {
+    if (activeTab === 'supplier' && supplierFilter) {
       filtered = filtered.filter(m => m.supplierId === supplierFilter);
     }
 
@@ -366,9 +368,7 @@ export default function ProductMappingsPage() {
     loadData(activeTab);
   }, [searchTerm]);
 
-  // 获取当前Tab的过滤值
-  const getPartnerFilter = activeTab === 'customer' ? customerFilter : supplierFilter;
-  const setPartnerFilter = activeTab === 'customer' ? setCustomerFilter : setSupplierFilter;
+  // 获取当前Tab的选项列表
   const getPartnerOptions = (activeTab === 'customer'
     ? customers.filter(c => !!String(c.code ?? '').trim()).map(c => ({ value: c.code, label: c.name }))
     : suppliers.filter(s => !!String(s.id ?? '').trim()).map(s => ({ value: s.id, label: s.name })));
@@ -607,7 +607,7 @@ export default function ProductMappingsPage() {
 
   const handleExport = () => {
     const partnerLabel = activeTab === 'customer' ? '客户' : '发货方';
-    const headers = [partnerLabel + '商品名称', partnerLabel + 'SKU', '系统商品编码', '商品名称', '价格', '状态'];
+    const headers = [partnerLabel + '商品名称', partnerLabel + '商品编码', '系统商品编码', '系统商品名称', '价格', '状态'];
     const rows = filteredMappings.map(m => [
       m.customerProductName || '',
       m.customerSku || '',
@@ -1011,25 +1011,97 @@ export default function ProductMappingsPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder={activeTab === 'customer' ? "搜索客户商品名称、SKU..." : "搜索发货方商品名称、SKU..."}
+              placeholder={activeTab === 'customer' ? "搜索客户商品名称、编码..." : "搜索发货方商品名称、编码..."}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
             />
           </div>
-          <Select value={getPartnerFilter || 'all'} onValueChange={(v) => setPartnerFilter(v === 'all' ? '' : v)}>
-            <SelectTrigger className="w-full lg:w-[200px]">
-              <SelectValue placeholder={activeTab === 'customer' ? "筛选客户" : "筛选发货方"} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{activeTab === 'customer' ? '全部客户' : '全部发货方'}</SelectItem>
-              {getPartnerOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {activeTab === 'customer' ? (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-full lg:w-[200px] justify-between font-normal">
+                  {customerFilter ? (
+                    <span className="truncate">{customers.find(c => c.code === customerFilter)?.name || customerFilter}</span>
+                  ) : (
+                    <span className="text-muted-foreground truncate">全部客户</span>
+                  )}
+                  <ChevronDown className="h-4 w-4 ml-1 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[220px] p-0" align="start">
+                <div className="p-2 border-b">
+                  <Input
+                    placeholder="搜索客户..."
+                    value={customerSearch}
+                    onChange={(e) => setCustomerSearch(e.target.value)}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="p-1 max-h-[200px] overflow-y-auto">
+                  <button
+                    onClick={() => { setCustomerFilter(''); setCustomerSearch(''); }}
+                    className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-muted cursor-pointer ${!customerFilter ? 'bg-primary/10 text-primary' : ''}`}
+                  >
+                    全部客户
+                  </button>
+                  {customers
+                    .filter(c => c.name.toLowerCase().includes(customerSearch.toLowerCase()) || c.code.toLowerCase().includes(customerSearch.toLowerCase()))
+                    .map((c) => (
+                      <button
+                        key={c.code}
+                        onClick={() => { setCustomerFilter(c.code); setCustomerSearch(''); }}
+                        className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-muted cursor-pointer truncate ${customerFilter === c.code ? 'bg-primary/10 text-primary' : ''}`}
+                      >
+                        {c.name}
+                      </button>
+                    ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+          ) : (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-full lg:w-[200px] justify-between font-normal">
+                  {supplierFilter ? (
+                    <span className="truncate">{suppliers.find(s => s.id === supplierFilter)?.name || supplierFilter}</span>
+                  ) : (
+                    <span className="text-muted-foreground truncate">全部发货方</span>
+                  )}
+                  <ChevronDown className="h-4 w-4 ml-1 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[240px] p-0" align="start">
+                <div className="p-2 border-b">
+                  <Input
+                    placeholder="搜索发货方..."
+                    value={supplierSearch}
+                    onChange={(e) => setSupplierSearch(e.target.value)}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="p-1 max-h-[200px] overflow-y-auto">
+                  <button
+                    onClick={() => { setSupplierFilter(''); setSupplierSearch(''); }}
+                    className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-muted cursor-pointer ${!supplierFilter ? 'bg-primary/10 text-primary' : ''}`}
+                  >
+                    全部发货方
+                  </button>
+                  {suppliers
+                    .filter(s => s.name.toLowerCase().includes(supplierSearch.toLowerCase()))
+                    .map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => { setSupplierFilter(s.id); setSupplierSearch(''); }}
+                        className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-muted cursor-pointer truncate ${supplierFilter === s.id ? 'bg-primary/10 text-primary' : ''}`}
+                      >
+                        {s.name}
+                      </button>
+                    ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
         </div>
 
         <Card>
@@ -1040,7 +1112,7 @@ export default function ProductMappingsPage() {
                 <TableRow>
                   <TableHead>{partnerLabel}</TableHead>
                   <TableHead>{partnerLabel}商品名称</TableHead>
-                  <TableHead>{partnerLabel}SKU</TableHead>
+                  <TableHead>{partnerLabel}商品编码</TableHead>
                   <TableHead>系统商品</TableHead>
                   <TableHead>系统商品编码</TableHead>
                   <TableHead className="text-right">价格</TableHead>
@@ -1195,12 +1267,12 @@ export default function ProductMappingsPage() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="partner_sku">{partnerLabel}SKU</Label>
+                <Label htmlFor="partner_sku">{partnerLabel}商品编码</Label>
                 <Input
                   id="partner_sku"
                   value={formData.partnerSku}
                   onChange={(e) => setFormData({ ...formData, partnerSku: e.target.value })}
-                  placeholder={'输入' + partnerLabel + 'SKU编码'}
+                  placeholder={'输入' + partnerLabel + '商品编码'}
                 />
               </div>
               <div className="grid gap-2">
@@ -1264,7 +1336,7 @@ export default function ProductMappingsPage() {
             <DialogHeader>
               <DialogTitle>批量导入SKU映射</DialogTitle>
               <DialogDescription>
-                {activeTab === 'customer' ? '每行一条映射，格式：客户商品名称,SKU,系统商品编码,价格' : '每行一条映射，格式：发货方商品名称,SKU,系统商品编码,价格'}
+                {activeTab === 'customer' ? '每行一条映射，格式：客户商品名称,编码,系统商品编码,价格' : '每行一条映射，格式：发货方商品名称,编码,系统商品编码,价格'}
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -1295,11 +1367,11 @@ export default function ProductMappingsPage() {
                   id="import_text"
                   value={importText}
                   onChange={(e) => setImportText(e.target.value)}
-                  placeholder={activeTab === 'customer' 
-                    ? `客户商品1,SKU001,PROD001,99
-客户商品2,SKU002,PROD002,199`
-                    : `发货方商品1,SKU001,PROD001,99
-发货方商品2,SKU002,PROD002,199`
+                  placeholder={activeTab === 'customer'
+                    ? `客户商品1,PROD001,PROD001,99
+客户商品2,PROD002,PROD002,199`
+                    : `发货方商品1,PROD001,PROD001,99
+发货方商品2,PROD002,PROD002,199`
                   }
                   rows={10}
                   className="font-mono text-sm"
@@ -1310,7 +1382,7 @@ export default function ProductMappingsPage() {
                 <ul className="list-disc list-inside mt-1">
                   <li>每行一条映射记录</li>
                   <li>字段用英文逗号分隔</li>
-                  <li>格式：{partnerLabel}商品名称,SKU,{partnerLabel === '客户' ? '客户' : '发货方'}系统商品编码,价格</li>
+                  <li>格式：{partnerLabel}商品名称,{partnerLabel}商品编码,系统商品编码,价格</li>
                   <li>价格可为空，默认为0</li>
                 </ul>
               </div>
