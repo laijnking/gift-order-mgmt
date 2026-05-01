@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 export const runtime = 'nodejs';
 
@@ -28,10 +28,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
+    const client = getSupabaseClient();
 
     // 查询待导出的订单数量
-    const { count: orderCount, error: countError } = await supabase
+    const { count: orderCount, error: countError } = await client
       .from('orders')
       .select('*', { count: 'exact', head: true })
       .in('customer_id', customerIds)
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
       templateSource = 'explicit';
     } else {
       // 检查是否有客户映射
-      const { data: mappings } = await supabase
+      const { data: mappings } = await client
         .from('column_mappings')
         .select('id')
         .in('customer_id', customerIds)
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
       success: true,
       data: {
         customerCount: customerIds.length,
-        orderCount: count || 0,
+        orderCount: orderCount || 0,
         templateSource,
       },
     });
