@@ -161,3 +161,41 @@
 - 若不先统一规则，再加功能，会继续堆积分叉逻辑，后续成本指数上升。
 
 建议：按上面三阶段推进，优先做“规则中心化”和“字段口径清理”。
+
+
+---
+
+## 8. 补充深查（针对评审问题）
+
+### 8.1 Excel 字段映射是否会保存？下次同客户能否免手工映射？
+
+**结论：会保存，但“自动复用”依赖条件，当前实现并非绝对免手工。**
+
+1. **保存时机**：订单提交成功后，前端会异步调用 `POST /api/column-mappings` 自动保存本次 `columnMapping`、`headerRow`、`sourceHeaders`。  
+2. **保存内容**：后端会写入 `mapping_config`、`source_headers`、`header_fingerprint`、`template_signature`、`feedback_export_headers`，并将旧版本 `is_active=false`，新版本设为 active。  
+3. **下次自动加载机制**：前端会按“客户 + 当前表头指纹”请求 `/api/column-mappings/history?...&fingerprint=...`，命中后自动套用映射。  
+4. **关键限制**：
+   - 只有“表头标准化后完全一致”才命中；客户同一模板若增删列/改列名，自动命中会失败；
+   - 映射是“提交后保存”，仅完成解析但未提交订单不会落库；
+   - 自动保存是异步调用，失败时只 `console.warn`，用户侧缺少强提示。
+
+**建议补丁**：
+- 提交后映射保存改为“可见成功/失败状态”；
+- 增加“手动保存映射”按钮，避免仅依赖提交成功触发；
+- 指纹匹配失败时增加“近似匹配建议”（同客户最近版本 + 差异列提示）。
+
+### 8.2 客户反馈导出是否直接使用映射表？列名是否保留 Excel 原名？
+
+**结论：是，主路径已按该设计落地，但存在“模板覆盖”分支需要业务确认。**
+
+1. **主路径（有客户映射）**：
+   - 导出接口会查询 `column_mappings` 的 active 版本；
+   - 优先读取 `feedback_export_headers`（结构：`客户原始列名 -> 系统字段key`）；
+   - 生成行数据时按该映射输出列名，并额外追加“快递公司/运单号”。
+2. **字段取值来源**：系统从订单主表与 `orders.items` 组装 context（如 `orderNo/customerOrderNo/productName/productCode/productSpec/receiver...`），再按 `feedback_export_headers` 的系统字段 key 取值。
+3. **覆盖分支**：若当前客户没有可用 `column_mappings`，系统会退回模板映射（default/explicit/first），此时列名不一定是客户原始Excel列名。
+
+**建议补丁**：
+- 在导出 UI 明确展示“本次列来源：客户导入映射 / 模板映射”；
+- 对 `column_mapping` 缺失客户给出阻断或二次确认，避免用户误以为一定按原列名导出；
+- 对 `feedback_export_headers` 做完整性校验（关键列缺失时提示修复映射）。
