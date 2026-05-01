@@ -133,7 +133,9 @@ export function CustomerSelector({
           >
             {selectedCustomer ? (
               <span className="truncate">
-                {customers.find((c) => c.code === selectedCustomer)?.name}
+                {customers.find((c) => c.code === selectedCustomer)?.name ||
+                 searchResults.find((c) => c.code === selectedCustomer)?.name ||
+                 selectedCustomer}
               </span>
             ) : (
               <span className="truncate">请搜索并选择客户...</span>
