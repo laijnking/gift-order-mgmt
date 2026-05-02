@@ -721,42 +721,6 @@ export default function OrderParsePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [excelPreview, headerRow]);
 
-  // 保存当前映射配置
-  const saveMapping = async () => {
-    if (!selectedCustomer) {
-      toast.error('请先选择客户');
-      return;
-    }
-
-    try {
-      const res = await fetch('/api/column-mappings', {
-        method: 'POST',
-        headers: {
-          ...buildUserInfoHeaders(),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          customerCode: selectedCustomer,
-          mappingConfig: columnMapping,
-          headerRow,
-          sourceHeaders: excelPreview[headerRow] || [],
-          feedbackExportHeaderOverrides: {},
-        }),
-      });
-
-      const data = await res.json();
-      if (data.success) {
-        toast.success(data.message);
-        loadMappingHistory(selectedCustomer);
-      } else {
-        toast.error(data.error || '保存失败');
-      }
-    } catch (error) {
-      console.error('保存映射配置失败:', error);
-      toast.error('保存映射配置失败');
-    }
-  };
-
   // 恢复历史版本
   const restoreMapping = async (mappingId: string) => {
     try {
@@ -799,6 +763,10 @@ export default function OrderParsePage() {
         setExcelRows(normalizedRows);
         setExcelPreview(preview);
 
+        // 重置自动匹配标志，确保新上传文件能重新触发 fingerprint 匹配
+        setMappingAutoLoaded(false);
+        setMappingAutoLoadedId(null);
+
         // 自动检测列映射
         if (preview.length > 0) {
           const detected = autoDetectMapping(preview[0]);
@@ -817,6 +785,8 @@ export default function OrderParsePage() {
     // 切换 sheet 时清除旧的映射，避免不同 sheet 的列结构混淆
     setColumnMapping({});
     setHeaderRow(0);
+    setMappingAutoLoaded(false);
+    setMappingAutoLoadedId(null);
     if (!excelFile) return;
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -1520,7 +1490,6 @@ export default function OrderParsePage() {
                 setOperatorName(name);
                 syncGlobalAssigneeToOrders('operator', id, name, previousName);
               }}
-              onSaveMapping={saveMapping}
             />
 
             {/* Input Panel */}

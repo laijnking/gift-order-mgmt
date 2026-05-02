@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { ChevronDown, Store, Save } from 'lucide-react';
+import { ChevronDown, Store } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getUserDisplayName, isOperatorAssignableRole, isSalesAssignableRole } from '@/lib/roles';
 
@@ -55,7 +55,6 @@ interface CustomerSelectorProps {
   onCustomerChange: (code: string, customer: Customer) => void;
   onSalespersonChange: (id: string, name: string) => void;
   onOperatorChange: (id: string, name: string) => void;
-  onSaveMapping: () => void;
 }
 
 export function CustomerSelector({
@@ -73,7 +72,6 @@ export function CustomerSelector({
   onCustomerChange,
   onSalespersonChange,
   onOperatorChange,
-  onSaveMapping,
 }: CustomerSelectorProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -315,17 +313,6 @@ export function CustomerSelector({
         </div>
       )}
 
-      {selectedCustomer && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 w-full text-xs"
-          onClick={onSaveMapping}
-        >
-          <Save className="h-3 w-3 mr-1" />
-          保存当前映射配置
-        </Button>
-      )}
     </div>
   );
 }
