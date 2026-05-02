@@ -172,6 +172,7 @@ export function useOrderSubmit() {
       console.error('创建订单失败:', error);
       options.onError('创建订单失败');
     } finally {
+      setIsSubmitting(false);
       options.onFinally();
     }
   }, []);

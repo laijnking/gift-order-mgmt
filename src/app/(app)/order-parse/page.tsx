@@ -642,6 +642,7 @@ export default function OrderParsePage() {
   const autoLoadMappingByFingerprint = useCallback(async (customerCode: string) => {
     const currentHeaders = excelPreview[headerRow] || [];
     if (currentHeaders.length === 0) {
+      setActiveMappingMeta(null);
       return;
     }
 
@@ -669,6 +670,7 @@ export default function OrderParsePage() {
         }
       } else {
         // 无匹配映射，重置状态
+        setActiveMappingMeta(null);
         setMappingAutoLoaded(false);
         setMappingAutoLoadedId(null);
         setMappingCollapsed(false);
@@ -699,6 +701,7 @@ export default function OrderParsePage() {
       loadMappingHistory(selectedCustomer);
       autoLoadMappingByFingerprint(selectedCustomer);
     } else {
+      setActiveMappingMeta(null);
       setMappingHistory([]);
       setColumnMapping({});
       setMappingAutoLoaded(false);
@@ -1320,6 +1323,7 @@ export default function OrderParsePage() {
 
   const handleCustomerChange = (code: string, customer: Customer) => {
     setSelectedCustomer(code);
+    setActiveMappingMeta(null);
     loadMappingHistory(code);
     autoLoadMappingByFingerprint(code);
     const matchedSalesUser = findUserByIdOrName(users, {
