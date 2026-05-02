@@ -45,8 +45,7 @@ function normalizeValue(value: unknown): unknown {
     return null;
   }
   if (Array.isArray(value)) {
-    const isPrimitiveArray = value.every((item) => item === null || ['string', 'number', 'boolean'].includes(typeof item));
-    return isPrimitiveArray ? value : JSON.stringify(value);
+    return JSON.stringify(value);
   }
   if (value && typeof value === 'object' && !(value instanceof Date) && !Buffer.isBuffer(value)) {
     return JSON.stringify(value);
