@@ -598,7 +598,7 @@ except Exception as e:
   }
 }
 
-function getPgPool(): Pool {
+export function getPgPool(): Pool {
   if (!pgPool) {
     const dbUrl = process.env.NEXT_PUBLIC_SUPABASE_DB_URL || process.env.DATABASE_URL;
     if (!dbUrl) {

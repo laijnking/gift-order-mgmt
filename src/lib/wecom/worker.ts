@@ -3,7 +3,7 @@
  * 背景任务处理器：文件队列轮询 + 回单扫描
  */
 
-import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { getPgPool } from '@/storage/database/supabase-client';
 import { processFileTask } from './file-processor';
 import { scanAndProcessFeedback } from './feedback-sender';
 import type { WeComFileTask, WeComWorkerConfig } from './types';
@@ -34,15 +34,12 @@ export class WeComWorker {
    * 启动 Worker
    */
   async start(): Promise<void> {
-    // 检查是否有激活的企微应用
-    const client = getSupabaseClient();
-    const { data: activeApps } = await client
-      .from('wecom_app_config')
-      .select('id')
-      .eq('is_active', true)
-      .is('deleted_at', null);
+    const pool = getPgPool();
+    const result = await pool.query(
+      `SELECT id FROM wecom_app_config WHERE is_active = true AND deleted_at IS NULL LIMIT 1`
+    );
 
-    if (!activeApps || activeApps.length === 0) {
+    if (result.rows.length === 0) {
       console.log('[WeComWorker] 没有激活的企微应用，Worker 不启动');
       return;
     }
@@ -57,7 +54,7 @@ export class WeComWorker {
       filePollInterval: this.config.filePollIntervalMs,
       feedbackScanInterval: this.config.feedbackScanIntervalMs,
       maxConcurrentFiles: this.config.maxConcurrentFiles,
-      activeApps: activeApps.length,
+      activeApps: result.rows.length,
     });
 
     this.pollFileQueue();
@@ -71,11 +68,9 @@ export class WeComWorker {
     console.log('[WeComWorker] 收到关闭信号，等待活跃任务完成...');
     this.running = false;
 
-    // 清除定时器
     if (this.fileTimer) clearTimeout(this.fileTimer);
     if (this.feedbackTimer) clearTimeout(this.feedbackTimer);
 
-    // 等待活跃任务完成（最长 30 秒）
     const deadline = Date.now() + 30000;
     while ((this.activeFileTasks > 0 || this.activeFeedbackTasks > 0) && Date.now() < deadline) {
       await this.sleep(500);
@@ -137,40 +132,35 @@ export class WeComWorker {
       }
     };
 
-    // 立即执行一次
     poll();
   }
 
   /**
-   * 获取待处理的文件任务
+   * 获取待处理的文件任务（FOR UPDATE SKIP LOCKED 原子锁定）
    */
   private async fetchPendingFileTasks(limit: number): Promise<WeComFileTask[]> {
-    const client = getSupabaseClient();
+    const pool = getPgPool();
 
-    // 使用子查询实现 FOR UPDATE SKIP LOCKED 效果
-    // Supabase 不直接支持 FOR UPDATE，但通过状态检查实现类似效果
-    const { data: tasks } = await client
-      .from('wecom_file_process_queue')
-      .select('*')
-      .eq('status', 'pending')
-      .lte('retry_count', 2) // 重试次数限制
-      .order('created_at', { ascending: true })
-      .limit(limit);
+    // 使用 CTE 实现 FOR UPDATE SKIP LOCKED 原子锁定
+    // 先锁定行，再更新状态为 downloading，防止多 Worker 实例竞态
+    const result = await pool.query(
+      `WITH locked AS (
+        SELECT id FROM wecom_file_process_queue
+        WHERE status = 'pending'
+          AND retry_count < max_retries
+        ORDER BY created_at
+        LIMIT $1
+        FOR UPDATE SKIP LOCKED
+      )
+      UPDATE wecom_file_process_queue
+      SET status = 'downloading', updated_at = NOW()
+      FROM locked
+      WHERE wecom_file_process_queue.id = locked.id
+      RETURNING wecom_file_process_queue.*`,
+      [limit]
+    );
 
-    if (!tasks || tasks.length === 0) {
-      return [];
-    }
-
-    // 原子性地获取并标记任务
-    const taskIds = tasks.map((t) => t.id);
-    const { data: lockedTasks } = await client
-      .from('wecom_file_process_queue')
-      .update({ status: 'pending' }) // 保持原状态，让 processFileTask 自己更新
-      .in('id', taskIds)
-      .select('*')
-      .in('id', taskIds);
-
-    return (lockedTasks || []) as unknown as WeComFileTask[];
+    return result.rows as WeComFileTask[];
   }
 
   /**

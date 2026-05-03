@@ -5,28 +5,9 @@
 
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { WeComAPIClient } from './api-client';
-import type {
-  WeComAppConfig,
-  WeComFeedbackTask,
-  WeComGroupMapping,
-} from './types';
-
-const DOWNLOAD_DIR = process.env.WECOM_DOWNLOAD_DIR || '/tmp/wecom-files';
-
-/**
- * 获取应用配置
- */
-async function getAppConfig(appId: string): Promise<WeComAppConfig | null> {
-  const client = getSupabaseClient();
-  const { data } = await client
-    .from('wecom_app_config')
-    .select('*')
-    .eq('id', appId)
-    .eq('is_active', true)
-    .is('deleted_at', null)
-    .maybeSingle();
-  return data;
-}
+import { getWeComAppConfig } from './shared';
+import { buildFeedbackRows, DEFAULT_CUSTOMER_FEEDBACK_MAPPINGS } from '@/lib/feedback-exporter';
+import type { WeComGroupMapping } from './types';
 
 /**
  * 扫描待回单订单
@@ -71,7 +52,7 @@ async function scanFeedbackOrders(
 }
 
 /**
- * 构建回单 Excel 数据
+ * 构建回单 Excel 数据（使用共享的 buildFeedbackRows）
  */
 async function buildFeedbackExcelData(
   client: ReturnType<typeof getSupabaseClient>,
@@ -93,71 +74,25 @@ async function buildFeedbackExcelData(
 
   const feedbackHeaders = (mapping?.feedback_export_headers || {}) as Record<string, string>;
 
-  // 定义回单导出字段
-  const exportFields = [
-    'order_no',
-    'product_name',
-    'product_spec',
-    'customer_product_code',
-    'quantity',
-    'price',
-    'total_amount',
-    'express_company',
-    'tracking_no',
-    'receiver_name',
-    'receiver_phone',
-    'receiver_address',
-  ];
+  // 使用共享的 buildFeedbackRows 构建回单行数据
+  const rowObjects = buildFeedbackRows(
+    orders as Record<string, unknown>[],
+    DEFAULT_CUSTOMER_FEEDBACK_MAPPINGS,
+    feedbackHeaders
+  );
 
-  // 构建表头
-  const headers = exportFields.map((field) => {
-    // 尝试从 feedback_export_headers 获取客户原始列名
-    return feedbackHeaders[field] || field;
-  });
-
-  // 构建数据行
-  const rows: (string | number | null)[][] = [];
-
-  for (const order of orders) {
-    const items = Array.isArray(order.items) ? order.items : [];
-    for (const item of items) {
-      const row = exportFields.map((field) => {
-        const itemRecord = item as Record<string, unknown>;
-        switch (field) {
-          case 'order_no':
-            return order.order_no;
-          case 'product_name':
-            return String(itemRecord.customerProductName || itemRecord.systemProductName || '');
-          case 'product_spec':
-            return String(itemRecord.customerProductSpec || itemRecord.systemProductSpec || '');
-          case 'customer_product_code':
-            return String(itemRecord.customerProductCode || '');
-          case 'quantity':
-            return Number(itemRecord.quantity) || 0;
-          case 'price':
-            return Number(itemRecord.price || itemRecord.systemProductPrice || 0);
-          case 'total_amount': {
-            const qty = Number(itemRecord.quantity) || 0;
-            const price = Number(itemRecord.price || itemRecord.systemProductPrice || 0);
-            return qty * price;
-          }
-          case 'express_company':
-            return String(itemRecord.expressCompany || '');
-          case 'tracking_no':
-            return String(itemRecord.trackingNo || itemRecord.tracking_no || '');
-          case 'receiver_name':
-            return String(itemRecord.receiverName || '');
-          case 'receiver_phone':
-            return String(itemRecord.receiverPhone || '');
-          case 'receiver_address':
-            return String(itemRecord.receiverAddress || '');
-          default:
-            return null;
-        }
-      });
-      rows.push(row);
-    }
+  if (rowObjects.length === 0) {
+    return { headers: [], rows: [] };
   }
+
+  // 从第一行提取表头（保持客户列名顺序 + 物流列在末尾）
+  const headers = Object.keys(rowObjects[0]);
+  const rows = rowObjects.map((obj) =>
+    headers.map((h) => {
+      const v = obj[h];
+      return v === null || v === undefined ? '' : v;
+    }) as (string | number | null)[]
+  );
 
   return { headers, rows };
 }
@@ -172,7 +107,6 @@ async function generateFeedbackExcel(
   const XLSX = await import('xlsx');
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
 
-  // 设置列宽
   ws['!cols'] = headers.map(() => ({ wch: 15 }));
 
   const wb = XLSX.utils.book_new();
@@ -211,7 +145,7 @@ export async function scanAndProcessFeedback(): Promise<{
     for (const mapping of mappings) {
       try {
         // 检查应用配置
-        const appConfig = await getAppConfig(mapping.app_id);
+        const appConfig = await getWeComAppConfig(mapping.app_id);
         if (!appConfig) {
           continue;
         }
@@ -332,7 +266,7 @@ export async function resendFeedbackTask(taskId: string): Promise<{
     }
 
     // 获取应用配置
-    const appConfig = await getAppConfig(task.app_id || '');
+    const appConfig = await getWeComAppConfig(task.app_id || '');
     if (!appConfig) {
       return { success: false, error: 'App config not found' };
     }
