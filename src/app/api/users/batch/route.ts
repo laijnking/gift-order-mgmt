@@ -9,7 +9,7 @@ function hashPassword(password: string): string {
 }
 
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.USERS_CREATE);
+  const authError = await requirePermission(request, PERMISSIONS.USERS_CREATE);
   if (authError) return authError;
 
   try {

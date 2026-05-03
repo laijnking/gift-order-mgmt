@@ -11,7 +11,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = requirePermission(request, PERMISSIONS.STOCKS_VIEW);
+  const authError = await requirePermission(request, PERMISSIONS.STOCKS_VIEW);
   if (authError) return authError;
   const client = getSupabaseClient();
   const { id } = await params;
@@ -58,7 +58,7 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = requirePermission(request, PERMISSIONS.STOCKS_EDIT);
+  const authError = await requirePermission(request, PERMISSIONS.STOCKS_EDIT);
   if (authError) return authError;
   const client = getSupabaseClient();
   const { id } = await params;
@@ -151,7 +151,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = requirePermission(request, PERMISSIONS.STOCKS_EDIT);
+  const authError = await requirePermission(request, PERMISSIONS.STOCKS_EDIT);
   if (authError) return authError;
   const client = getSupabaseClient();
   const { id } = await params;

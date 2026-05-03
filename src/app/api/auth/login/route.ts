@@ -5,7 +5,7 @@ import { PERMISSIONS } from '@/lib/permissions';
 
 // 签名密钥（生产环境应从环境变量读取）
 const AUTH_SECRET = process.env.AUTH_SECRET || 'gift-order-mgmt-secret-key-change-in-production';
-const SIGNATURE_MAX_AGE_MS = 5 * 60 * 1000; // 5 minutes
+const SIGNATURE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 // 密码哈希配置（使用 PBKDF2，比 SHA256 更安全）
 const HASH_SECRET = process.env.PASSWORD_HASH_SECRET || AUTH_SECRET;

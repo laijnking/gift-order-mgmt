@@ -4,7 +4,7 @@ import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { PERMISSIONS } from '@/lib/permissions';
 
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.SUPPLIERS_CREATE);
+  const authError = await requirePermission(request, PERMISSIONS.SUPPLIERS_CREATE);
   if (authError) return authError;
 
   try {

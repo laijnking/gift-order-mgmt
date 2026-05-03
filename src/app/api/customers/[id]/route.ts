@@ -9,7 +9,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = requirePermission(request, PERMISSIONS.CUSTOMERS_VIEW);
+  const authError = await requirePermission(request, PERMISSIONS.CUSTOMERS_VIEW);
   if (authError) return authError;
 
   const client = getSupabaseClient();
@@ -48,7 +48,7 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = requirePermission(request, PERMISSIONS.CUSTOMERS_EDIT);
+  const authError = await requirePermission(request, PERMISSIONS.CUSTOMERS_EDIT);
   if (authError) return authError;
 
   const client = getSupabaseClient();
@@ -90,7 +90,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = requirePermission(request, PERMISSIONS.CUSTOMERS_DELETE);
+  const authError = await requirePermission(request, PERMISSIONS.CUSTOMERS_DELETE);
   if (authError) return authError;
 
   const client = getSupabaseClient();

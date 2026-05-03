@@ -261,7 +261,7 @@ async function matchProduct(
 
 // 获取所有订单
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.ORDERS_VIEW);
+  const authError = await requirePermission(request, PERMISSIONS.ORDERS_VIEW);
   if (authError) return authError;
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
@@ -397,7 +397,7 @@ export async function GET(request: NextRequest) {
 
 // 导入订单（支持JSON格式创建和Excel文件上传）
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.ORDERS_CREATE);
+  const authError = await requirePermission(request, PERMISSIONS.ORDERS_CREATE);
   if (authError) return authError;
   const client = getSupabaseClient();
   
@@ -970,7 +970,7 @@ export async function PATCH(request: NextRequest) {
   const debugInfo: Record<string, unknown> = { start: new Date().toISOString(), url: request.url };
 
   try {
-    const authError = requirePermission(request, PERMISSIONS.ORDERS_EDIT);
+    const authError = await requirePermission(request, PERMISSIONS.ORDERS_EDIT);
     if (authError) return authError;
 
     const client = getSupabaseClient();
@@ -1151,7 +1151,7 @@ export async function PATCH(request: NextRequest) {
 
 // 删除订单
 export async function DELETE(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.ORDERS_DELETE);
+  const authError = await requirePermission(request, PERMISSIONS.ORDERS_DELETE);
   if (authError) return authError;
   const client = getSupabaseClient();
   

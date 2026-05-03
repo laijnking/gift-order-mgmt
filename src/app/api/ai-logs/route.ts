@@ -5,7 +5,7 @@ import { PERMISSIONS } from '@/lib/permissions';
 
 // 获取AI执行日志
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.AI_LOGS_VIEW);
+  const authError = await requirePermission(request, PERMISSIONS.AI_LOGS_VIEW);
   if (authError) return authError;
 
   const client = getSupabaseClient();

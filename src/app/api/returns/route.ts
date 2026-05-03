@@ -158,7 +158,7 @@ async function findOrder(client: ReturnType<typeof getSupabaseClient>, row: Retu
 }
 
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.ORDERS_EDIT);
+  const authError = await requirePermission(request, PERMISSIONS.ORDERS_EDIT);
   if (authError) return authError;
   const client = getSupabaseClient();
 

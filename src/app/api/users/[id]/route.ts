@@ -29,7 +29,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = requirePermission(request, PERMISSIONS.USERS_VIEW);
+  const authError = await requirePermission(request, PERMISSIONS.USERS_VIEW);
   if (authError) return authError;
 
   const { id } = await params;
@@ -64,7 +64,7 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = requirePermission(request, PERMISSIONS.USERS_EDIT);
+  const authError = await requirePermission(request, PERMISSIONS.USERS_EDIT);
   if (authError) return authError;
 
   const { id } = await params;
@@ -118,7 +118,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = requirePermission(request, PERMISSIONS.USERS_DELETE);
+  const authError = await requirePermission(request, PERMISSIONS.USERS_DELETE);
   if (authError) return authError;
 
   const { id } = await params;

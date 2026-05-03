@@ -16,7 +16,7 @@ interface TemplateFieldInput {
 
 // 获取模板字段列表
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
+  const authError = await requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
   if (authError) return authError;
 
   const client = getSupabaseClient();
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
 
 // 保存模板字段配置
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.SETTINGS_EDIT);
+  const authError = await requirePermission(request, PERMISSIONS.SETTINGS_EDIT);
   if (authError) return authError;
 
   const client = getSupabaseClient();
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
 
 // 更新单个模板字段
 export async function PUT(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.SETTINGS_EDIT);
+  const authError = await requirePermission(request, PERMISSIONS.SETTINGS_EDIT);
   if (authError) return authError;
 
   const client = getSupabaseClient();

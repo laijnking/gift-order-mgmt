@@ -5,7 +5,7 @@ import { PERMISSIONS } from '@/lib/permissions';
 
 // 获取预警记录列表
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.ORDERS_VIEW);
+  const authError = await requirePermission(request, PERMISSIONS.ORDERS_VIEW);
   if (authError) return authError;
   const client = getSupabaseClient();
   
@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
 
 // 创建预警记录
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.ORDERS_EDIT);
+  const authError = await requirePermission(request, PERMISSIONS.ORDERS_EDIT);
   if (authError) return authError;
   const client = getSupabaseClient();
   
@@ -186,7 +186,7 @@ export async function POST(request: NextRequest) {
 
 // 批量标记已读
 export async function PATCH(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.ORDERS_EDIT);
+  const authError = await requirePermission(request, PERMISSIONS.ORDERS_EDIT);
   if (authError) return authError;
   const client = getSupabaseClient();
   

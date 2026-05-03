@@ -11,7 +11,7 @@ export type ServerAuthUser = {
 };
 
 const AUTH_SECRET = process.env.AUTH_SECRET || 'gift-order-mgmt-secret-key-change-in-production';
-const SIGNATURE_MAX_AGE_MS = 5 * 60 * 1000; // 5 minutes
+const SIGNATURE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 function parseUserInfoHeader(request: NextRequest): ServerAuthUser | null {
   const raw = request.headers.get('x-user-info');
@@ -132,7 +132,15 @@ export function getRequestUser(request: NextRequest) {
   return parseUserInfoHeader(request);
 }
 
-export function requirePermission(request: NextRequest, permission: string) {
+export async function requirePermission(request: NextRequest, permission: string) {
+  const sigResult = await verifyUserSignature(request);
+  if (!sigResult.valid) {
+    return NextResponse.json(
+      { success: false, error: sigResult.reason || '签名验证失败' },
+      { status: 401 }
+    );
+  }
+
   const user = parseUserInfoHeader(request);
 
   if (!user) {
@@ -152,7 +160,15 @@ export function requirePermission(request: NextRequest, permission: string) {
   return null;
 }
 
-export function requireAnyPermission(request: NextRequest, permissions: string[]) {
+export async function requireAnyPermission(request: NextRequest, permissions: string[]) {
+  const sigResult = await verifyUserSignature(request);
+  if (!sigResult.valid) {
+    return NextResponse.json(
+      { success: false, error: sigResult.reason || '签名验证失败' },
+      { status: 401 }
+    );
+  }
+
   const user = parseUserInfoHeader(request);
 
   if (!user) {

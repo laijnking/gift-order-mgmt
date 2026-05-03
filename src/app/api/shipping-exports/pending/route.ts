@@ -5,7 +5,7 @@ import { PERMISSIONS } from '@/lib/permissions';
 
 // 获取待发货发货方列表（从订单出发，只返回有待发货的发货方）
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.ORDERS_VIEW);
+  const authError = await requirePermission(request, PERMISSIONS.ORDERS_VIEW);
   if (authError) return authError;
 
   const client = getSupabaseClient();

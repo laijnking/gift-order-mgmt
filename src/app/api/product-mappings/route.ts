@@ -29,7 +29,7 @@ function transformMapping(dbMapping: Record<string, unknown>) {
 
 // 获取SKU映射列表
 export async function GET(request: NextRequest) {
-  const authError = requireAnyPermission(request, [PERMISSIONS.PRODUCTS_VIEW, PERMISSIONS.SUPPLIERS_VIEW]);
+  const authError = await requireAnyPermission(request, [PERMISSIONS.PRODUCTS_VIEW, PERMISSIONS.SUPPLIERS_VIEW]);
   if (authError) return authError;
 
   const client = getSupabaseClient();
@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
 
 // 新增SKU映射
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.PRODUCTS_EDIT);
+  const authError = await requirePermission(request, PERMISSIONS.PRODUCTS_EDIT);
   if (authError) return authError;
 
   const client = getSupabaseClient();
@@ -194,7 +194,7 @@ export async function POST(request: NextRequest) {
 
 // 批量导入SKU映射
 export async function PUT(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.PRODUCTS_EDIT);
+  const authError = await requirePermission(request, PERMISSIONS.PRODUCTS_EDIT);
   if (authError) return authError;
 
   const client = getSupabaseClient();

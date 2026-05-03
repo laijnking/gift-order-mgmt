@@ -5,7 +5,7 @@ import { PERMISSIONS } from '@/lib/permissions';
 
 // 获取角色列表
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
+  const authError = await requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
   if (authError) return authError;
 
   const client = getSupabaseClient();
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
 
 // 创建角色
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
+  const authError = await requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
   if (authError) return authError;
 
   const client = getSupabaseClient();

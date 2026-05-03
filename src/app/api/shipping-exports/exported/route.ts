@@ -5,7 +5,7 @@ import { PERMISSIONS } from '@/lib/permissions';
 
 // 获取已导出发货通知的发货方列表（从 export_records 出发）
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
+  const authError = await requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
   if (authError) return authError;
 
   const client = getSupabaseClient();

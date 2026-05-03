@@ -141,7 +141,7 @@ function summarizeTemplateSource(
 
 // 批量导出已回单状态的客户反馈单（仅返回 returned 状态订单）
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
+  const authError = await requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
   if (authError) return authError;
 
   const client = getSupabaseClient();

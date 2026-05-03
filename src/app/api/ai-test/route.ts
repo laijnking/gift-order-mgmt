@@ -6,7 +6,7 @@ import { buildAiTestMockResult } from '@/lib/ai-test-mock';
 
 // 执行AI测试
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.AGENT_CONFIGS_EDIT);
+  const authError = await requirePermission(request, PERMISSIONS.AGENT_CONFIGS_EDIT);
   if (authError) return authError;
 
   const client = getSupabaseClient();

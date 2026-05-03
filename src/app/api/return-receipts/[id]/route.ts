@@ -29,7 +29,7 @@ function appendLogisticsInfo(existing: string | null, newValue: string | null): 
 
 // 获取回单导入记录详情
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.ORDERS_VIEW);
+  const authError = await requirePermission(request, PERMISSIONS.ORDERS_VIEW);
   if (authError) return authError;
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
@@ -79,7 +79,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = requirePermission(request, PERMISSIONS.ORDERS_EDIT);
+  const authError = await requirePermission(request, PERMISSIONS.ORDERS_EDIT);
   if (authError) return authError;
   const client = getSupabaseClient();
 

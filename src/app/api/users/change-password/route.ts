@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
 
   try {
     // Require authentication (any logged in user can change their own password)
-    const authError = requirePermission(request, 'users:view');
+    const authError = await requirePermission(request, 'users:view');
     if (authError) return authError;
 
     // Get current user from header

@@ -6,7 +6,7 @@ import { PERMISSIONS } from '@/lib/permissions';
 
 // 更新历史成本库的快递费用
 export async function PATCH(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.ORDERS_EDIT);
+  const authError = await requirePermission(request, PERMISSIONS.ORDERS_EDIT);
   if (authError) return authError;
   const client = getSupabaseClient();
   

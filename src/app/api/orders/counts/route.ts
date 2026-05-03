@@ -7,7 +7,7 @@ import { PERMISSIONS } from '@/lib/permissions';
 
 // 获取订单状态统计（用于快捷筛选数量）
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.ORDERS_VIEW);
+  const authError = await requirePermission(request, PERMISSIONS.ORDERS_VIEW);
   if (authError) return authError;
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);

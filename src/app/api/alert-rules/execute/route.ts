@@ -4,7 +4,7 @@ import { executeAlertRules } from '@/lib/alert-executor';
 import { PERMISSIONS } from '@/lib/permissions';
 
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
+  const authError = await requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
   if (authError) return authError;
 
   try {

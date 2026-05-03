@@ -9,7 +9,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ type: string }> }
 ) {
-  const authError = requireAnyPermission(request, [
+  const authError = await requireAnyPermission(request, [
     PERMISSIONS.SETTINGS_VIEW,
     PERMISSIONS.ORDERS_VIEW,
     PERMISSIONS.ORDERS_EXPORT,

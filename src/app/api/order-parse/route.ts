@@ -8,7 +8,7 @@ import { PERMISSIONS } from '@/lib/permissions';
 
 // 解析订单文本
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.ORDERS_CREATE);
+  const authError = await requirePermission(request, PERMISSIONS.ORDERS_CREATE);
   if (authError) return authError;
   const client = getSupabaseClient();
   

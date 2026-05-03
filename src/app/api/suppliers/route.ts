@@ -35,7 +35,7 @@ function transformSupplier(dbSupplier: Record<string, unknown>) {
 
 // 获取所有活跃发货方（统一查询 shippers 表）
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.SUPPLIERS_VIEW);
+  const authError = await requirePermission(request, PERMISSIONS.SUPPLIERS_VIEW);
   if (authError) return authError;
 
   const client = getSupabaseClient();
@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
 
 // 创建发货方（统一写入 shippers 表）
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.SUPPLIERS_CREATE);
+  const authError = await requirePermission(request, PERMISSIONS.SUPPLIERS_CREATE);
   if (authError) return authError;
 
   const client = getSupabaseClient();

@@ -6,7 +6,7 @@ import { PERMISSIONS } from '@/lib/permissions';
 
 // 导出前校验订单回单状态
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
+  const authError = await requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
   if (authError) return authError;
 
   const client = getSupabaseClient();

@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // Require authentication
-    const authError = requirePermission(request, 'users:view');
+    const authError = await requirePermission(request, 'users:view');
     if (authError) return authError;
 
     // Get current user from header
@@ -68,7 +68,7 @@ export async function PUT(request: NextRequest) {
 
   try {
     // Require authentication
-    const authError = requirePermission(request, 'users:view');
+    const authError = await requirePermission(request, 'users:view');
     if (authError) return authError;
 
     // Get current user from header

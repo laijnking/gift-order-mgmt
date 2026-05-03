@@ -75,7 +75,7 @@ const CHINESE_MAPPING: Record<string, string> = {
 };
 
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.PRODUCTS_CREATE);
+  const authError = await requirePermission(request, PERMISSIONS.PRODUCTS_CREATE);
   if (authError) return authError;
 
   try {

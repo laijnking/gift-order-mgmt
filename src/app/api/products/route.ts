@@ -36,7 +36,7 @@ function transformProduct(dbProduct: Record<string, unknown>) {
 
 // 获取商品列表
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.PRODUCTS_VIEW);
+  const authError = await requirePermission(request, PERMISSIONS.PRODUCTS_VIEW);
   if (authError) return authError;
 
   const client = getSupabaseClient();
@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
 
 // 新增商品
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.PRODUCTS_CREATE);
+  const authError = await requirePermission(request, PERMISSIONS.PRODUCTS_CREATE);
   if (authError) return authError;
 
   const client = getSupabaseClient();

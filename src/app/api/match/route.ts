@@ -192,7 +192,7 @@ function normalizeTransientOrder(input: Record<string, unknown>): Record<string,
 }
 
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.ORDERS_VIEW);
+  const authError = await requirePermission(request, PERMISSIONS.ORDERS_VIEW);
   if (authError) return authError;
   const client = getSupabaseClient();
 

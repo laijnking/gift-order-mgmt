@@ -290,7 +290,7 @@ async function recordStockVersion(
 }
 
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.STOCKS_EDIT);
+  const authError = await requirePermission(request, PERMISSIONS.STOCKS_EDIT);
   if (authError) return authError;
   const client = getSupabaseClient();
 

@@ -15,7 +15,7 @@ import { PERMISSIONS } from '@/lib/permissions';
 
 // 系统商品匹配接口
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.PRODUCTS_VIEW);
+  const authError = await requirePermission(request, PERMISSIONS.PRODUCTS_VIEW);
   if (authError) return authError;
 
   const client = getSupabaseClient();
@@ -221,7 +221,7 @@ export async function POST(request: NextRequest) {
 
 // 批量匹配接口
 export async function PUT(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.PRODUCTS_VIEW);
+  const authError = await requirePermission(request, PERMISSIONS.PRODUCTS_VIEW);
   if (authError) return authError;
 
   const client = getSupabaseClient();

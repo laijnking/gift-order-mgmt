@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     }, { status: 400 });
   }
 
-  const authError = requirePermission(request, requiredPermission);
+  const authError = await requirePermission(request, requiredPermission);
   if (authError) return authError;
 
   const client = getSupabaseClient();

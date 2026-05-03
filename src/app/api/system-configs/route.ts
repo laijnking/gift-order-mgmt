@@ -5,7 +5,7 @@ import { PERMISSIONS } from '@/lib/permissions';
 
 // 获取系统配置列表
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
+  const authError = await requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
   if (authError) return authError;
 
   const client = getSupabaseClient();
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
 
 // 更新系统配置
 export async function PATCH(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.SETTINGS_EDIT);
+  const authError = await requirePermission(request, PERMISSIONS.SETTINGS_EDIT);
   if (authError) return authError;
 
   const client = getSupabaseClient();

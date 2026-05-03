@@ -149,7 +149,7 @@ function summarizeTemplateSource(
 
 // 批量导出客户反馈单
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
+  const authError = await requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
   if (authError) return authError;
 
   const client = getSupabaseClient();

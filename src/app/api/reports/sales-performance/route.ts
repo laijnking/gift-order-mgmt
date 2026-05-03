@@ -6,7 +6,7 @@ import { PERMISSIONS } from '@/lib/permissions';
 
 // 获取销售业绩数据
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.DASHBOARD_VIEW);
+  const authError = await requirePermission(request, PERMISSIONS.DASHBOARD_VIEW);
   if (authError) return authError;
   try {
     const supabase = await getSupabaseClient();

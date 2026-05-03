@@ -5,7 +5,7 @@ import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 // 获取有待导出（已回单）订单的客户列表
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
+  const authError = await requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
   if (authError) return authError;
 
   const client = getSupabaseClient();

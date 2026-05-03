@@ -5,7 +5,7 @@ import { PERMISSIONS } from '@/lib/permissions';
 
 // 获取库存版本历史
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.STOCKS_VIEW);
+  const authError = await requirePermission(request, PERMISSIONS.STOCKS_VIEW);
   if (authError) return authError;
   const client = getSupabaseClient();
   
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
 
 // 创建库存版本记录（自动在库存变更时调用）
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.STOCKS_EDIT);
+  const authError = await requirePermission(request, PERMISSIONS.STOCKS_EDIT);
   if (authError) return authError;
   const client = getSupabaseClient();
   

@@ -6,7 +6,7 @@ import { PERMISSIONS } from '@/lib/permissions';
 
 // 获取模板列表
 export async function GET(request: NextRequest) {
-  const authError = requireAnyPermission(request, [
+  const authError = await requireAnyPermission(request, [
     PERMISSIONS.SETTINGS_VIEW,
     PERMISSIONS.ORDERS_VIEW,
     PERMISSIONS.ORDERS_EXPORT,
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
 
 // 创建模板
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
+  const authError = await requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
   if (authError) return authError;
 
   const client = getSupabaseClient();

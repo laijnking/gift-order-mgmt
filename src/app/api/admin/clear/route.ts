@@ -4,7 +4,7 @@ import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { PERMISSIONS } from '@/lib/permissions';
 
 export async function DELETE(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.SETTINGS_EDIT);
+  const authError = await requirePermission(request, PERMISSIONS.SETTINGS_EDIT);
   if (authError) return authError;
 
   try {
@@ -59,7 +59,7 @@ export async function DELETE(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.SETTINGS_EDIT);
+  const authError = await requirePermission(request, PERMISSIONS.SETTINGS_EDIT);
   if (authError) return authError;
 
   try {

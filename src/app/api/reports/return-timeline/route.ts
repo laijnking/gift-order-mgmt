@@ -6,7 +6,7 @@ import { ORDER_STATUS_ASSIGNED, ORDER_STATUS_PARTIAL_RETURNED, ORDER_STATUS_RETU
 
 // 获取回单时效分析数据
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.DASHBOARD_VIEW);
+  const authError = await requirePermission(request, PERMISSIONS.DASHBOARD_VIEW);
   if (authError) return authError;
   try {
     const supabase = await getSupabaseClient();

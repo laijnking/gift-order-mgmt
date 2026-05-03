@@ -428,7 +428,7 @@ async function parseExcelData(
 }
 
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.ORDERS_CREATE);
+  const authError = await requirePermission(request, PERMISSIONS.ORDERS_CREATE);
   if (authError) return authError;
   const client = getSupabaseClient();
   

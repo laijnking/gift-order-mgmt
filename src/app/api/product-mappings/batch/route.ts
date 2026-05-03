@@ -31,7 +31,7 @@ async function findShipperIdByCode(client: ReturnType<typeof getSupabaseClient>,
 
 // 批量导入SKU映射
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.PRODUCTS_EDIT);
+  const authError = await requirePermission(request, PERMISSIONS.PRODUCTS_EDIT);
   if (authError) return authError;
 
   const client = getSupabaseClient();

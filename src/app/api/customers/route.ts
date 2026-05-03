@@ -6,7 +6,7 @@ import { buildCustomerMutationData, getCustomerSchemaMode, transformCustomerReco
 
 // 获取客户列表
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.CUSTOMERS_VIEW);
+  const authError = await requirePermission(request, PERMISSIONS.CUSTOMERS_VIEW);
   if (authError) return authError;
 
   const client = getSupabaseClient();
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
 
 // 新增客户
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.CUSTOMERS_CREATE);
+  const authError = await requirePermission(request, PERMISSIONS.CUSTOMERS_CREATE);
   if (authError) return authError;
 
   const client = getSupabaseClient();

@@ -46,7 +46,7 @@ function validateMappingConfig(mappingConfig: Record<string, string>) {
 
 // 获取客户当前生效的字段映射配置
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.ORDERS_CREATE);
+  const authError = await requirePermission(request, PERMISSIONS.ORDERS_CREATE);
   if (authError) return authError;
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
 
 // 保存客户字段映射配置
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.ORDERS_CREATE);
+  const authError = await requirePermission(request, PERMISSIONS.ORDERS_CREATE);
   if (authError) return authError;
   const client = getSupabaseClient();
 

@@ -55,7 +55,7 @@ function getFieldValue(item: Record<string, unknown>, fieldName: string): unknow
 }
 
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.CUSTOMERS_CREATE);
+  const authError = await requirePermission(request, PERMISSIONS.CUSTOMERS_CREATE);
   if (authError) return authError;
 
   try {

@@ -23,7 +23,7 @@ function appendLogisticsInfo(existing: string | null, newValue: string | null): 
 
 // 批量确认回单（支持部分回单，物流信息追加）
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.ORDERS_EDIT);
+  const authError = await requirePermission(request, PERMISSIONS.ORDERS_EDIT);
   if (authError) return authError;
   const client = getSupabaseClient();
 

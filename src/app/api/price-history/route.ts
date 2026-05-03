@@ -5,7 +5,7 @@ import { PERMISSIONS } from '@/lib/permissions';
 
 // 获取价格历史
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.STOCKS_VIEW);
+  const authError = await requirePermission(request, PERMISSIONS.STOCKS_VIEW);
   if (authError) return authError;
   const client = getSupabaseClient();
   
@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
 
 // 记录价格变更
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.STOCKS_EDIT);
+  const authError = await requirePermission(request, PERMISSIONS.STOCKS_EDIT);
   if (authError) return authError;
   const client = getSupabaseClient();
   

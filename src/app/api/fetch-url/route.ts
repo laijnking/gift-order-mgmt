@@ -119,7 +119,7 @@ function isUrlSafe(inputUrl: string): { valid: boolean; reason?: string } {
 }
 
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.SETTINGS_EDIT);
+  const authError = await requirePermission(request, PERMISSIONS.SETTINGS_EDIT);
   if (authError) return authError;
 
   try {

@@ -5,7 +5,7 @@ import { PERMISSIONS } from '@/lib/permissions';
 
 // 关联模板到客户或发货方
 export async function POST(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.SETTINGS_EDIT);
+  const authError = await requirePermission(request, PERMISSIONS.SETTINGS_EDIT);
   if (authError) return authError;
 
   const client = getSupabaseClient();
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
 
 // 取消关联
 export async function DELETE(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.SETTINGS_EDIT);
+  const authError = await requirePermission(request, PERMISSIONS.SETTINGS_EDIT);
   if (authError) return authError;
 
   const client = getSupabaseClient();
@@ -101,7 +101,7 @@ export async function DELETE(request: NextRequest) {
 
 // 获取模板的关联列表
 export async function GET(request: NextRequest) {
-  const authError = requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
+  const authError = await requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
   if (authError) return authError;
 
   const client = getSupabaseClient();
