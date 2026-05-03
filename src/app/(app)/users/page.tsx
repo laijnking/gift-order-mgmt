@@ -141,6 +141,8 @@ export default function UsersPage() {
     realName: '',
     role: '',
     department: '',
+    phone: '',
+    email: '',
     isActive: true,
   });
 
@@ -264,6 +266,8 @@ export default function UsersPage() {
       realName: user.realName || '',
       role: user.role || allRoles[0]?.code || '',
       department: user.department || '',
+      phone: user.phone || '',
+      email: user.email || '',
       isActive: user.isActive ?? true,
     });
     setIsDialogOpen(true);
@@ -323,6 +327,8 @@ export default function UsersPage() {
       realName: '',
       role: allRoles[0]?.code || '',
       department: '',
+      phone: '',
+      email: '',
       isActive: true,
     });
   };
@@ -572,6 +578,8 @@ export default function UsersPage() {
                 <TableRow>
                   <TableHead>用户名</TableHead>
                   <TableHead>姓名</TableHead>
+                  <TableHead>手机号</TableHead>
+                  <TableHead>邮箱</TableHead>
                   <TableHead>角色</TableHead>
                   <TableHead>部门</TableHead>
                   <TableHead>状态</TableHead>
@@ -582,7 +590,7 @@ export default function UsersPage() {
               <TableBody>
                 {filteredUsers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       {users.length === 0 ? '暂无用户' : '未找到匹配的用户'}
                     </TableCell>
                   </TableRow>
@@ -593,6 +601,8 @@ export default function UsersPage() {
                         <code className="bg-muted px-2 py-1 rounded">{user.username}</code>
                       </TableCell>
                       <TableCell>{user.realName || '-'}</TableCell>
+                      <TableCell>{user.phone || '-'}</TableCell>
+                      <TableCell>{user.email || '-'}</TableCell>
                       <TableCell>{getRoleBadge(user.role)}</TableCell>
                       <TableCell>{user.department || '-'}</TableCell>
                       <TableCell>
@@ -732,6 +742,26 @@ export default function UsersPage() {
                 onChange={(e) => setFormData({ ...formData, department: e.target.value })}
                 placeholder="所属部门"
               />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="phone">手机号码</Label>
+                <Input
+                  id="phone"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  placeholder="手机号码"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="email">邮箱</Label>
+                <Input
+                  id="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="邮箱地址"
+                />
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <Switch
