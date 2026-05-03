@@ -13,6 +13,8 @@ export interface AuthUser {
   department?: string;
   dataScope: string;
   permissions: string[];
+  authSignature?: string;
+  authTimestamp?: number;
 }
 
 interface AuthContextType {
@@ -50,6 +52,8 @@ function normalizeStoredUser(value: unknown): AuthUser | null {
     permissions: Array.isArray(record.permissions)
       ? record.permissions.filter((permission): permission is string => typeof permission === 'string')
       : [],
+    authSignature: typeof record.authSignature === 'string' ? record.authSignature : undefined,
+    authTimestamp: typeof record.authTimestamp === 'number' ? record.authTimestamp : undefined,
   };
 }
 
@@ -108,7 +112,7 @@ export function buildUserInfoHeaders(user?: AuthUser | null): Record<string, str
     return {};
   }
 
-  return {
+  const headers: Record<string, string> = {
     'x-user-info': JSON.stringify({
       id: currentUser.id,
       username: currentUser.username,
@@ -117,6 +121,14 @@ export function buildUserInfoHeaders(user?: AuthUser | null): Record<string, str
       permissions: currentUser.permissions,
     }),
   };
+
+  // 添加签名信息
+  if (currentUser.authSignature && currentUser.authTimestamp) {
+    headers['x-user-signature'] = currentUser.authSignature;
+    headers['x-timestamp'] = String(currentUser.authTimestamp);
+  }
+
+  return headers;
 }
 
 export function getUserDataScope(user: AuthUser | null): string {

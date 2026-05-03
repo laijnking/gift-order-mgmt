@@ -3,29 +3,72 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission } from '@/lib/server-auth';
 
-const BUILTIN_PASSWORDS: Record<string, string> = {
-  admin: 'admin123',
-  salesperson: 'sales123',
-  operator: 'operator123',
-};
+// 密码哈希配置（使用 PBKDF2）
+const HASH_SECRET = process.env.PASSWORD_HASH_SECRET || process.env.AUTH_SECRET || 'gift-order-mgmt-secret-key-change-in-production';
+const HASH_ITERATIONS = 100000;
+const HASH_KEYLEN = 64;
+const HASH_DIGEST = 'sha512';
 
-function verifyPassword(username: string, password: string, storedHash: string | null | undefined): boolean {
+/**
+ * 使用 PBKDF2 生成密码哈希
+ */
+function hashPassword(password: string, salt?: string): { hash: string; salt: string } {
+  const generatedSalt = salt || crypto.randomBytes(32).toString('hex');
+  const hash = crypto.pbkdf2Sync(password, generatedSalt, HASH_ITERATIONS, HASH_KEYLEN, HASH_DIGEST).toString('hex');
+  return { hash, salt: generatedSalt };
+}
+
+/**
+ * 验证密码是否匹配
+ * 支持旧格式（SHA256）和新格式（PBKDF2）
+ */
+function verifyPassword(password: string, storedHash: string | null | undefined): boolean {
   if (!storedHash) return false;
 
-  // Direct match
-  if (storedHash === password) return true;
+  // 新格式：salt$hash（PBKDF2）
+  if (storedHash.includes('$')) {
+    const parts = storedHash.split('$');
+    if (parts.length === 2) {
+      const [salt, hash] = parts;
+      const { hash: expectedHash } = hashPassword(password, salt);
+      try {
+        return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(expectedHash, 'hex'));
+      } catch {
+        return false;
+      }
+    }
+  }
 
-  // SHA256 hash match
-  const sha256Hash = crypto.createHash('sha256').update(password).digest('hex');
-  if (storedHash === sha256Hash) return true;
-
-  // Built-in password match
-  const builtinPassword = BUILTIN_PASSWORDS[username];
-  if (builtinPassword && password === builtinPassword) {
-    return true;
+  // 旧格式检测：SHA256 哈希（64 字符 hex）
+  if (storedHash.length === 64 && /^[a-f0-9]+$/.test(storedHash)) {
+    const hash = crypto.createHash('sha256').update(password).digest('hex');
+    try {
+      return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(storedHash, 'hex'));
+    } catch {
+      return false;
+    }
   }
 
   return false;
+}
+
+/**
+ * 检查密码强度
+ */
+function isPasswordStrong(password: string): { valid: boolean; reason?: string } {
+  if (password.length < 8) {
+    return { valid: false, reason: '密码长度至少 8 位' };
+  }
+  if (!/[A-Z]/.test(password)) {
+    return { valid: false, reason: '密码必须包含大写字母' };
+  }
+  if (!/[a-z]/.test(password)) {
+    return { valid: false, reason: '密码必须包含小写字母' };
+  }
+  if (!/[0-9]/.test(password)) {
+    return { valid: false, reason: '密码必须包含数字' };
+  }
+  return { valid: true };
 }
 
 export async function POST(request: NextRequest) {
@@ -60,12 +103,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    if (newPassword.length < 6) {
-      return NextResponse.json({
-        success: false,
-        error: '新密码长度不能少于6位',
-      }, { status: 400 });
-    }
+    // 新密码长度验证（已在 isPasswordStrong 中检查，但保留此检查作为前端提示）
 
     if (newPassword !== confirmPassword) {
       return NextResponse.json({
@@ -89,7 +127,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify old password
-    if (!verifyPassword(username, oldPassword, user.password_hash)) {
+    if (!verifyPassword(oldPassword, user.password_hash)) {
       return NextResponse.json({
         success: false,
         error: '原密码错误',
@@ -104,10 +142,20 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Update password
+    // Validate new password strength
+    const strengthCheck = isPasswordStrong(newPassword);
+    if (!strengthCheck.valid) {
+      return NextResponse.json({
+        success: false,
+        error: strengthCheck.reason || '密码强度不足',
+      }, { status: 400 });
+    }
+
+    // Hash new password with PBKDF2 and update
+    const { hash, salt } = hashPassword(newPassword);
     const { error: updateError } = await client
       .from('users')
-      .update({ password_hash: newPassword })
+      .update({ password_hash: `${salt}$${hash}` })
       .eq('id', userId);
 
     if (updateError) {

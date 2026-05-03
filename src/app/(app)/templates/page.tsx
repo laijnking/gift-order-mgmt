@@ -46,11 +46,16 @@ interface ExportTemplate {
   targetType?: string;
   targetId?: string;
   targetName?: string;
-  fieldMappings: Record<string, string>;
+  fieldMappings: Record<string, string> | FieldMappingItem[];
   isDefault: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+interface FieldMappingItem {
+  excelColumn: string;
+  systemField: string;
 }
 
 interface Customer {
@@ -334,7 +339,7 @@ export default function TemplatesPage() {
       let mappingArray: { excelColumn: string; systemField: string }[] = [];
       if (Array.isArray(template.fieldMappings)) {
         // 新数据：数组格式
-        mappingArray = template.fieldMappings.map((m: any) => ({
+        mappingArray = template.fieldMappings.map((m: FieldMappingItem) => ({
           excelColumn: m.excelColumn || '',
           systemField: m.systemField || '',
         }));

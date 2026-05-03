@@ -3,11 +3,74 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { PERMISSIONS } from '@/lib/permissions';
 
-const BUILTIN_PASSWORDS: Record<string, string> = {
-  admin: 'admin123',
-  salesperson: 'sales123',
-  operator: 'operator123',
-};
+// 签名密钥（生产环境应从环境变量读取）
+const AUTH_SECRET = process.env.AUTH_SECRET || 'gift-order-mgmt-secret-key-change-in-production';
+const SIGNATURE_MAX_AGE_MS = 5 * 60 * 1000; // 5 minutes
+
+// 密码哈希配置（使用 PBKDF2，比 SHA256 更安全）
+const HASH_SECRET = process.env.PASSWORD_HASH_SECRET || AUTH_SECRET;
+const HASH_ITERATIONS = 100000;
+const HASH_KEYLEN = 64;
+const HASH_DIGEST = 'sha512';
+
+/**
+ * 使用 PBKDF2 生成密码哈希
+ */
+function hashPassword(password: string, salt?: string): { hash: string; salt: string } {
+  const generatedSalt = salt || crypto.randomBytes(32).toString('hex');
+  const hash = crypto.pbkdf2Sync(password, generatedSalt, HASH_ITERATIONS, HASH_KEYLEN, HASH_DIGEST).toString('hex');
+  return { hash, salt: generatedSalt };
+}
+
+/**
+ * 验证密码是否匹配
+ * 支持旧格式（SHA256 明文存储）和新格式（PBKDF2）
+ */
+function verifyPassword(password: string, storedHash: string | null | undefined): boolean {
+  if (!storedHash) return false;
+
+  // 检测哈希格式
+  // 新格式：salt$hash（PBKDF2）
+  if (storedHash.includes('$')) {
+    const parts = storedHash.split('$');
+    if (parts.length === 2) {
+      const [salt, hash] = parts;
+      const { hash: expectedHash } = hashPassword(password, salt);
+      return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(expectedHash, 'hex'));
+    }
+  }
+
+  // 旧格式检测：SHA256 哈希（32 字符 hex）
+  if (storedHash.length === 64 && /^[a-f0-9]+$/.test(storedHash)) {
+    const hash = sha256(password);
+    try {
+      return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(storedHash, 'hex'));
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * 检查密码强度
+ */
+function isPasswordStrong(password: string): { valid: boolean; reason?: string } {
+  if (password.length < 8) {
+    return { valid: false, reason: '密码长度至少 8 位' };
+  }
+  if (!/[A-Z]/.test(password)) {
+    return { valid: false, reason: '密码必须包含大写字母' };
+  }
+  if (!/[a-z]/.test(password)) {
+    return { valid: false, reason: '密码必须包含小写字母' };
+  }
+  if (!/[0-9]/.test(password)) {
+    return { valid: false, reason: '密码必须包含数字' };
+  }
+  return { valid: true };
+}
 
 const FALLBACK_PERMISSIONS: Record<string, string[]> = {
   admin: [
@@ -61,6 +124,74 @@ function sha256(value: string): string {
   return crypto.createHash('sha256').update(value).digest('hex');
 }
 
+/**
+ * 生成用户信息签名
+ * 签名包含用户 ID 和权限，服务端验证时根据用户 ID 查询真实权限进行对比
+ */
+function generateUserSignature(userId: string, permissions: string[]): { signature: string; timestamp: number } {
+  const timestamp = Date.now();
+  const dataToSign = `${userId}:${permissions.sort().join(',')}:${timestamp}`;
+  const signature = crypto.createHmac('sha256', AUTH_SECRET).update(dataToSign).digest('hex');
+  return { signature, timestamp };
+}
+
+/**
+ * 验证用户信息签名
+ * 通过用户 ID 查询数据库获取当前真实权限，与签名中的权限进行对比
+ */
+async function verifyUserSignature(
+  client: ReturnType<typeof getSupabaseClient>,
+  userId: string,
+  permissions: string[],
+  signature: string,
+  timestamp: number
+): Promise<{ valid: boolean; reason?: string }> {
+  // 检查时间戳是否过期
+  const now = Date.now();
+  if (Math.abs(now - timestamp) > SIGNATURE_MAX_AGE_MS) {
+    return { valid: false, reason: '签名已过期' };
+  }
+
+  // 获取用户在数据库中的真实权限
+  const { data: user, error } = await client
+    .from('users')
+    .select('id, username, role, is_active')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error || !user) {
+    return { valid: false, reason: '用户不存在' };
+  }
+
+  if (!user.is_active) {
+    return { valid: false, reason: '用户已被禁用' };
+  }
+
+  // 获取真实权限
+  const roleMeta = await getRoleMeta(client, user.role || '');
+  const realPermissions = roleMeta.permissions.sort();
+
+  // 对比签名中的权限与真实权限
+  const signedPermissions = [...permissions].sort();
+  if (JSON.stringify(signedPermissions) !== JSON.stringify(realPermissions)) {
+    return { valid: false, reason: '权限已变更，请重新登录' };
+  }
+
+  // 重新计算签名并验证
+  const dataToSign = `${userId}:${realPermissions.join(',')}:${timestamp}`;
+  const expectedSignature = crypto.createHmac('sha256', AUTH_SECRET).update(dataToSign).digest('hex');
+
+  try {
+    if (!crypto.timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expectedSignature, 'hex'))) {
+      return { valid: false, reason: '签名验证失败' };
+    }
+  } catch {
+    return { valid: false, reason: '签名格式无效' };
+  }
+
+  return { valid: true };
+}
+
 async function getRoleMeta(client: ReturnType<typeof getSupabaseClient>, roleCode: string) {
   const { data: role } = await client
     .from('roles')
@@ -95,20 +226,6 @@ async function getRoleMeta(client: ReturnType<typeof getSupabaseClient>, roleCod
   };
 }
 
-function verifyPassword(username: string, password: string, storedHash: string | null | undefined) {
-  if (!storedHash) return false;
-
-  if (storedHash === password) return true;
-  if (storedHash === sha256(password)) return true;
-
-  const builtinPassword = BUILTIN_PASSWORDS[username];
-  if (builtinPassword && password === builtinPassword) {
-    return true;
-  }
-
-  return false;
-}
-
 export async function POST(request: NextRequest) {
   const client = getSupabaseClient();
 
@@ -135,11 +252,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: '用户名或密码错误' }, { status: 401 });
     }
 
-    if (!verifyPassword(username, password, user.password_hash)) {
+    // 验证密码（支持旧格式 SHA256 和新格式 PBKDF2）
+    const passwordValid = verifyPassword(password, user.password_hash);
+    if (!passwordValid) {
       return NextResponse.json({ success: false, error: '用户名或密码错误' }, { status: 401 });
     }
 
+    // 如果是旧格式 SHA256，自动升级到 PBKDF2
+    if (user.password_hash && user.password_hash.length === 64 && /^[a-f0-9]+$/.test(user.password_hash)) {
+      const { hash, salt } = hashPassword(password);
+      await client
+        .from('users')
+        .update({ password_hash: `${salt}$${hash}` })
+        .eq('id', user.id);
+    }
+
     const roleMeta = await getRoleMeta(client, user.role || '');
+
+    // 生成签名
+    const { signature, timestamp } = generateUserSignature(user.id, roleMeta.permissions);
 
     await client
       .from('users')
@@ -157,6 +288,9 @@ export async function POST(request: NextRequest) {
         department: user.department || '',
         dataScope: roleMeta.dataScope,
         permissions: roleMeta.permissions,
+        // 添加签名信息
+        authSignature: signature,
+        authTimestamp: timestamp,
       },
     });
   } catch (error) {
