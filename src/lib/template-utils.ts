@@ -70,6 +70,7 @@ const LEGACY_TO_CAMEL: Record<string, string> = {
   'dispatch_batch': 'dispatchBatch',
   'unit_cost': 'unitCost',
   'warehouse_name': 'warehouseName',
+  'created_at': 'createdAt',
 };
 
 export function migrateFieldMappings(mappings: Record<string, string>): Record<string, string> {

@@ -177,6 +177,7 @@ const SYSTEM_FIELDS = [
   { key: 'expressFee', label: '运费' },             // order.express_fee
   // === 备注 ===
   { key: 'remark', label: '备注' },                  // order.remark
+  { key: 'createdAt', label: '创建日期' },          // order.created_at
 ];
 
 const TEMPLATE_TYPES = [
@@ -626,6 +627,7 @@ export default function TemplatesPage() {
         case 'matchCode': return 'MATCH-001';
         case 'dispatchBatch': return 'SHIP-20260415-00001';
         case 'warehouseName': return '杭州仓';
+        case 'createdAt': return '2026-04-15';
         default: return '-';
       }
     });

@@ -23,6 +23,7 @@ const DEFAULT_KINGDEE_FIELD_MAPPINGS: Array<{ excelColumn: string; systemField: 
   { excelColumn: '业务员', systemField: 'salesperson' },
   { excelColumn: '跟单员', systemField: 'operator' },
   { excelColumn: '派发批次', systemField: 'dispatchBatch' },
+  { excelColumn: '日期', systemField: 'createdAt' },
 ];
 
 function parseItems(value: unknown): OrderItem[] {
@@ -82,6 +83,7 @@ function buildKingdeeRows(
         salesperson: order.salesperson || '',
         operator: order.operator_name || '',
         dispatchBatch: order.assigned_batch || '',
+        createdAt: order.created_at || '',
       };
 
       return Object.fromEntries(
