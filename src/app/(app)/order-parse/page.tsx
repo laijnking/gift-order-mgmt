@@ -1403,15 +1403,29 @@ export default function OrderParsePage() {
             docUrl="/docs/guides/order-parse"
           >
             <HelpSection title="功能说明">
-              支持通过 Excel 导入订单，自动解析表头、智能匹配商品和发货方、历史映射自动加载。
+              支持通过 Excel 批量导入订单：自动识别表头并建立列映射、智能匹配系统商品与发货方库存、历史映射一键复用。客户反馈导出时按原始列名还原。
             </HelpSection>
-            <HelpSection title="快速操作">
+            <HelpSection title="操作流程">
               <HelpSteps steps={[
-                { title: "选择客户", description: "自动联动业务员/跟单员" },
-                { title: "上传 Excel", description: "支持 .xls/.xlsx 格式" },
-                { title: "配置列映射", description: "自动加载历史映射" },
-                { title: "解析并提交", description: "智能匹配商品" },
+                { title: "选择客户", description: "联动业务员/跟单员，同时检索该客户的历史映射配置" },
+                { title: "上传 Excel", description: "支持 .xls/.xlsx，自动计算表头指纹匹配历史映射" },
+                { title: "配置列映射", description: "首次导入需手工配置；再次导入自动加载，仅在 Excel 列有变动时调整" },
+                { title: "解析订单", description: "系统按 规格→编码→条码→名称 四级优先级自动匹配商品，并查询各发货方库存" },
+                { title: "确认发货方", description: "系统按 内部仓库优先→成本最优→库存充足 规则推荐默认发货方，不合适可批量重选" },
+                { title: "提交订单", description: "提交时自动保存列映射（映射历史 +1），后续反馈导出按客户原始列名+顺序+系统追加物流信息输出" },
               ]} />
+            </HelpSection>
+            <HelpSection title="首次 vs 再次导入">
+              <div className="text-xs space-y-2">
+                <div>
+                  <span className="font-medium text-foreground">首次导入：</span>
+                  选择客户 → 上传 Excel → 手工配置列映射 → 解析匹配商品 → 确认发货方 → 提交。映射自动保存。
+                </div>
+                <div>
+                  <span className="font-medium text-foreground">再次导入（同客户同类表格）：</span>
+                  选择客户 → 上传 Excel → 自动加载历史映射（绿色提示）→ 解析匹配 → 确认发货方 → 提交。仅当 Excel 列有变动时才需调整映射。
+                </div>
+              </div>
             </HelpSection>
             <HelpSection title="商品匹配优先级">
               <div className="text-xs space-y-1">
@@ -1422,7 +1436,7 @@ export default function OrderParsePage() {
               </div>
             </HelpSection>
             <HelpNote type="tip">
-              提示：库存 ≤ 2 台时会显示尾货预警，请注意撞单风险
+              提示：库存 ≤ 2 台时会显示尾货预警，请注意撞单风险。列映射提交时自动保存，无需手动操作。
             </HelpNote>
             <HelpLinks links={[
               { label: "订单管理", href: "/orders", description: "查看已提交订单" },
