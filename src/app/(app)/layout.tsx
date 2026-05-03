@@ -9,7 +9,7 @@ import {
   Package, BarChart3, Warehouse, Users, Bot, FileText,
   Link2, Settings, ChevronLeft, ChevronRight, LogOut, User,
   Building2, Truck, Menu, X, ChevronDown, Bell, DollarSign,
-  UserCircle, Lock, Mail, Phone, XIcon
+  UserCircle, Lock, Mail, Phone, XIcon, MessageSquare
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -67,6 +67,18 @@ const menuItems: MenuItem[] = [
       { label: '预警设置', href: '/alerts', icon: Bell },
       { label: '模板配置', href: '/templates', icon: Settings },
       { label: '系统配置', href: '/system-configs', icon: Settings },
+    ]
+  },
+  {
+    label: '企业微信管理',
+    href: '/wecom/config',
+    icon: MessageSquare,
+    permissions: ['wecom:manage'],
+    children: [
+      { label: '应用配置', href: '/wecom/config', icon: Settings },
+      { label: '群映射管理', href: '/wecom/mappings', icon: Users },
+      { label: '文件队列', href: '/wecom/queue', icon: FileText },
+      { label: '回单记录', href: '/wecom/feedback', icon: Package },
     ]
   },
 ];
