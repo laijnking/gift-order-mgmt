@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { getSupabaseClient, getPgPool } from '@/storage/database/supabase-client';
 
 export type ServerAuthUser = {
   id?: string;
@@ -92,17 +92,24 @@ export async function verifyUserSignature(request: NextRequest): Promise<{ valid
 
   let realPermissions: string[] = [];
   if (role) {
+    // 分两步查询：先获取 role_permissions 的 permission_id 列表，再查询对应的 permissions code
     const { data: permissionLinks } = await client
       .from('role_permissions')
-      .select('permissions(code)')
+      .select('permission_id')
       .eq('role_id', role.id);
 
-    realPermissions = (permissionLinks || [])
-      .map((item: Record<string, unknown>) => {
-        const permission = item.permissions as Record<string, unknown> | null;
-        return typeof permission?.code === 'string' ? permission.code : null;
-      })
-      .filter((code): code is string => Boolean(code));
+    if (permissionLinks && permissionLinks.length > 0) {
+      const permIds = permissionLinks.map((p: Record<string, unknown>) => p.permission_id as string);
+
+      // 直接用 Pool 查询避免 LocalSupabaseClient 的跨表查询限制
+      const pool = getPgPool();
+      const idsParam = permIds.map((_, i) => `$${i + 1}`).join(', ');
+      const result = await pool.query(
+        `SELECT code FROM permissions WHERE id IN (${idsParam})`,
+        permIds
+      );
+      realPermissions = result.rows.map(r => r.code as string);
+    }
   }
 
   // 对比签名中的权限与真实权限
