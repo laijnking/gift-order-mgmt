@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
   const startDate = searchParams.get('startDate');
   const endDate = searchParams.get('endDate');
   const supplierId = searchParams.get('supplierId');
+  const supplierName = searchParams.get('supplierName');
   const customerId = searchParams.get('customerId');
 
   try {
@@ -42,6 +43,20 @@ export async function GET(request: NextRequest) {
 
     if (customerId) {
       query = query.eq('customer_id', customerId);
+    }
+
+    // supplierName 模糊搜索需要先关联 shippers 表
+    if (supplierName) {
+      const { data: matchedShippers } = await client
+        .from('shippers')
+        .select('id')
+        .ilike('name', `%${supplierName}%`);
+      if (matchedShippers && matchedShippers.length > 0) {
+        query = query.in('supplier_id', matchedShippers.map(s => s.id));
+      } else {
+        // 没有匹配的发货方，返回空结果
+        return NextResponse.json({ success: true, data: [], total: 0, page, pageSize, totalPages: 0 });
+      }
     }
 
     // 分页

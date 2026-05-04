@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/select';
 import {
   FileDown, Search, RefreshCw, CheckCircle2, Loader2,
-  FileSpreadsheet, Clock, History, FileText
+  FileSpreadsheet, Clock, History, FileText, Download
 } from 'lucide-react';
 import { HelpGuide, HelpSection, HelpSteps, HelpNote, HelpLinks } from '@/components/ui/help-guide';
 import { toast } from 'sonner';
@@ -66,6 +66,58 @@ interface ExportSummary {
   };
 }
 
+interface ExportRecord {
+  id: string;
+  export_type: string;
+  supplier_id: string | null;
+  customer_id: string | null;
+  supplier_name: string | null;
+  customer_name: string | null;
+  template_id: string | null;
+  template_name: string;
+  file_url: string;
+  file_name: string;
+  total_count: number;
+  exported_by: string;
+  metadata: {
+    batch_id?: string;
+    customer_ids?: string[];
+    details?: ExportDetail[];
+    shipped_order_count?: number;
+    pending_receipt_count?: number;
+    download_mode?: 'regenerate';
+    last_regenerated_at?: string;
+    last_regenerated_file_name?: string;
+    artifact?: {
+      provider?: 'local' | 's3';
+      relative_path?: string;
+      file_name?: string;
+    };
+    template_source?: 'explicit' | 'default' | 'first' | 'column_mapping';
+  } | null;
+  created_at: string;
+}
+
+interface ExportDetail {
+  supplierId?: string;
+  supplierName?: string;
+  customerId?: string;
+  customerName?: string;
+  orderCount: number;
+  shippedOrderCount?: number;
+  pendingReceiptCount?: number;
+  fileName: string;
+  fileUrl: string;
+  status: string;
+  templateName?: string;
+  templateSource?: 'explicit' | 'default' | 'first' | 'column_mapping';
+  artifact?: {
+    provider?: 'local' | 's3';
+    relative_path?: string;
+    file_name?: string;
+  };
+}
+
 export default function FeedbackExportPage() {
   const router = useRouter();
   const { user } = useAuth();
@@ -99,6 +151,28 @@ export default function FeedbackExportPage() {
   const [exportResults, setExportResults] = useState<ExportResult[]>([]);
   const [exportErrors, setExportErrors] = useState<ExportError[]>([]);
   const [downloadingZip, setDownloadingZip] = useState(false);
+
+  // 导出记录（历史导出记录表格）
+  const [records, setRecords] = useState<ExportRecord[]>([]);
+  const [recordTotal, setRecordTotal] = useState(0);
+  const [recordPage, setRecordPage] = useState(1);
+  const [recordPageSize] = useState(20);
+  const [recordSearchTerm, setRecordSearchTerm] = useState('');
+  const [recordStartDate, setRecordStartDate] = useState(() => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  });
+  const [recordEndDate, setRecordEndDate] = useState(() => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  });
+  const [recordCustomerName, setRecordCustomerName] = useState('');
+  const [recordLoading, setRecordLoading] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState<ExportRecord | null>(null);
+  const [recordDetails, setRecordDetails] = useState<ExportDetail[]>([]);
+  const [showDetailDialog, setShowDetailDialog] = useState(false);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [regeneratingRecordId, setRegeneratingRecordId] = useState<string | null>(null);
 
   // 加载待导出客户
   const loadPending = useCallback(async () => {
@@ -135,6 +209,31 @@ export default function FeedbackExportPage() {
     }
   }, [authHeaders, user]);
 
+  // 加载导出记录（历史导出记录表格）
+  const loadRecords = useCallback(async () => {
+    if (!user) return;
+    try {
+      setRecordLoading(true);
+      let url = `/api/export-records?page=${recordPage}&pageSize=${recordPageSize}&exportType=customer_feedback`;
+      if (recordStartDate) url += `&startDate=${recordStartDate}`;
+      if (recordEndDate) url += `&endDate=${recordEndDate}`;
+      if (recordCustomerName) url += `&customerName=${encodeURIComponent(recordCustomerName)}`;
+
+      const res = await fetch(url, { headers: authHeaders() });
+      const data = await res.json();
+      if (data.success) {
+        setRecords(data.data || []);
+        setRecordTotal(data.total || 0);
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '加载导出记录失败');
+    } finally {
+      setRecordLoading(false);
+    }
+  }, [authHeaders, user, recordPage, recordPageSize, recordStartDate, recordEndDate, recordCustomerName]);
+
   useEffect(() => {
     loadTemplates();
   }, [loadTemplates]);
@@ -143,8 +242,17 @@ export default function FeedbackExportPage() {
     if (!user) return;
     if (activeTab === 'export') {
       loadPending();
+    } else if (activeTab === 'history') {
+      loadRecords();
     }
-  }, [activeTab, loadPending, user]);
+  }, [activeTab, loadPending, loadRecords, user]);
+
+  // 导出记录加载依赖
+  useEffect(() => {
+    if (activeTab === 'history') {
+      loadRecords();
+    }
+  }, [recordPage, recordStartDate, recordEndDate, recordCustomerName, loadRecords]);
 
   // 全选
   const toggleSelectAll = (list: string[], setFn: (v: string[]) => void, filtered: { id: string }[]) => {
@@ -167,6 +275,120 @@ export default function FeedbackExportPage() {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+  };
+
+  // 导出记录辅助函数
+  const triggerBrowserDownload = (url: string, filename?: string) => {
+    const link = document.createElement('a');
+    link.href = url;
+    if (filename) {
+      link.download = filename;
+    }
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const isRecordBusy = (recordId?: string | null) => regeneratingRecordId === recordId;
+
+  const isPersistedRecord = (record: ExportRecord | null | undefined) =>
+    record?.file_url?.startsWith('/api/export-records/');
+
+  const isPersistedArtifact = (artifact?: { relative_path?: string; provider?: string }): boolean | undefined =>
+    artifact?.relative_path && artifact.provider ? true : undefined;
+
+  const getDownloadActionLabel = (provider?: string, isPersisted?: boolean) => {
+    if (isPersisted) return '下载';
+    return '重新生成';
+  };
+
+  const getStorageProviderLabel = (provider?: string) => {
+    if (provider === 'local') return '本地';
+    if (provider === 's3') return 'S3';
+    return '';
+  };
+
+  const getDownloadStrategy = (provider?: string, isPersisted?: boolean) => {
+    if (isPersisted) return '持久化';
+    return '实时';
+  };
+
+  const getDownloadHint = (provider?: string, isPersisted?: boolean) => {
+    if (isPersisted) return provider === 'local' ? '文件存储在本地' : '文件存储在 S3';
+    return '实时生成，不占用存储空间';
+  };
+
+  const templateSourceLabel = (source?: string) => {
+    switch (source) {
+      case 'explicit': return '手动选择';
+      case 'column_mapping': return '客户导入映射';
+      case 'mixed': return '混合来源';
+      case 'first': return '兜底模板';
+      case 'default':
+      default: return '默认模板';
+    }
+  };
+
+  // 查看导出详情
+  const handleViewDetail = async (record: ExportRecord) => {
+    setSelectedRecord(record);
+    setLoadingDetails(true);
+    setShowDetailDialog(true);
+
+    try {
+      const response = await fetch(`/api/export-records/${record.id}`, {
+        headers: authHeaders(),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setRecordDetails(data.data.details || []);
+      }
+    } catch (error) {
+      toast.error('加载详情失败');
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
+
+  // 重新生成 ZIP
+  const handleRegenerateRecordZip = async (record: ExportRecord | null) => {
+    if (!record) {
+      toast.error('未找到导出记录');
+      return;
+    }
+
+    if (record.file_url?.startsWith('/api/export-records/')) {
+      triggerBrowserDownload(record.file_url, record.file_name || undefined);
+      toast.success('已开始下载已持久化的ZIP文件');
+      return;
+    }
+
+    try {
+      setRegeneratingRecordId(record.id);
+      const response = await fetch(`/api/export-records/${record.id}`, {
+        method: 'POST',
+        headers: authHeaders(),
+      });
+      const data = await response.json();
+
+      if (!data.success || !data.data?.zipBase64 || !data.data?.zipFileName) {
+        throw new Error(data.error || '重新生成ZIP失败');
+      }
+
+      const refreshedRecord = data.data;
+
+      if (refreshedRecord.file_url?.startsWith('/api/export-records/')) {
+        triggerBrowserDownload(refreshedRecord.file_url, refreshedRecord.file_name || undefined);
+      } else {
+        const linkSource = `data:application/zip;base64,${data.data.zipBase64}`;
+        triggerBrowserDownload(linkSource, data.data.zipFileName);
+      }
+      toast.success('已重新生成并下载ZIP');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '重新生成ZIP失败');
+    } finally {
+      setRegeneratingRecordId(null);
+    }
   };
 
   // 执行导出
@@ -485,20 +707,171 @@ export default function FeedbackExportPage() {
           )}
         </TabsContent>
 
-        {/* 历史记录 Tab */}
+        {/* 历史记录 Tab - 历史导出记录表格 */}
         <TabsContent value="history" className="space-y-4">
+          {/* 筛选栏 */}
           <Card>
             <CardContent className="pt-6">
-              <div className="text-center py-12">
-                <History className="h-12 w-12 mx-auto mb-4 opacity-50 text-muted-foreground" />
-                <p className="text-muted-foreground mb-4">查看客户反馈导出历史记录</p>
-                <Button variant="outline" onClick={() => router.push('/export-records?type=customer_feedback')}>
-                  <FileSpreadsheet className="h-4 w-4 mr-2" />
-                  前往导出记录
-                </Button>
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input
+                    type="date"
+                    placeholder="开始日期"
+                    value={recordStartDate}
+                    onChange={(e) => setRecordStartDate(e.target.value)}
+                    className="w-[150px]"
+                  />
+                  <span className="text-muted-foreground">至</span>
+                  <Input
+                    type="date"
+                    placeholder="结束日期"
+                    value={recordEndDate}
+                    onChange={(e) => setRecordEndDate(e.target.value)}
+                    className="w-[150px]"
+                  />
+                </div>
+                <Input
+                  placeholder="搜索客户..."
+                  value={recordCustomerName}
+                  onChange={(e) => setRecordCustomerName(e.target.value)}
+                  className="w-[200px]"
+                />
+                <div className="relative flex-1 lg:max-w-sm">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="搜索文件名..."
+                    value={recordSearchTerm}
+                    onChange={(e) => setRecordSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <div className="text-sm text-muted-foreground lg:ml-auto">
+                  共 {recordTotal} 条记录
+                </div>
               </div>
             </CardContent>
           </Card>
+
+          {/* 导出记录列表 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">导出记录列表</CardTitle>
+              <div className="flex justify-end">
+                <Button variant="outline" size="sm" onClick={() => loadRecords()} disabled={recordLoading}>
+                  <RefreshCw className={`h-4 w-4 mr-2 ${recordLoading ? 'animate-spin' : ''}`} />
+                  刷新
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {recordLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : records.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <FileDown className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>暂无导出记录</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>导出时间</TableHead>
+                        <TableHead>客户</TableHead>
+                        <TableHead>文件名</TableHead>
+                        <TableHead>模板</TableHead>
+                        <TableHead className="text-right">导出数量</TableHead>
+                        <TableHead>导出人</TableHead>
+                        <TableHead className="text-center">操作</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {records.filter(r => !recordSearchTerm || r.file_name.includes(recordSearchTerm) || r.template_name.includes(recordSearchTerm)).map((record) => (
+                        <TableRow key={record.id}>
+                          <TableCell>
+                            {new Date(record.created_at).toLocaleString('zh-CN')}
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {record.customer_name || '-'}
+                          </TableCell>
+                          <TableCell className="font-medium">{record.file_name}</TableCell>
+                          <TableCell>
+                            <div className="space-y-1">
+                              <div>{record.template_name || '-'}</div>
+                              <div className="flex flex-wrap gap-1">
+                                {record.metadata?.template_source && (
+                                  <Badge variant="outline" className="text-[10px]">
+                                    {templateSourceLabel(record.metadata.template_source)}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <span className="font-semibold">{record.total_count}</span>
+                            <span className="text-muted-foreground"> 单</span>
+                          </TableCell>
+                          <TableCell>{record.exported_by || '系统'}</TableCell>
+                          <TableCell className="text-center">
+                            <div className="flex flex-col items-center gap-1 sm:flex-row sm:justify-center">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleViewDetail(record)}
+                              >
+                                <FileSpreadsheet className="h-4 w-4 mr-1" />
+                                详情
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={isRecordBusy(record.id)}
+                                onClick={() => handleRegenerateRecordZip(record)}
+                              >
+                                {isRecordBusy(record.id) ? (
+                                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                ) : (
+                                  <Download className="h-4 w-4 mr-1" />
+                                )}
+                                {getDownloadActionLabel(record.metadata?.artifact?.provider, isPersistedArtifact(record.metadata?.artifact))}
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* 分页 */}
+          {recordTotal > recordPageSize && (
+            <div className="flex flex-col items-stretch justify-center gap-2 sm:flex-row sm:items-center">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={recordPage === 1}
+                onClick={() => setRecordPage(p => p - 1)}
+              >
+                上一页
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                第 {recordPage} / {Math.ceil(recordTotal / recordPageSize)} 页
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={recordPage >= Math.ceil(recordTotal / recordPageSize)}
+                onClick={() => setRecordPage(p => p + 1)}
+              >
+                下一页
+              </Button>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 
@@ -599,6 +972,53 @@ export default function FeedbackExportPage() {
               {downloadingZip ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
               下载 ZIP
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 导出记录详情对话框 */}
+      <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
+        <DialogContent className="max-h-[85vh] w-[calc(100vw-1.5rem)] overflow-auto sm:max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>导出详情</DialogTitle>
+            <DialogDescription>
+              {selectedRecord?.file_name}
+            </DialogDescription>
+          </DialogHeader>
+
+          {loadingDetails ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          ) : recordDetails.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <p>暂无详情</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {recordDetails.map((detail, index) => (
+                <div key={index} className="rounded-lg border p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
+                      <div>
+                        <p className="font-medium">{detail.customerName || detail.supplierName || '未知'}</p>
+                        <p className="text-sm text-muted-foreground">
+                          共 {detail.orderCount} 个订单
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="shrink-0 max-w-[200px] truncate">
+                      {detail.fileName}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+            <Button variant="outline" onClick={() => setShowDetailDialog(false)}>关闭</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
