@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { getSupabaseClient, getPgPool } from '@/storage/database/supabase-client';
+import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { Pool } from 'pg';
 
 export type ServerAuthUser = {
   id?: string;
@@ -102,13 +103,17 @@ export async function verifyUserSignature(request: NextRequest): Promise<{ valid
       const permIds = permissionLinks.map((p: Record<string, unknown>) => p.permission_id as string);
 
       // 直接用 Pool 查询避免 LocalSupabaseClient 的跨表查询限制
-      const pool = getPgPool();
-      const idsParam = permIds.map((_, i) => `$${i + 1}`).join(', ');
-      const result = await pool.query(
-        `SELECT code FROM permissions WHERE id IN (${idsParam})`,
-        permIds
-      );
-      realPermissions = result.rows.map(r => r.code as string);
+      const dbUrl = process.env.NEXT_PUBLIC_SUPABASE_DB_URL || process.env.DATABASE_URL;
+      if (dbUrl) {
+        const pool = new Pool({ connectionString: dbUrl });
+        const idsParam = permIds.map((_, i) => `$${i + 1}`).join(', ');
+        const result = await pool.query(
+          `SELECT code FROM permissions WHERE id IN (${idsParam})`,
+          permIds
+        );
+        realPermissions = result.rows.map(r => r.code as string);
+        await pool.end();
+      }
     }
   }
 
