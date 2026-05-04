@@ -194,6 +194,8 @@ export async function GET(request: NextRequest) {
   const supplierId = searchParams.get('supplierId');
   const startDate = searchParams.get('startDate');
   const endDate = searchParams.get('endDate');
+  const status = searchParams.get('status');
+  const keyword = searchParams.get('keyword');
   const page = parseInt(searchParams.get('page') || '1');
   const pageSize = parseInt(searchParams.get('pageSize') || '20');
 
@@ -250,6 +252,111 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // 如果有状态筛选，需要先查询所有匹配的 record_ids（分页会干扰状态筛选）
+    const needsStatusFilter = status && status !== 'all';
+
+    if (needsStatusFilter) {
+      // 先不带分页查询所有 return_receipt_records
+      let allQuery = client
+        .from('return_receipt_records')
+        .select('*', { count: 'exact' })
+        .order('imported_at', { ascending: false });
+
+      if (supplierId) {
+        allQuery = allQuery.eq('supplier_id', supplierId);
+      }
+      if (startDate) {
+        allQuery = allQuery.gte('imported_at', startDate);
+      }
+      if (endDate) {
+        allQuery = allQuery.lte('imported_at', endDate + ' 23:59:59');
+      }
+      if (keyword) {
+        allQuery = allQuery.ilike('file_name', `%${keyword}%`);
+      }
+
+      const { data: allData, error: allError, count: allCount } = await allQuery;
+      if (allError) throw new Error(`查询回单历史失败: ${allError.message}`);
+
+      const allRecordIds = (allData || []).map((record) => record.id).filter(Boolean);
+
+      // 查询所有 record 的统计信息
+      const reviewStatsMap = new Map<string, {
+        reviewCount: number;
+        conflictCount: number;
+        reviewStatus: 'clean' | 'needs_review' | 'has_conflict';
+      }>();
+
+      if (allRecordIds.length > 0) {
+        const { data: receiptRows, error: receiptStatsError } = await client
+          .from('return_receipts')
+          .select('record_id, match_status')
+          .in('record_id', allRecordIds);
+
+        if (receiptStatsError) throw new Error(`查询回单复核统计失败: ${receiptStatsError.message}`);
+
+        for (const row of receiptRows || []) {
+          const recordId = row.record_id as string | undefined;
+          if (!recordId) continue;
+
+          const current = reviewStatsMap.get(recordId) || {
+            reviewCount: 0,
+            conflictCount: 0,
+            reviewStatus: 'clean' as const,
+          };
+
+          const reviewStatus = getReviewStatus(row.match_status);
+          if (reviewStatus === 'needs_review') {
+            current.reviewCount += 1;
+            if (current.reviewStatus === 'clean') {
+              current.reviewStatus = 'needs_review';
+            }
+          }
+          if (reviewStatus === 'conflict') {
+            current.reviewCount += 1;
+            current.conflictCount += 1;
+            current.reviewStatus = 'has_conflict';
+          }
+
+          reviewStatsMap.set(recordId, current);
+        }
+      }
+
+      // 根据 status 筛选
+      const filteredRecords = (allData || []).filter((record) => {
+        const stats = reviewStatsMap.get(record.id);
+        if (status === 'clean') return stats?.reviewStatus === 'clean' || !stats;
+        if (status === 'needs_review') return stats?.reviewStatus === 'needs_review';
+        if (status === 'has_conflict') return stats?.reviewStatus === 'has_conflict';
+        return true;
+      });
+
+      // 对筛选后的结果进行分页
+      const filteredTotal = filteredRecords.length;
+      const totalPages = Math.ceil(filteredTotal / pageSize);
+      const paginatedRecords = filteredRecords.slice((page - 1) * pageSize, page * pageSize);
+
+      // 补充统计信息
+      const recordsWithStats = paginatedRecords.map((record) =>
+        mapRecord({
+          ...record,
+          review_count: reviewStatsMap.get(record.id)?.reviewCount || 0,
+          conflict_count: reviewStatsMap.get(record.id)?.conflictCount || 0,
+          review_status: reviewStatsMap.get(record.id)?.reviewStatus || 'clean',
+        })
+      );
+
+      return NextResponse.json({
+        success: true,
+        data: recordsWithStats,
+        total: filteredTotal,
+        page,
+        pageSize,
+        totalPages,
+      });
+    }
+
+    // 无状态筛选时的原有逻辑（带分页）
     let query = client
       .from('return_receipt_records')
       .select('*', { count: 'exact' })
@@ -258,33 +365,29 @@ export async function GET(request: NextRequest) {
     if (supplierId) {
       query = query.eq('supplier_id', supplierId);
     }
-
     if (startDate) {
       query = query.gte('imported_at', startDate);
     }
-
     if (endDate) {
       query = query.lte('imported_at', endDate + ' 23:59:59');
     }
+    if (keyword) {
+      query = query.ilike('file_name', `%${keyword}%`);
+    }
 
-    // 分页
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
     query = query.range(from, to);
 
     const { data, error, count } = await query;
-
     if (error) throw new Error(`查询回单历史失败: ${error.message}`);
 
     const recordIds = (data || []).map((record) => record.id).filter(Boolean);
-    const reviewStatsMap = new Map<
-      string,
-      {
-        reviewCount: number;
-        conflictCount: number;
-        reviewStatus: 'clean' | 'needs_review' | 'has_conflict';
-      }
-    >();
+    const reviewStatsMap = new Map<string, {
+      reviewCount: number;
+      conflictCount: number;
+      reviewStatus: 'clean' | 'needs_review' | 'has_conflict';
+    }>();
 
     if (recordIds.length > 0) {
       const { data: receiptRows, error: receiptStatsError } = await client

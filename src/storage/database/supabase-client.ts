@@ -44,8 +44,10 @@ function normalizeValue(value: unknown): unknown {
   if (value === undefined) {
     return null;
   }
+  // PostgreSQL array columns (TEXT[], UUID[], etc.) need native arrays, not JSON strings
+  // The pg driver handles JavaScript arrays correctly for PostgreSQL array types
   if (Array.isArray(value)) {
-    return JSON.stringify(value);
+    return value.map(normalizeValue);
   }
   if (value && typeof value === 'object' && !(value instanceof Date) && !Buffer.isBuffer(value)) {
     return JSON.stringify(value);

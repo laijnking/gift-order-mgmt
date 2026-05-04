@@ -30,8 +30,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
+import {
   Upload, Loader2, CheckCircle2,
-  AlertTriangle, FileText, RefreshCw, Package, Link2
+  AlertTriangle, FileText, RefreshCw, Package, Link2, Search, X
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { HelpGuide, HelpSection, HelpSteps, HelpNote, HelpLinks } from '@/components/ui/help-guide';
@@ -153,6 +159,9 @@ export default function ReturnReceiptPage() {
   const { hasPermission } = usePermission();
   const canEditOrders = hasPermission('orders:edit');
 
+  // 页签状态
+  const [activeTab, setActiveTab] = useState<'pending' | 'history'>('pending');
+
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [records, setRecords] = useState<ReceiptRecord[]>([]);
@@ -168,11 +177,20 @@ export default function ReturnReceiptPage() {
   const [receiptFilter, setReceiptFilter] = useState<'all' | 'needs_review' | 'conflict' | 'matched'>('all');
   const [manualMatching, setManualMatching] = useState(false);
 
+  // 历史记录筛选状态
+  const [historyStartDate, setHistoryStartDate] = useState('');
+  const [historyEndDate, setHistoryEndDate] = useState('');
+  const [historyStatus, setHistoryStatus] = useState<string>('all');
+  const [historySupplierId, setHistorySupplierId] = useState<string>('');
+
   // 分页相关状态
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(20);
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+
+  // 发货方列表
+  const [suppliers, setSuppliers] = useState<Array<{ id: string; name: string }>>([]);
 
   const actorName = user?.realName || user?.username || 'system';
   const authHeaders = useCallback(() => buildUserInfoHeaders(user), [user]);
@@ -184,12 +202,38 @@ export default function ReturnReceiptPage() {
     [user]
   );
 
+  const loadSuppliers = useCallback(async () => {
+    try {
+      const res = await fetch('/api/shippers?pageSize=100', { headers: authHeaders() });
+      const data = await res.json();
+      if (data.success) {
+        setSuppliers(data.data || []);
+      }
+    } catch { /* silent */ }
+  }, [authHeaders]);
+
+  const clearHistoryFilters = useCallback(() => {
+    setHistoryStartDate('');
+    setHistoryEndDate('');
+    setHistoryStatus('all');
+    setHistorySupplierId('');
+    setSearchTerm('');
+    setCurrentPage(1);
+  }, []);
+
+  const hasActiveHistoryFilters = Boolean(historyStartDate || historyEndDate || historyStatus !== 'all' || historySupplierId || searchTerm);
+
   const loadRecords = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
       params.set('page', String(currentPage));
       params.set('pageSize', String(pageSize));
+      if (historyStartDate) params.set('startDate', historyStartDate);
+      if (historyEndDate) params.set('endDate', historyEndDate);
+      if (historyStatus && historyStatus !== 'all') params.set('status', historyStatus);
+      if (historySupplierId) params.set('supplierId', historySupplierId);
+      if (searchTerm) params.set('keyword', searchTerm);
       const response = await fetch(`/api/return-receipts/history?${params.toString()}`, { headers: authHeaders() });
       const data = await response.json();
       if (data.success) {
@@ -202,7 +246,7 @@ export default function ReturnReceiptPage() {
     } finally {
       setLoading(false);
     }
-  }, [authHeaders, currentPage, pageSize]);
+  }, [authHeaders, currentPage, pageSize, historyStartDate, historyEndDate, historyStatus, historySupplierId, searchTerm]);
 
   // 文件上传处理（不再需要选择发货方）
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
@@ -309,6 +353,16 @@ export default function ReturnReceiptPage() {
   useEffect(() => {
     loadRecords();
   }, [loadRecords]);
+
+  // 加载发货方列表
+  useEffect(() => {
+    loadSuppliers();
+  }, [loadSuppliers]);
+
+  // 筛选条件变化时重置页码
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [historyStartDate, historyEndDate, historyStatus, historySupplierId, searchTerm]);
 
   // 自动匹配回单
   const handleAutoMatch = async () => {
@@ -590,365 +644,444 @@ export default function ReturnReceiptPage() {
         </div>
       </div>
 
-      {/* 搜索栏 */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Input
-              placeholder="搜索文件名..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full sm:max-w-xs"
-            />
-          </div>
-          <div className="flex items-center justify-between px-2 py-3 border-t">
-            <div className="text-sm text-muted-foreground">
-              共 {totalCount} 条
-            </div>
-            <div className="flex items-center gap-1">
-              <Button variant="outline" size="sm" onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>首页</Button>
-              <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => p - 1)} disabled={currentPage === 1}>上一页</Button>
-              <span className="px-2 text-sm">{currentPage} / {totalPages}</span>
-              <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage === totalPages || totalPages === 0}>下一页</Button>
-              <Button variant="outline" size="sm" onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages || totalPages === 0}>末页</Button>
-            </div>
-            <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}>
-              <SelectTrigger className="w-[100px] h-8 text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="20">20条/页</SelectItem>
-                <SelectItem value="50">50条/页</SelectItem>
-                <SelectItem value="100">100条/页</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Tabs 切换 */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
+        <TabsList className="mb-4">
+          <TabsTrigger value="pending">待回单</TabsTrigger>
+          <TabsTrigger value="history">回单历史</TabsTrigger>
+        </TabsList>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* 左侧：导入区域和记录列表 */}
-        <div className="lg:col-span-1 space-y-6">
-          {/* 导入区域 */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">导入回单</CardTitle>
-              <CardDescription>上传包含快递信息的Excel文件</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {canEditOrders ? (
-                <div
-                  {...getRootProps()}
-                  className={`
-                    relative border-2 border-dashed rounded-lg p-8 text-center cursor-pointer
-                    transition-colors
-                    ${isDragActive ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50'}
-                  `}
-                >
-                  <input
-                    {...getInputProps()}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  />
-                  <Upload className="h-10 w-10 mx-auto mb-4 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">
-                    {isDragActive ? '放下文件开始导入' : '拖放Excel文件到这里，或点击选择'}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    支持 .xlsx, .xls 格式
-                  </p>
-                </div>
-              ) : (
-                <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                  当前账号可以查看回单记录，但没有导入和处理回单的权限。
-                </div>
-              )}
+        {/* 待回单 Tab */}
+        <TabsContent value="pending" className="space-y-6">
+          <div className="grid grid-cols-1 gap-6">
+            {/* 导入区域 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">导入回单</CardTitle>
+                <CardDescription>上传包含快递信息的Excel文件</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {canEditOrders ? (
+                  <div
+                    {...getRootProps()}
+                    className={`
+                      relative border-2 border-dashed rounded-lg p-8 text-center cursor-pointer
+                      transition-colors
+                      ${isDragActive ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50'}
+                    `}
+                  >
+                    <input
+                      {...getInputProps()}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    <Upload className="h-10 w-10 mx-auto mb-4 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      {isDragActive ? '放下文件开始导入' : '拖放Excel文件到这里，或点击选择'}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      支持 .xlsx, .xls 格式
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                    当前账号可以查看回单记录，但没有导入和处理回单的权限。
+                  </div>
+                )}
 
-              {/* Excel格式说明 */}
-              <div className="mt-4 p-3 bg-muted rounded-lg">
-                <p className="text-xs font-medium mb-2">Excel应包含以下列：</p>
-                <ul className="text-xs text-muted-foreground space-y-1">
-                  <li>客户订单号 / 订单号（必填）</li>
-                  <li>快递公司</li>
-                  <li>快递单号</li>
-                  <li>发货日期（可选）</li>
-                  <li>运费 / 运费成本 / 快递费（可选）</li>
-                </ul>
-              </div>
-            </CardContent>
-          </Card>
+                {/* Excel格式说明 */}
+                <div className="mt-4 p-3 bg-muted rounded-lg">
+                  <p className="text-xs font-medium mb-2">Excel应包含以下列：</p>
+                  <ul className="text-xs text-muted-foreground space-y-1">
+                    <li>客户订单号 / 订单号（必填）</li>
+                    <li>快递公司</li>
+                    <li>快递单号</li>
+                    <li>发货日期（可选）</li>
+                    <li>运费 / 运费成本 / 快递费（可选）</li>
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
 
-          {/* 导入记录列表 */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">导入记录</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                </div>
-              ) : filteredRecords.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <FileText className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">暂无导入记录</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {filteredRecords.map((record) => (
-                    <div
-                      key={record.id}
-                      className={`
-                        p-3 border rounded-lg cursor-pointer transition-colors
-                        ${currentRecord?.id === record.id ? 'border-primary bg-primary/5' : 'hover:border-primary/50'}
-                      `}
-                      onClick={() => {
-                        setCurrentRecord(record);
-                        loadRecordDetail(record.id);
-                      }}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium truncate">{record.fileName}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {record.totalCount} 条
+            {/* 回单明细 */}
+            <Card>
+              <CardHeader>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <CardTitle className="text-lg">回单明细</CardTitle>
+                      {currentRecord && (
+                        <CardDescription>
+                          {currentRecord.fileName} - 共 {receipts.length} 条
+                        </CardDescription>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      {currentRecord && (
+                        <select
+                          value={receiptFilter}
+                          onChange={(e) => setReceiptFilter(e.target.value as typeof receiptFilter)}
+                          className="h-9 rounded-md border bg-background px-3 text-sm"
+                        >
+                          {reviewFilterOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      {selectedReceipts.length > 0 && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button onClick={handleBatchConfirm} disabled={confirming || !canEditOrders} className="w-full sm:w-auto">
+                              <CheckCircle2 className="h-4 w-4 mr-2" />
+                              批量确认 ({selectedReceipts.length})
+                            </Button>
+                          </TooltipTrigger>
+                          {!canEditOrders ? (
+                            <TooltipContent>
+                              <p>您没有处理回单的权限</p>
+                            </TooltipContent>
+                          ) : null}
+                        </Tooltip>
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {!currentRecord ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>导入回单后即可查看回单明细</p>
+                    </div>
+                  ) : receipts.length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>暂无回单数据</p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* 统计信息 */}
+                      <div className="mb-3 flex flex-wrap gap-2">
+                        <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                          人工复核池：待复核 {reviewReceipts.length}
+                        </Badge>
+                        <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                          冲突 {conflictReceipts.length}
+                        </Badge>
+                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                          已匹配 {matchedReceipts.length}
                         </Badge>
                       </div>
-                      <div className="text-xs text-muted-foreground space-y-1">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle2 className="h-3 w-3 text-green-500" />
-                          <span>已匹配: {record.matchedCount}</span>
+                      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                        <div className="p-4 bg-muted rounded-lg">
+                          <div className="text-2xl font-bold">{receipts.length}</div>
+                          <div className="text-sm text-muted-foreground">总数量</div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <AlertTriangle className="h-3 w-3 text-yellow-500" />
-                          <span>待匹配: {record.unmatchedCount}</span>
+                        <div className="p-4 bg-green-50 rounded-lg">
+                          <div className="text-2xl font-bold text-green-600">
+                            {matchedReceipts.length}
+                          </div>
+                          <div className="text-sm text-green-600">已匹配</div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <AlertTriangle className={`h-3 w-3 ${(record.conflictCount || 0) > 0 ? 'text-red-500' : 'text-orange-500'}`} />
-                          <span>
-                            待复核: {record.reviewCount || 0}
-                            {(record.conflictCount || 0) > 0 ? `（冲突 ${record.conflictCount}）` : ''}
-                          </span>
+                        <div className="p-4 bg-orange-50 rounded-lg">
+                          <div className="text-2xl font-bold text-orange-600">
+                            {reviewReceipts.length}
+                          </div>
+                          <div className="text-sm text-orange-600">待复核</div>
+                        </div>
+                        <div className="p-4 bg-red-50 rounded-lg">
+                          <div className="text-2xl font-bold text-red-600">
+                            {conflictReceipts.length}
+                          </div>
+                          <div className="text-sm text-red-600">冲突</div>
                         </div>
                       </div>
-                      <div className="text-xs text-muted-foreground mt-2">
-                        {new Date(record.importedAt).toLocaleString()}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
 
-        {/* 右侧：回单明细 */}
-        <div className="lg:col-span-2">
+                      <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[50px]">
+                              {filteredReceipts.some(r => r.reviewStatus === 'matched') && (
+                                <input
+                                  type="checkbox"
+                                  checked={
+                                    filteredReceipts.filter(r => r.reviewStatus === 'matched').length > 0 &&
+                                    selectedReceipts.length === filteredReceipts.filter(r => r.reviewStatus === 'matched').length
+                                  }
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedReceipts(filteredReceipts.filter(r => r.reviewStatus === 'matched').map(r => r.id));
+                                    } else {
+                                      setSelectedReceipts([]);
+                                    }
+                                  }}
+                                />
+                              )}
+                            </TableHead>
+                            <TableHead>客户订单号</TableHead>
+                            <TableHead>快递公司</TableHead>
+                            <TableHead>快递单号</TableHead>
+                            <TableHead>运费</TableHead>
+                            <TableHead>发货日期</TableHead>
+                            <TableHead>匹配状态</TableHead>
+                            <TableHead>置信度</TableHead>
+                            <TableHead>关联订单</TableHead>
+                            <TableHead className="text-center">操作</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredReceipts.map((receipt) => (
+                            <TableRow key={receipt.id}>
+                              <TableCell>
+                                {receipt.reviewStatus === 'matched' && (
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedReceipts.includes(receipt.id)}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setSelectedReceipts([...selectedReceipts, receipt.id]);
+                                      } else {
+                                        setSelectedReceipts(selectedReceipts.filter(id => id !== receipt.id));
+                                      }
+                                    }}
+                                  />
+                                )}
+                              </TableCell>
+                              <TableCell className="font-medium">{receipt.customerOrderNo}</TableCell>
+                              <TableCell>{receipt.expressCompany || '-'}</TableCell>
+                              <TableCell className="font-mono">{receipt.trackingNo || '-'}</TableCell>
+                              <TableCell>{receipt.freightCost !== undefined ? `¥${receipt.freightCost}` : '-'}</TableCell>
+                              <TableCell>{receipt.shipDate || '-'}</TableCell>
+                              <TableCell>
+                                {receipt.reviewStatus === 'conflict' ? (
+                                  <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200">
+                                    冲突
+                                  </Badge>
+                                ) : receipt.reviewStatus === 'needs_review' ? (
+                                  <Badge variant="outline" className="bg-yellow-50 text-yellow-600 border-yellow-200">
+                                    待复核
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200">
+                                    已匹配
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <span className={`text-xs font-medium ${getConfidenceColor(receipt.confidence)}`}>
+                                  {receipt.confidence !== undefined ? `${receipt.confidence}%` : '-'}
+                                </span>
+                                {receipt.matchRule && (
+                                  <div className="text-xs text-muted-foreground">
+                                    {MATCH_RULE_LABELS[receipt.matchRule] || receipt.matchRule}
+                                  </div>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {receipt.orderNo ? (
+                                  <span className="font-mono text-sm">{receipt.orderNo}</span>
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleManualMatch(receipt)}
+                                  disabled={!canEditOrders}
+                                >
+                                  <Link2 className="h-4 w-4 mr-1" />
+                                  {receipt.reviewStatus === 'matched'
+                                    ? '重匹配'
+                                    : receipt.reviewStatus === 'conflict'
+                                      ? '处理冲突'
+                                      : '进入复核'}
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+          </div>
+        </TabsContent>
+
+        {/* 回单历史 Tab */}
+        <TabsContent value="history" className="space-y-4">
+          {/* 历史记录筛选 */}
           <Card>
-            <CardHeader>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <CardTitle className="text-lg">回单明细</CardTitle>
-                  {currentRecord && (
-                    <CardDescription>
-                      {currentRecord.fileName} - 共 {receipts.length} 条
-                    </CardDescription>
-                  )}
+            <CardContent className="pt-6">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+                {/* 时间范围 */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium">开始日期</label>
+                  <Input
+                    type="date"
+                    value={historyStartDate}
+                    onChange={(e) => setHistoryStartDate(e.target.value)}
+                    className="w-full lg:w-[180px]"
+                  />
                 </div>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  {currentRecord && (
-                    <select
-                      value={receiptFilter}
-                      onChange={(e) => setReceiptFilter(e.target.value as typeof receiptFilter)}
-                      className="h-9 rounded-md border bg-background px-3 text-sm"
-                    >
-                      {reviewFilterOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium">结束日期</label>
+                  <Input
+                    type="date"
+                    value={historyEndDate}
+                    onChange={(e) => setHistoryEndDate(e.target.value)}
+                    className="w-full lg:w-[180px]"
+                  />
+                </div>
+                {/* 状态筛选 */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium">匹配状态</label>
+                  <Select value={historyStatus} onValueChange={setHistoryStatus}>
+                    <SelectTrigger className="w-full lg:w-[140px]">
+                      <SelectValue placeholder="选择状态" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">全部</SelectItem>
+                      <SelectItem value="clean">已匹配</SelectItem>
+                      <SelectItem value="needs_review">待复核</SelectItem>
+                      <SelectItem value="has_conflict">有冲突</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {/* 发货方筛选 */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium">发货方</label>
+                  <Select value={historySupplierId || '__all__'} onValueChange={(v) => setHistorySupplierId(v === '__all__' ? '' : v)}>
+                    <SelectTrigger className="w-full lg:w-[160px]">
+                      <SelectValue placeholder="选择发货方" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">全部</SelectItem>
+                      {suppliers.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                       ))}
-                    </select>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {/* 关键词搜索 */}
+                <div className="flex flex-col gap-1.5 flex-1">
+                  <label className="text-sm font-medium">文件名搜索</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="搜索文件名..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                </div>
+                {/* 操作按钮 */}
+                <div className="flex gap-2">
+                  {hasActiveHistoryFilters && (
+                    <Button variant="outline" onClick={clearHistoryFilters}>
+                      <X className="h-4 w-4 mr-2" />
+                      重置
+                    </Button>
                   )}
-                  {selectedReceipts.length > 0 && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button onClick={handleBatchConfirm} disabled={confirming || !canEditOrders} className="w-full sm:w-auto">
-                          <CheckCircle2 className="h-4 w-4 mr-2" />
-                          批量确认 ({selectedReceipts.length})
-                        </Button>
-                      </TooltipTrigger>
-                      {!canEditOrders ? (
-                        <TooltipContent>
-                          <p>您没有处理回单的权限</p>
-                        </TooltipContent>
-                      ) : null}
-                    </Tooltip>
-                  )}
+                  <Button variant="outline" onClick={loadRecords} disabled={loading}>
+                    <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                    刷新
+                  </Button>
                 </div>
               </div>
-            </CardHeader>
-            <CardContent>
-              {!currentRecord ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>选择左侧记录查看回单明细</p>
+            </CardContent>
+          </Card>
+
+          {/* 历史记录表格 */}
+          <Card>
+            <CardContent className="pt-6">
+              {loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
-              ) : receipts.length === 0 ? (
+              ) : records.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>暂无回单数据</p>
+                  <p>暂无回单历史记录</p>
                 </div>
               ) : (
                 <>
-                  {/* 统计信息 */}
-                  <div className="mb-3 flex flex-wrap gap-2">
-                    <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
-                      人工复核池：待复核 {reviewReceipts.length}
-                    </Badge>
-                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                      冲突 {conflictReceipts.length}
-                    </Badge>
-                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                      已匹配 {matchedReceipts.length}
-                    </Badge>
-                  </div>
-                  <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <div className="p-4 bg-muted rounded-lg">
-                      <div className="text-2xl font-bold">{receipts.length}</div>
-                      <div className="text-sm text-muted-foreground">总数量</div>
-                    </div>
-                    <div className="p-4 bg-green-50 rounded-lg">
-                      <div className="text-2xl font-bold text-green-600">
-                        {matchedReceipts.length}
-                      </div>
-                      <div className="text-sm text-green-600">已匹配</div>
-                    </div>
-                    <div className="p-4 bg-orange-50 rounded-lg">
-                      <div className="text-2xl font-bold text-orange-600">
-                        {reviewReceipts.length}
-                      </div>
-                      <div className="text-sm text-orange-600">待复核</div>
-                    </div>
-                    <div className="p-4 bg-red-50 rounded-lg">
-                      <div className="text-2xl font-bold text-red-600">
-                        {conflictReceipts.length}
-                      </div>
-                      <div className="text-sm text-red-600">冲突</div>
-                    </div>
-                  </div>
-
                   <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[50px]">
-                          {filteredReceipts.some(r => r.reviewStatus === 'matched') && (
-                            <input
-                              type="checkbox"
-                              checked={
-                                filteredReceipts.filter(r => r.reviewStatus === 'matched').length > 0 &&
-                                selectedReceipts.length === filteredReceipts.filter(r => r.reviewStatus === 'matched').length
-                              }
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedReceipts(filteredReceipts.filter(r => r.reviewStatus === 'matched').map(r => r.id));
-                                } else {
-                                  setSelectedReceipts([]);
-                                }
-                              }}
-                            />
-                          )}
-                        </TableHead>
-                        <TableHead>客户订单号</TableHead>
-                        <TableHead>快递公司</TableHead>
-                        <TableHead>快递单号</TableHead>
-                        <TableHead>运费</TableHead>
-                        <TableHead>发货日期</TableHead>
-                        <TableHead>匹配状态</TableHead>
-                        <TableHead>置信度</TableHead>
-                        <TableHead>关联订单</TableHead>
-                        <TableHead className="text-center">操作</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredReceipts.map((receipt) => (
-                        <TableRow key={receipt.id}>
-                          <TableCell>
-                            {receipt.reviewStatus === 'matched' && (
-                              <input
-                                type="checkbox"
-                                checked={selectedReceipts.includes(receipt.id)}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setSelectedReceipts([...selectedReceipts, receipt.id]);
-                                  } else {
-                                    setSelectedReceipts(selectedReceipts.filter(id => id !== receipt.id));
-                                  }
-                                }}
-                              />
-                            )}
-                          </TableCell>
-                          <TableCell className="font-medium">{receipt.customerOrderNo}</TableCell>
-                          <TableCell>{receipt.expressCompany || '-'}</TableCell>
-                          <TableCell className="font-mono">{receipt.trackingNo || '-'}</TableCell>
-                          <TableCell>{receipt.freightCost !== undefined ? `¥${receipt.freightCost}` : '-'}</TableCell>
-                          <TableCell>{receipt.shipDate || '-'}</TableCell>
-                          <TableCell>
-                            {receipt.reviewStatus === 'conflict' ? (
-                              <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200">
-                                冲突
-                              </Badge>
-                            ) : receipt.reviewStatus === 'needs_review' ? (
-                              <Badge variant="outline" className="bg-yellow-50 text-yellow-600 border-yellow-200">
-                                待复核
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200">
-                                已匹配
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <span className={`text-xs font-medium ${getConfidenceColor(receipt.confidence)}`}>
-                              {receipt.confidence !== undefined ? `${receipt.confidence}%` : '-'}
-                            </span>
-                            {receipt.matchRule && (
-                              <div className="text-xs text-muted-foreground">
-                                {MATCH_RULE_LABELS[receipt.matchRule] || receipt.matchRule}
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {receipt.orderNo ? (
-                              <span className="font-mono text-sm">{receipt.orderNo}</span>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => handleManualMatch(receipt)}
-                              disabled={!canEditOrders}
-                            >
-                              <Link2 className="h-4 w-4 mr-1" />
-                              {receipt.reviewStatus === 'matched'
-                                ? '重匹配'
-                                : receipt.reviewStatus === 'conflict'
-                                  ? '处理冲突'
-                                  : '进入复核'}
-                            </Button>
-                          </TableCell>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[50px]">序号</TableHead>
+                          <TableHead>文件名</TableHead>
+                          <TableHead>发货方</TableHead>
+                          <TableHead>导入时间</TableHead>
+                          <TableHead className="text-right">总条数</TableHead>
+                          <TableHead className="text-right">已匹配</TableHead>
+                          <TableHead className="text-right">待复核</TableHead>
+                          <TableHead className="text-right">冲突</TableHead>
+                          <TableHead className="text-center">操作</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {records.map((record, index) => (
+                          <TableRow
+                            key={record.id}
+                            className="cursor-pointer hover:bg-muted/50"
+                            onClick={() => {
+                              setCurrentRecord(record);
+                              loadRecordDetail(record.id);
+                            }}
+                          >
+                            <TableCell>{(currentPage - 1) * pageSize + index + 1}</TableCell>
+                            <TableCell className="font-medium">{record.fileName}</TableCell>
+                            <TableCell>{record.supplierName || '-'}</TableCell>
+                            <TableCell>{new Date(record.importedAt).toLocaleString()}</TableCell>
+                            <TableCell className="text-right">{record.totalCount}</TableCell>
+                            <TableCell className="text-right text-green-600">{record.matchedCount}</TableCell>
+                            <TableCell className="text-right text-yellow-600">{record.reviewCount || 0}</TableCell>
+                            <TableCell className="text-right text-red-600">{record.conflictCount || 0}</TableCell>
+                            <TableCell className="text-center">
+                              <Button variant="ghost" size="sm">
+                                查看详情
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  {/* 分页 */}
+                  <div className="flex items-center justify-between px-2 py-4 border-t mt-4">
+                    <div className="text-sm text-muted-foreground">
+                      共 {totalCount} 条
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button variant="outline" size="sm" onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>首页</Button>
+                      <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => p - 1)} disabled={currentPage === 1}>上一页</Button>
+                      <span className="px-2 text-sm">{currentPage} / {totalPages}</span>
+                      <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage === totalPages || totalPages === 0}>下一页</Button>
+                      <Button variant="outline" size="sm" onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages || totalPages === 0}>末页</Button>
+                    </div>
+                    <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}>
+                      <SelectTrigger className="w-[100px] h-8 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="20">20条/页</SelectItem>
+                        <SelectItem value="50">50条/页</SelectItem>
+                        <SelectItem value="100">100条/页</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </>
               )}
             </CardContent>
           </Card>
-        </div>
-      </div>
+        </TabsContent>
+      </Tabs>
 
       {/* 自动匹配对话框（含预览） */}
       <Dialog open={showMatchDialog} onOpenChange={setShowMatchDialog}>
