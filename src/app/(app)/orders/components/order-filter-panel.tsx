@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Search, ChevronDown, ChevronUp, SlidersHorizontal, X, Plus, Loader2 } from 'lucide-react';
 import { buildUserInfoHeaders } from '@/lib/auth';
 import {
@@ -123,6 +124,7 @@ export function OrderFilterPanel({
 }: OrderFilterPanelProps) {
   const [customerSearchResults, setCustomerSearchResults] = useState<Customer[]>([]);
   const [customerSearchLoading, setCustomerSearchLoading] = useState(false);
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
   const customerSearchTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // 客户服务端搜索（防抖 300ms）
@@ -231,10 +233,10 @@ export function OrderFilterPanel({
           </div>
         </div>
 
-        {/* Row 2: Condition filters */}
-        <div className="flex flex-wrap xl:flex-nowrap xl:items-end gap-3">
+        {/* Row 2: Core search filters - 4 columns on all screens */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {/* Order no */}
-          <div className="space-y-1 min-w-0 flex-1">
+          <div className="space-y-1 min-w-0">
             <Label className="text-xs text-muted-foreground">订单号</Label>
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -248,7 +250,7 @@ export function OrderFilterPanel({
           </div>
 
           {/* Product name */}
-          <div className="space-y-1 min-w-0 flex-1">
+          <div className="space-y-1 min-w-0">
             <Label className="text-xs text-muted-foreground">商品名称/型号</Label>
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -262,7 +264,7 @@ export function OrderFilterPanel({
           </div>
 
           {/* Phone */}
-          <div className="space-y-1 min-w-0 flex-1">
+          <div className="space-y-1 min-w-0">
             <Label className="text-xs text-muted-foreground">电话号码</Label>
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -275,26 +277,103 @@ export function OrderFilterPanel({
             </div>
           </div>
 
-          {/* Creation date range */}
-          <div className="space-y-1 min-w-0 flex-1">
+          {/* Creation date quick filters */}
+          <div className="space-y-1 min-w-0">
             <Label className="text-xs text-muted-foreground">创建时间</Label>
-            <div className="flex items-center gap-1">
-              <Input
-                type="date"
-                value={createdFrom}
-                onChange={(e) => setCreatedFrom(e.target.value)}
-                className="h-8 text-xs w-[130px]"
-                max={createdTo || undefined}
-              />
-              <span className="text-muted-foreground text-xs">至</span>
-              <Input
-                type="date"
-                value={createdTo}
-                onChange={(e) => setCreatedTo(e.target.value)}
-                className="h-8 text-xs w-[130px]"
-                min={createdFrom || undefined}
-              />
+            <div className="flex flex-wrap gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => {
+                  const today = new Date();
+                  setCreatedFrom(today.toISOString().split('T')[0]);
+                  setCreatedTo(today.toISOString().split('T')[0]);
+                }}
+              >
+                本日
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => {
+                  const today = new Date();
+                  const dayOfWeek = today.getDay();
+                  const monday = new Date(today);
+                  monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+                  const sunday = new Date(monday);
+                  sunday.setDate(monday.getDate() + 6);
+                  setCreatedFrom(monday.toISOString().split('T')[0]);
+                  setCreatedTo(sunday.toISOString().split('T')[0]);
+                }}
+              >
+                本周
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => {
+                  const today = new Date();
+                  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+                  const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                  setCreatedFrom(firstDay.toISOString().split('T')[0]);
+                  setCreatedTo(lastDay.toISOString().split('T')[0]);
+                }}
+              >
+                本月
+              </Button>
             </div>
+          </div>
+        </div>
+
+        {/* Row 3: Quick filters + More filters toggle */}
+        <div className="flex flex-wrap items-end gap-3">
+          {/* Supplier */}
+          <div className="space-y-1 min-w-0 flex-1">
+            <Label className="text-xs text-muted-foreground">发货方</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 w-full justify-between font-normal">
+                  {supplierFilter ? (
+                    <span className="truncate">{suppliers.find(s => s.id === supplierFilter)?.name || supplierFilter}</span>
+                  ) : (
+                    <span className="text-muted-foreground truncate">全部发货方</span>
+                  )}
+                  <ChevronDown className="h-3 w-3 ml-1 shrink-0" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[240px] p-0" align="start">
+                <div className="p-2 border-b">
+                  <Input
+                    placeholder="搜索发货方..."
+                    value={supplierSearch}
+                    onChange={(e) => setSupplierSearch(e.target.value)}
+                    className="h-7 text-sm"
+                  />
+                </div>
+                <div className="p-1 max-h-[200px] overflow-y-auto">
+                  <button
+                    onClick={() => { setSupplierFilter(''); setSupplierSearch(''); }}
+                    className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-muted cursor-pointer ${!supplierFilter ? 'bg-primary/10 text-primary' : ''}`}
+                  >
+                    全部发货方
+                  </button>
+                  {suppliers
+                    .filter(s => s.name.toLowerCase().includes(supplierSearch.toLowerCase()))
+                    .map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => { setSupplierFilter(s.id); setSupplierSearch(''); }}
+                        className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-muted cursor-pointer truncate ${supplierFilter === s.id ? 'bg-primary/10 text-primary' : ''}`}
+                      >
+                        {s.name}
+                      </button>
+                    ))}
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
 
           {/* Customer */}
@@ -357,154 +436,132 @@ export function OrderFilterPanel({
             </Popover>
           </div>
 
-          {/* Quantity */}
-          <div className="space-y-1 min-w-0 flex-1">
-            <Label className="text-xs text-muted-foreground">商品数量</Label>
-            <div className="flex items-center gap-1">
-              <Select value={quantityOp || 'eq'} onValueChange={(v) => setQuantityOp(v as 'gt' | 'lt' | 'eq')}>
-                <SelectTrigger className="h-8 w-[70px] text-sm shrink-0">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="gt">大于</SelectItem>
-                  <SelectItem value="lt">小于</SelectItem>
-                  <SelectItem value="eq">等于</SelectItem>
-                </SelectContent>
-              </Select>
-              <Input
-                type="number"
-                min="1"
-                placeholder="数量"
-                value={quantityFilter}
-                onChange={(e) => setQuantityFilter(e.target.value)}
-                className="h-8 text-sm w-full"
-              />
-            </div>
-          </div>
-
-          {/* Supplier */}
-          <div className="space-y-1 min-w-0 flex-1">
-            <Label className="text-xs text-muted-foreground">发货方</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8 w-full justify-between font-normal">
-                  {supplierFilter ? (
-                    <span className="truncate">{suppliers.find(s => s.id === supplierFilter)?.name || supplierFilter}</span>
-                  ) : (
-                    <span className="text-muted-foreground truncate">全部发货方</span>
-                  )}
-                  <ChevronDown className="h-3 w-3 ml-1 shrink-0" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[240px] p-0" align="start">
-                <div className="p-2 border-b">
+          {/* More filters toggle */}
+          <Collapsible open={showMoreFilters} onOpenChange={setShowMoreFilters} className="shrink-0">
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5 mr-1" />
+                更多筛选
+                {showMoreFilters ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="w-full mt-3 pt-3 border-t">
+              {/* Creation date range */}
+              <div className="mb-3">
+                <Label className="text-xs text-muted-foreground block mb-1">创建时间</Label>
+                <div className="flex items-center gap-1">
                   <Input
-                    placeholder="搜索发货方..."
-                    value={supplierSearch}
-                    onChange={(e) => setSupplierSearch(e.target.value)}
-                    className="h-7 text-sm"
+                    type="date"
+                    value={createdFrom}
+                    onChange={(e) => setCreatedFrom(e.target.value)}
+                    className="h-8 text-xs w-[120px]"
+                    max={createdTo || undefined}
+                  />
+                  <span className="text-muted-foreground text-xs">至</span>
+                  <Input
+                    type="date"
+                    value={createdTo}
+                    onChange={(e) => setCreatedTo(e.target.value)}
+                    className="h-8 text-xs w-[120px]"
+                    min={createdFrom || undefined}
                   />
                 </div>
-                <div className="p-1 max-h-[200px] overflow-y-auto">
-                  <button
-                    onClick={() => { setSupplierFilter(''); setSupplierSearch(''); }}
-                    className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-muted cursor-pointer ${!supplierFilter ? 'bg-primary/10 text-primary' : ''}`}
-                  >
-                    全部发货方
-                  </button>
-                  {suppliers
-                    .filter(s => s.name.toLowerCase().includes(supplierSearch.toLowerCase()))
-                    .map((s) => (
-                      <button
-                        key={s.id}
-                        onClick={() => { setSupplierFilter(s.id); setSupplierSearch(''); }}
-                        className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-muted cursor-pointer truncate ${supplierFilter === s.id ? 'bg-primary/10 text-primary' : ''}`}
-                      >
-                        {s.name}
-                      </button>
-                    ))}
+              </div>
+
+              {/* Quantity */}
+              <div className="space-y-1 min-w-0">
+                <Label className="text-xs text-muted-foreground">商品数量</Label>
+                <div className="flex items-center gap-1">
+                  <Select value={quantityOp || 'eq'} onValueChange={(v) => setQuantityOp(v as 'gt' | 'lt' | 'eq')}>
+                    <SelectTrigger className="h-8 w-[70px] text-sm shrink-0">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="gt">大于</SelectItem>
+                      <SelectItem value="lt">小于</SelectItem>
+                      <SelectItem value="eq">等于</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    type="number"
+                    min="1"
+                    placeholder="数量"
+                    value={quantityFilter}
+                    onChange={(e) => setQuantityFilter(e.target.value)}
+                    className="h-8 text-sm w-full"
+                  />
                 </div>
-              </PopoverContent>
-            </Popover>
-          </div>
+              </div>
+
+              {/* Advanced filter panel */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <Label className="text-sm font-medium">高级筛选</Label>
+                  <span className="text-xs text-muted-foreground">添加更多筛选字段</span>
+                </div>
+
+                {Object.entries(advancedFields).length > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {Object.entries(advancedFields).map(([key, value]) => {
+                      const fieldDef = FILTERABLE_FIELDS.find((f) => f.key === key);
+                      return (
+                        <div key={key} className="flex items-center gap-2">
+                          <div className="flex-1 space-y-1">
+                            <Label className="text-xs text-muted-foreground">{fieldDef?.label || key}</Label>
+                            <div className="relative">
+                              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                              <Input
+                                placeholder={fieldDef?.placeholder || ''}
+                                value={value}
+                                onChange={(e) => updateAdvancedField_(key, e.target.value)}
+                                className="pl-8 h-8 text-sm"
+                              />
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 mt-5"
+                            onClick={() => removeAdvancedField(key)}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2">
+                  <Select
+                    value=""
+                    onValueChange={(v) => { if (v) addAdvancedField(v); }}
+                  >
+                    <SelectTrigger className="w-[180px] h-8 text-sm">
+                      <Plus className="w-3.5 h-3.5 mr-1" />
+                      <SelectValue placeholder="添加筛选字段" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FILTERABLE_FIELDS.filter(
+                        (f) => !advancedFields.hasOwnProperty(f.key) && !searchFields.hasOwnProperty(f.key)
+                      ).map((f) => (
+                        <SelectItem key={f.key} value={f.key}>
+                          {f.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
 
           <div className="hidden xl:block xl:flex-1" />
-
-          {/* Advanced */}
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 shrink-0"
-            onClick={() => setShowAdvancedFilter(!showAdvancedFilter)}
-          >
-            <SlidersHorizontal className="w-3.5 h-3.5 mr-1" />
-            高级
-            {showAdvancedFilter ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />}
-          </Button>
         </div>
-
-        {/* Advanced filter panel */}
-        {showAdvancedFilter && (
-          <div className="mt-3 pt-3 border-t space-y-3">
-            <div className="flex items-center gap-2 mb-2">
-              <Label className="text-sm font-medium">高级筛选</Label>
-              <span className="text-xs text-muted-foreground">添加更多筛选字段</span>
-            </div>
-
-            {Object.entries(advancedFields).length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {Object.entries(advancedFields).map(([key, value]) => {
-                  const fieldDef = FILTERABLE_FIELDS.find((f) => f.key === key);
-                  return (
-                    <div key={key} className="flex items-center gap-2">
-                      <div className="flex-1 space-y-1">
-                        <Label className="text-xs text-muted-foreground">{fieldDef?.label || key}</Label>
-                        <div className="relative">
-                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                          <Input
-                            placeholder={fieldDef?.placeholder || ''}
-                            value={value}
-                            onChange={(e) => updateAdvancedField_(key, e.target.value)}
-                            className="pl-8 h-8 text-sm"
-                          />
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0 mt-5"
-                        onClick={() => removeAdvancedField(key)}
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            <div className="flex items-center gap-2">
-              <Select
-                value=""
-                onValueChange={(v) => { if (v) addAdvancedField(v); }}
-              >
-                <SelectTrigger className="w-[180px] h-8 text-sm">
-                  <Plus className="w-3.5 h-3.5 mr-1" />
-                  <SelectValue placeholder="添加筛选字段" />
-                </SelectTrigger>
-                <SelectContent>
-                  {FILTERABLE_FIELDS.filter(
-                    (f) => !advancedFields.hasOwnProperty(f.key) && !searchFields.hasOwnProperty(f.key)
-                  ).map((f) => (
-                    <SelectItem key={f.key} value={f.key}>
-                      {f.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        )}
       </CardContent>
     </Card>
   );
