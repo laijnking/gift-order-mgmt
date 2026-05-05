@@ -9,6 +9,18 @@ import { parseCallbackXML, extractFileMessage, isExcelFile, buildSuccessCallback
 import { matchCustomerForGroup, upsertGroupMapping } from './customer-matcher';
 import type { WeComAppConfig, WeComFileTask } from './types';
 
+/**
+ * 对企业微信回调参数进行 URL Decode 处理
+ */
+function decodeUrlParams(param: string | null): string {
+  if (!param) return '';
+  try {
+    return decodeURIComponent(param);
+  } catch {
+    return param;
+  }
+}
+
 const MAX_FILE_SIZE_MB = parseInt(process.env.WECOM_MAX_FILE_SIZE_MB || '10', 10);
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
@@ -150,10 +162,13 @@ export async function handleCallback(request: Request): Promise<Response> {
 
     // GET 请求：验证回调 URL
     if (request.method === 'GET') {
-      const msgSignature = url.searchParams.get('msg_signature');
-      const timestamp = url.searchParams.get('timestamp');
-      const nonce = url.searchParams.get('nonce');
-      const echostr = url.searchParams.get('echostr');
+      // 企业微信文档要求对参数进行 URL Decode 处理
+      const msgSignature = decodeUrlParams(url.searchParams.get('msg_signature'));
+      const timestamp = decodeUrlParams(url.searchParams.get('timestamp'));
+      const nonce = decodeUrlParams(url.searchParams.get('nonce'));
+      const echostr = decodeUrlParams(url.searchParams.get('echostr'));
+
+      console.log('[WeComCallback] Verification request:', { msgSignature, timestamp, nonce, echostr: echostr?.substring(0, 20) + '...' });
 
       if (!msgSignature || !timestamp || !nonce || !echostr) {
         return new Response(buildErrorCallbackResponse('Missing parameters'), {
@@ -165,6 +180,7 @@ export async function handleCallback(request: Request): Promise<Response> {
       // 验证并获取应用配置
       const context = await verifyAndGetApp(request);
       if (!context) {
+        console.log('[WeComCallback] App not found for agentId:', url.searchParams.get('agentid'));
         return new Response(buildErrorCallbackResponse('App not found'), {
           status: 404,
           headers: { 'Content-Type': 'text/plain' },
@@ -181,6 +197,7 @@ export async function handleCallback(request: Request): Promise<Response> {
       );
 
       if (!isValid) {
+        console.log('[WeComCallback] Signature verification failed');
         return new Response(buildErrorCallbackResponse('Signature verification failed'), {
           status: 401,
           headers: { 'Content-Type': 'text/plain' },
@@ -191,6 +208,7 @@ export async function handleCallback(request: Request): Promise<Response> {
       let decryptedEchostr: string;
       try {
         decryptedEchostr = decryptMessage(context.appConfig.encoding_aes_key, echostr);
+        console.log('[WeComCallback] Decrypted echostr length:', decryptedEchostr.length);
       } catch (err) {
         console.error('[WeComCallback] Failed to decrypt echostr:', err);
         return new Response(buildErrorCallbackResponse('Decryption failed'), {
@@ -199,6 +217,7 @@ export async function handleCallback(request: Request): Promise<Response> {
         });
       }
 
+      // 返回明文消息内容（不能加引号，不能带换行符）
       return new Response(decryptedEchostr, {
         status: 200,
         headers: { 'Content-Type': 'text/plain' },
@@ -207,9 +226,9 @@ export async function handleCallback(request: Request): Promise<Response> {
 
     // POST 请求：处理回调消息
     if (request.method === 'POST') {
-      const msgSignature = url.searchParams.get('msg_signature');
-      const timestamp = url.searchParams.get('timestamp');
-      const nonce = url.searchParams.get('nonce');
+      const msgSignature = decodeUrlParams(url.searchParams.get('msg_signature'));
+      const timestamp = decodeUrlParams(url.searchParams.get('timestamp'));
+      const nonce = decodeUrlParams(url.searchParams.get('nonce'));
 
       if (!msgSignature || !timestamp || !nonce) {
         return new Response(buildErrorCallbackResponse('Missing parameters'), {
