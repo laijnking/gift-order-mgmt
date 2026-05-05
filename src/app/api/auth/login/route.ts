@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
+import { Pool } from 'pg';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { PERMISSIONS } from '@/lib/permissions';
 
@@ -207,22 +208,40 @@ async function getRoleMeta(client: ReturnType<typeof getSupabaseClient>, roleCod
     };
   }
 
-  const { data: permissionLinks } = await client
-    .from('role_permissions')
-    .select('permissions(code)')
-    .eq('role_id', role.id);
+  // 使用 Pool 直接查询获取权限，避免 LocalSupabaseClient 不支持跨表 join 的问题
+  let permissions: string[] = [];
+  const dbUrl = process.env.NEXT_PUBLIC_SUPABASE_DB_URL || process.env.DATABASE_URL;
+  if (dbUrl) {
+    const pool = new Pool({ connectionString: dbUrl });
+    try {
+      const { data: permissionLinks } = await client
+        .from('role_permissions')
+        .select('permission_id')
+        .eq('role_id', role.id);
 
-  const permissions = (permissionLinks || [])
-    .map((item: Record<string, unknown>) => {
-      const permission = item.permissions as Record<string, unknown> | null;
-      return typeof permission?.code === 'string' ? permission.code : null;
-    })
-    .filter((code): code is string => Boolean(code));
+      if (permissionLinks && permissionLinks.length > 0) {
+        const permIds = permissionLinks.map((p: Record<string, unknown>) => p.permission_id as string);
+        const idsParam = permIds.map((_, i) => `$${i + 1}`).join(', ');
+        const result = await pool.query(
+          `SELECT code FROM permissions WHERE id IN (${idsParam})`,
+          permIds
+        );
+        permissions = result.rows.map(r => r.code as string);
+      }
+    } finally {
+      await pool.end();
+    }
+  }
+
+  // 如果数据库查询结果为空，使用 fallback
+  if (permissions.length === 0) {
+    permissions = FALLBACK_PERMISSIONS[role.code] || [];
+  }
 
   return {
     roleName: role.name,
     dataScope: role.data_scope || 'self',
-    permissions: permissions.length > 0 ? permissions : (FALLBACK_PERMISSIONS[role.code] || []),
+    permissions,
   };
 }
 
