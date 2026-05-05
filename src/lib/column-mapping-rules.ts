@@ -55,9 +55,11 @@ export const GROUPED_OPTIONS = COLUMN_OPTIONS.reduce((acc, opt) => {
 
 export const COMMON_FIELDS = [
   'customer_order_no',
+  'bill_date',
   'customer_product_name',
   'customer_product_spec',
   'customer_product_code',
+  'barcode',
   'quantity',
   'price',
   'receiver_name',
@@ -65,6 +67,10 @@ export const COMMON_FIELDS = [
   'receiver_address',
   'express_company',
   'tracking_no',
+  'remark',
+  'channel_remark',
+  'suggested_shipper',
+  'original_status',
 ];
 
 // Patterns for auto-detection
