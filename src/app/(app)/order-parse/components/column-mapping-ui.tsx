@@ -95,21 +95,22 @@ onValueChange={(v) => {
     ))}
   </SelectGroup>
   {Object.entries(GROUPED_OPTIONS)
-    .filter(
-      ([group]) =>
-        group !== '其他' &&
-        !COMMON_FIELDS.some((f) => GROUPED_OPTIONS[group]?.some((o) => o.value === f))
-    )
-    .map(([group, options]) => (
-      <SelectGroup key={group}>
-        <SelectLabel className="text-xs">{group}</SelectLabel>
-        {options.map((opt) => (
-          <SelectItem key={opt.value} value={opt.value}>
-            {opt.label}
-          </SelectItem>
-        ))}
-      </SelectGroup>
-    ))}
+    .map(([group, options]) => {
+      // 过滤掉已在"常用字段"中出现的选项，避免重复
+      const nonCommon = options.filter((opt) => !COMMON_FIELDS.includes(opt.value));
+      if (nonCommon.length === 0) return null;
+      return (
+        <SelectGroup key={group}>
+          <SelectLabel className="text-xs">{group}</SelectLabel>
+          {nonCommon.map((opt) => (
+            <SelectItem key={opt.value} value={opt.value}>
+              {opt.label}
+            </SelectItem>
+          ))}
+        </SelectGroup>
+      );
+    })
+    .filter(Boolean)}
 </SelectContent>
                 </Select>
               </div>
