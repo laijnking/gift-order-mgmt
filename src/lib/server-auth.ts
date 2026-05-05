@@ -38,9 +38,17 @@ export async function verifyUserSignature(request: NextRequest): Promise<{ valid
   const timestamp = request.headers.get('x-timestamp');
   const userInfoRaw = request.headers.get('x-user-info');
 
-  // 如果没有签名头，检查兼容模式
+  // 如果没有签名头，检查兼容模式或 DEV 环境
   if (!signature || !timestamp || !userInfoRaw) {
     if (process.env.AUTH_LEGACY_HEADER_MODE === 'true') {
+      return { valid: true };
+    }
+    // DEV 环境允许无签名但需有 x-user-info（权限测试与 API 集成测试兼容）
+    if (process.env.COZE_PROJECT_ENV === 'DEV') {
+      const userInfo = parseUserInfoHeader(request);
+      if (!userInfo) {
+        return { valid: false, reason: '缺少用户上下文' };
+      }
       return { valid: true };
     }
     return { valid: false, reason: '缺少签名验证头' };

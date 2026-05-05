@@ -63,7 +63,7 @@ export async function wait(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export function startServer(port: number) {
+export function startServer(port: number, envOverrides?: Record<string, string>) {
   cleanNextDevLock();
 
   const child = spawn(process.execPath, ['--import', 'tsx', 'src/server.ts'], {
@@ -73,6 +73,7 @@ export function startServer(port: number) {
       PORT: String(port),
       HOSTNAME: DEFAULT_HOST,
       COZE_PROJECT_ENV: 'DEV',
+      ...envOverrides,
     },
     stdio: 'pipe',
   });

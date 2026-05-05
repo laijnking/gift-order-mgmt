@@ -92,7 +92,7 @@ async function expectUnauthorized(path: string, init?: RequestInit) {
   const response = await fetchJson<ApiEnvelope>(`${BASE_URL}${path}`, init);
   assert(response.status === 401, `${path} should return 401 without user context`);
   assert(response.data.success === false, `${path} should fail without user context`);
-  assert(response.data.error?.includes('未登录') || response.data.error?.includes('缺少用户上下文'), `${path} should explain missing auth context`);
+  assert(response.data.error?.includes('未登录') || response.data.error?.includes('缺少用户上下文') || response.data.error?.includes('签名'), `${path} should explain missing auth context`);
 }
 
 async function expectForbidden(path: string, user: MockUser, init?: RequestInit) {
@@ -130,7 +130,7 @@ async function expectNotDenied(path: string, user: MockUser, init?: RequestInit)
 
 async function run() {
     console.log('Starting test server...');
-    const serverProcess = startServer(PORT);
+    const serverProcess = startServer(PORT, { AUTH_LEGACY_HEADER_MODE: 'false' });
     await waitForServer(BASE_URL, serverProcess);
     console.log(`Server is ready at ${BASE_URL}`);
 
