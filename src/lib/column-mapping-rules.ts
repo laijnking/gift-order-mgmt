@@ -216,6 +216,7 @@ const PATTERNS: Record<string, Array<{ regex: RegExp; exact?: boolean; priority:
     { regex: /^收件电话$/, exact: true, priority: 8 },
     { regex: /^手机号码$/, priority: 5 },
     { regex: /^联系电话$/, priority: 4 },
+    { regex: /^联系方式$/, exact: true, priority: 9 },
   ],
   receiver_address: [
     { regex: /^收件人地址$/, exact: true, priority: 10 },
