@@ -44,10 +44,13 @@ function normalizeValue(value: unknown): unknown {
   if (value === undefined) {
     return null;
   }
-  // PostgreSQL array columns (TEXT[], UUID[], etc.) need native arrays, not JSON strings
-  // The pg driver handles JavaScript arrays correctly for PostgreSQL array types
   if (Array.isArray(value)) {
-    return value.map(normalizeValue);
+    // 基本类型数组（如 TEXT[]、UUID[]）需要保持原生数组，pg 驱动会转为 PG 数组字面量 {val1,val2}
+    // 对象数组（如 JSONB 列）需要 JSON.stringify，否则 pg 会错误地转为 PG 数组格式
+    const isPrimitiveArray = value.every(
+      (item) => item === null || ['string', 'number', 'boolean'].includes(typeof item)
+    );
+    return isPrimitiveArray ? value : JSON.stringify(value);
   }
   if (value && typeof value === 'object' && !(value instanceof Date) && !Buffer.isBuffer(value)) {
     return JSON.stringify(value);
