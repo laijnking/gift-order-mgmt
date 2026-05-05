@@ -196,7 +196,7 @@ export async function POST(request: NextRequest) {
     };
 
     if (await supportsColumnMappingMetadata(client)) {
-      insertPayload.source_headers = normalizedHeaders;
+      insertPayload.source_headers = JSON.stringify(normalizedHeaders);
       insertPayload.header_fingerprint = buildHeaderFingerprint(normalizedHeaders);
       insertPayload.template_signature = buildTemplateSignature(
         mappingConfig,
