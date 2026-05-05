@@ -319,6 +319,9 @@ export async function parseExcelData(
       const trackingNo = getFieldValue(row, columnMapping, 'tracking_no');
       const remark = getFieldValue(row, columnMapping, 'remark');
       const billDate = getFieldValue(row, columnMapping, 'bill_date');
+      const channelRemark = getFieldValue(row, columnMapping, 'channel_remark');
+      const suggestedShipper = getFieldValue(row, columnMapping, 'suggested_shipper');
+      const originalStatus = getFieldValue(row, columnMapping, 'original_status');
 
       const finalProductName = customerProductName || productName;
       const finalProductSpec = customerProductSpec || productSpec;
@@ -345,6 +348,9 @@ export async function parseExcelData(
             expressCompany,
             trackingNo,
             remark,
+            channelRemark,
+            suggestedShipper,
+            originalStatus,
           };
           orders.set(orderNo, order);
         } catch (orderErr) {

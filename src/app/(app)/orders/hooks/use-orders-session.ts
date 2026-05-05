@@ -126,6 +126,9 @@ export interface Order {
   incomeAmount?: number;
   invoiceRequired?: boolean;
   remark?: string;
+  channelRemark?: string;
+  suggestedShipper?: string;
+  originalStatus?: string;
   expressRequirement?: string;
   extFields?: Record<string, string | null>;
   createdAt: string;

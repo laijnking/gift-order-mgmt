@@ -63,6 +63,7 @@ function transformOrder(dbOrder: Record<string, unknown>, options?: {
       cuProductName: (normalized.customerProductName || normalized.cu_product_name || item.product_name || '') as string,
       cuProductCode: (normalized.customerProductCode || normalized.cu_product_code || '') as string,
       cuProductSpec: (normalized.customerProductSpec || normalized.cu_product_spec || '') as string,
+      cuBarcode: (normalized.customerBarcode || normalized.cu_barcode || '') as string,
       // 系统商品档案信息（自动匹配或手动指定）
       productId: (normalized.systemProductId || normalized.product_id || item.systemProductId || null) as string | null,
       productName: (normalized.systemProductName || normalized.product_name || item.systemProductName || '') as string,
@@ -126,6 +127,9 @@ function transformOrder(dbOrder: Record<string, unknown>, options?: {
     assignedAt: dbOrder.assigned_at as string | undefined,
     completedAt: dbOrder.completed_at as string | undefined,
     remark: dbOrder.remark as string | undefined,
+    channelRemark: dbOrder.channel_remark as string | undefined,
+    suggestedShipper: dbOrder.suggested_shipper as string | undefined,
+    originalStatus: dbOrder.original_status as string | undefined,
     expressRequirement: dbOrder.express_requirement as string | undefined,
     extFields: Object.keys(extFields).length > 0 ? extFields : undefined,
   };
@@ -489,6 +493,7 @@ export async function POST(request: NextRequest) {
             cu_product_name: item.productName,
             cu_product_spec: item.productSpec || '',
             cu_product_code: item.productCode || '',
+            cu_barcode: item.cuBarcode || item.barcode || '',
             quantity: item.quantity || 1,
             price: item.price ?? null,
             amount: item.amount ?? null,
@@ -529,6 +534,9 @@ export async function POST(request: NextRequest) {
           income_amount: item.income_amount || null,
           invoice_required: item.invoice_required || null,
           source: 'ai_parse',
+          channel_remark: item.channel_remark || null,
+          suggested_shipper: item.suggested_shipper || null,
+          original_status: item.original_status || null,
           import_batch: importBatch,
           match_code: matchCode,
           created_at: new Date().toISOString(),
@@ -700,7 +708,11 @@ export async function POST(request: NextRequest) {
       receiverName: findHeader(headers, ['收货人', '收件人', '姓名']),
       receiverPhone: findHeader(headers, ['电话', '手机', '收货电话', '收件人电话', '手机号码']),
       receiverAddress: findHeader(headers, ['地址', '收货地址', '收件地址', '收货地址']),
-      remark: findHeader(headers, ['备注', '商品行备注']),
+      remark: findHeader(headers, ['备注', '商品行备注', '买家留言', '订单备注', '客服备注']),
+      barcode: findHeader(headers, ['条码', '商品69码', '条形码']),
+      channelRemark: findHeader(headers, ['渠道备注']),
+      suggestedShipper: findHeader(headers, ['店铺名称', '供应商名称', '发货供应商']),
+      originalStatus: findHeader(headers, ['订单状态', '付款状态', '发货状态']),
     };
 
     // 识别已映射的列索引，剩余列自动分配到备用字段
@@ -748,6 +760,10 @@ export async function POST(request: NextRequest) {
       const receiverPhone = getValue(fieldMappings.receiverPhone) || '';
       const receiverAddress = getValue(fieldMappings.receiverAddress) || '';
       const remark = getValue(fieldMappings.remark) || '';
+      const barcode = getValue(fieldMappings.barcode) || '';
+      const channelRemark = getValue(fieldMappings.channelRemark) || '';
+      const suggestedShipper = getValue(fieldMappings.suggestedShipper) || '';
+      const originalStatus = getValue(fieldMappings.originalStatus) || '';
 
       // 商品档案自动匹配
       const matchResult = await matchProduct(client, productName, customerProductCode, customerProductSpec);
@@ -784,6 +800,7 @@ export async function POST(request: NextRequest) {
           cu_product_name: productName,
           cu_product_code: customerProductCode,
           cu_product_spec: customerProductSpec,
+          cu_barcode: barcode,
           // 订单信息
           quantity,
           price: price || null,
@@ -806,6 +823,9 @@ export async function POST(request: NextRequest) {
         salesperson_id: salespersonId || null,
         salesperson: salesperson,
         source: 'excel',
+        channel_remark: channelRemark || null,
+        suggested_shipper: suggestedShipper || null,
+        original_status: originalStatus || null,
         import_batch: importBatch,
         match_code: matchCode,
         created_at: new Date().toISOString(),
@@ -1096,6 +1116,12 @@ export async function PATCH(request: NextRequest) {
     if (express_requirement !== undefined) updateData.express_requirement = express_requirement;
     else if (expressRequirement !== undefined) updateData.express_requirement = expressRequirement;
     if (remark !== undefined) updateData.remark = remark;
+
+    // 新字段
+    const { channelRemark, suggestedShipper, originalStatus } = body;
+    if (channelRemark !== undefined) updateData.channel_remark = channelRemark;
+    if (suggestedShipper !== undefined) updateData.suggested_shipper = suggestedShipper;
+    if (originalStatus !== undefined) updateData.original_status = originalStatus;
 
     // 支持更新备用字段
     if (extFields && typeof extFields === 'object') {

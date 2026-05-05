@@ -51,6 +51,9 @@ export interface ParsedOrderDraft {
   tracking_no?: string;
   warehouse?: string;
   remark?: string;
+  channel_remark?: string;
+  suggested_shipper?: string;
+  original_status?: string;
   invoice_required?: boolean;
   income_name?: string;
   income_amount?: number;
@@ -88,4 +91,7 @@ export interface ParsedOrderBundleDraft {
   expressCompany: string;
   trackingNo: string;
   remark: string;
+  channelRemark: string;
+  suggestedShipper: string;
+  originalStatus: string;
 }

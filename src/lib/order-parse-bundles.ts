@@ -46,6 +46,9 @@ export function buildBundleDraftsFromFlatOrders(
       expressCompany: order.express_company || '',
       trackingNo: order.tracking_no || '',
       remark: order.remark || '',
+      channelRemark: order.channel_remark || '',
+      suggestedShipper: order.suggested_shipper || '',
+      originalStatus: order.original_status || '',
     };
   });
 }
@@ -72,6 +75,9 @@ export function flattenBundleDraftsToFlatOrders(
       express_company: bundle.expressCompany || '',
       tracking_no: bundle.trackingNo || '',
       remark: item.remark || bundle.remark || '',
+      channel_remark: bundle.channelRemark || '',
+      suggested_shipper: bundle.suggestedShipper || '',
+      original_status: bundle.originalStatus || '',
       mappedProductCode: item.systemProductCode || undefined,
       mappedProductName: item.systemProductName || undefined,
       mappedProductSpec: item.systemProductSpec || undefined,

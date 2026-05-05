@@ -555,6 +555,24 @@ export function OrderCard({
                         placeholder="仓库"
                       />
                     </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">建议发货方</Label>
+                      <Input
+                        value={order.suggested_shipper as string || ''}
+                        onChange={(e) => onUpdate(order.id, 'suggested_shipper', e.target.value)}
+                        className="h-7 text-xs"
+                        placeholder="建议发货方"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">原订单状态</Label>
+                      <Input
+                        value={order.original_status as string || ''}
+                        onChange={(e) => onUpdate(order.id, 'original_status', e.target.value)}
+                        className="h-7 text-xs"
+                        placeholder="原订单状态"
+                      />
+                    </div>
                   </div>
 
                   {/* Personnel info */}
@@ -730,6 +748,17 @@ export function OrderCard({
                       onChange={(e) => onUpdate(order.id, 'remark', e.target.value)}
                       className="h-7 text-xs"
                       placeholder="备注信息"
+                    />
+                  </div>
+
+                  {/* Channel remark + suggested shipper + original status */}
+                  <div>
+                    <Label className="text-xs text-muted-foreground">渠道备注</Label>
+                    <Input
+                      value={order.channel_remark as string || ''}
+                      onChange={(e) => onUpdate(order.id, 'channel_remark', e.target.value)}
+                      className="h-7 text-xs"
+                      placeholder="渠道备注"
                     />
                   </div>
 

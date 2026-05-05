@@ -34,6 +34,7 @@ export interface OrderItem {
   cuProductName?: string;          // 客户原始商品名称
   cuProductCode?: string;          // 客户原始商品编码
   cuProductSpec?: string;          // 客户原始规格型号
+  cuBarcode?: string;              // 客户原始商品条码
   
   // 订单商品信息
   quantity: number;                // 数量
@@ -104,6 +105,9 @@ export interface Order {
   
   // 其他
   remark?: string;
+  channelRemark?: string;     // 渠道备注
+  suggestedShipper?: string;  // 客户建议发货方
+  originalStatus?: string;    // 原平台订单业务状态
   expressRequirement?: string; // 快递要求，如"不发极兔"
 }
 

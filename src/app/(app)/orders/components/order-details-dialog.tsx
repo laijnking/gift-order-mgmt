@@ -160,6 +160,18 @@ export function OrderDetailsDialog({
                 <p className="font-mono">{order.trackingNo}</p>
               </div>
             )}
+            {order.suggestedShipper && (
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground mb-1">建议发货方</h4>
+                <p>{order.suggestedShipper}</p>
+              </div>
+            )}
+            {order.originalStatus && (
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground mb-1">原订单状态</h4>
+                <Badge variant="outline">{order.originalStatus}</Badge>
+              </div>
+            )}
           </div>
 
           {/* Invoice & amount */}
@@ -212,6 +224,12 @@ export function OrderDetailsDialog({
             <div className="border rounded-lg p-4 bg-yellow-50 border-yellow-200">
               <h4 className="text-sm font-medium text-yellow-800 mb-1">订单备注</h4>
               <p className="text-sm text-yellow-700">{order.remark}</p>
+            </div>
+          )}
+          {order.channelRemark && (
+            <div className="border rounded-lg p-4 bg-blue-50 border-blue-200">
+              <h4 className="text-sm font-medium text-blue-800 mb-1">渠道备注</h4>
+              <p className="text-sm text-blue-700">{order.channelRemark}</p>
             </div>
           )}
 

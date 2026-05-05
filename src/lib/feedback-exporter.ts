@@ -58,6 +58,10 @@ export const DEFAULT_CUSTOMER_FEEDBACK_MAPPINGS: Record<string, string> = {
   '发货方名称': 'supplierName',
   '发货方单据号': 'supplierOrderNo',
   '客户单据编号': 'customerOrderNo',
+  '商品条码': 'barcode',
+  '渠道备注': 'channelRemark',
+  '建议发货方': 'suggestedShipper',
+  '原订单状态': 'originalStatus',
 };
 
 export function buildFeedbackRows(
@@ -94,6 +98,10 @@ export function buildFeedbackRows(
         amount: toNumber(item.quantity, 1) * toNumber(item.price ?? item.unit_price, 0),
         warehouse: itemText(item, 'warehouse', 'warehouseName'),
         remark: order.remark || itemText(item, 'remark'),
+        channelRemark: order.channel_remark || '',
+        suggestedShipper: order.suggested_shipper || '',
+        originalStatus: order.original_status || '',
+        barcode: itemText(item, 'cu_barcode', 'cuBarcode', 'barcode'),
         receiverName: order.receiver_name || '',
         receiverPhone: order.receiver_phone || '',
         receiverAddress: order.receiver_address || '',
