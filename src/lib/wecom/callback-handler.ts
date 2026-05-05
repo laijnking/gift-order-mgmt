@@ -30,16 +30,32 @@ interface CallbackContext {
 
 /**
  * 验证并获取企微应用配置
+ * 注意：企业微信验证回调URL时可能不传agentid参数，此时使用唯一的active配置
  */
 async function verifyAndGetApp(request: Request): Promise<CallbackContext | null> {
   const url = new URL(request.url);
-  const agentId = url.searchParams.get('agentid');
-
-  if (!agentId) {
-    return null;
-  }
+  let agentId = url.searchParams.get('agentid');
 
   const client = getSupabaseClient();
+
+  // 如果没有 agentid 参数（验证URL时可能没有），使用唯一的active配置
+  if (!agentId) {
+    const { data: configs } = await client
+      .from('wecom_app_config')
+      .select('*')
+      .eq('is_active', true)
+      .is('deleted_at', null);
+
+    if (!configs || configs.length === 0) {
+      return null;
+    }
+    if (configs.length > 1) {
+      console.error('[WeComCallback] Multiple active configs found, cannot determine which to use');
+      return null;
+    }
+    return { appConfig: configs[0] };
+  }
+
   const { data: appConfig } = await client
     .from('wecom_app_config')
     .select('*')
