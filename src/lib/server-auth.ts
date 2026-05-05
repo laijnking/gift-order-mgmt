@@ -155,14 +155,18 @@ export async function requirePermission(request: NextRequest, permission: string
 
   const user = parseUserInfoHeader(request);
 
-  if (!user) {
+  // AUTH_LEGACY_HEADER_MODE=true 时允许无签名请求通过，但如果有 x-user-info 则仍需解析
+  const isLegacyMode = process.env.AUTH_LEGACY_HEADER_MODE === 'true';
+  const hasUserInfoHeader = request.headers.has('x-user-info');
+
+  if (!user && !(isLegacyMode && !hasUserInfoHeader)) {
     return NextResponse.json(
       { success: false, error: '未登录或缺少用户上下文' },
       { status: 401 }
     );
   }
 
-  if (!user.permissions?.includes(permission)) {
+  if (user && !user.permissions?.includes(permission)) {
     return NextResponse.json(
       { success: false, error: '当前账号没有执行此操作的权限' },
       { status: 403 }
@@ -183,14 +187,18 @@ export async function requireAnyPermission(request: NextRequest, permissions: st
 
   const user = parseUserInfoHeader(request);
 
-  if (!user) {
+  // AUTH_LEGACY_HEADER_MODE=true 时允许无签名请求通过，但如果有 x-user-info 则仍需解析
+  const isLegacyMode = process.env.AUTH_LEGACY_HEADER_MODE === 'true';
+  const hasUserInfoHeader = request.headers.has('x-user-info');
+
+  if (!user && !(isLegacyMode && !hasUserInfoHeader)) {
     return NextResponse.json(
       { success: false, error: '未登录或缺少用户上下文' },
       { status: 401 }
     );
   }
 
-  if (!permissions.some(p => user.permissions?.includes(p))) {
+  if (user && !permissions.some(p => user.permissions?.includes(p))) {
     return NextResponse.json(
       { success: false, error: '当前账号没有执行此操作的权限' },
       { status: 403 }
