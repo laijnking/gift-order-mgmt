@@ -291,7 +291,7 @@ export function OrderFilterPanel({
                   setCreatedTo(today.toISOString().split('T')[0]);
                 }}
               >
-                本日
+                今日
               </Button>
               <Button
                 variant="outline"
@@ -299,16 +299,13 @@ export function OrderFilterPanel({
                 className="h-7 px-2 text-xs"
                 onClick={() => {
                   const today = new Date();
-                  const dayOfWeek = today.getDay();
-                  const monday = new Date(today);
-                  monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
-                  const sunday = new Date(monday);
-                  sunday.setDate(monday.getDate() + 6);
-                  setCreatedFrom(monday.toISOString().split('T')[0]);
-                  setCreatedTo(sunday.toISOString().split('T')[0]);
+                  const sevenDaysAgo = new Date(today);
+                  sevenDaysAgo.setDate(today.getDate() - 6);
+                  setCreatedFrom(sevenDaysAgo.toISOString().split('T')[0]);
+                  setCreatedTo(today.toISOString().split('T')[0]);
                 }}
               >
-                本周
+                近7日
               </Button>
               <Button
                 variant="outline"
@@ -316,13 +313,13 @@ export function OrderFilterPanel({
                 className="h-7 px-2 text-xs"
                 onClick={() => {
                   const today = new Date();
-                  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-                  const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-                  setCreatedFrom(firstDay.toISOString().split('T')[0]);
-                  setCreatedTo(lastDay.toISOString().split('T')[0]);
+                  const thirtyDaysAgo = new Date(today);
+                  thirtyDaysAgo.setDate(today.getDate() - 29);
+                  setCreatedFrom(thirtyDaysAgo.toISOString().split('T')[0]);
+                  setCreatedTo(today.toISOString().split('T')[0]);
                 }}
               >
-                本月
+                近30日
               </Button>
             </div>
           </div>
