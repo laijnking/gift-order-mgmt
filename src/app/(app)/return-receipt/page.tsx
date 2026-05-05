@@ -716,17 +716,21 @@ export default function ReturnReceiptPage() {
                     </div>
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                       {currentRecord && (
-                        <select
+                        <Select
                           value={receiptFilter}
-                          onChange={(e) => setReceiptFilter(e.target.value as typeof receiptFilter)}
-                          className="h-9 rounded-md border bg-background px-3 text-sm"
+                          onValueChange={(v) => setReceiptFilter(v as typeof receiptFilter)}
                         >
-                          {reviewFilterOptions.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
+                          <SelectTrigger className="h-9 w-[120px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {reviewFilterOptions.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       )}
                       {selectedReceipts.length > 0 && (
                         <Tooltip>

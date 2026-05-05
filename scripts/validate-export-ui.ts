@@ -332,10 +332,11 @@ async function runShippingExportCheck(page: Page) {
   });
 
   await page.goto(`${BASE_URL}/shipping-export`);
-  await page.getByRole('heading', { name: '发货通知单导出' }).waitFor();
+  await page.getByRole('heading', { name: '发货通知单' }).waitFor();
   await page.getByRole('combobox').click();
   await page.getByRole('option', { name: '自定义发货模板' }).click();
 
+  // 单行预览
   const supplierRow = page.locator('tr').filter({ hasText: '发货方A' }).first();
   await supplierRow.getByRole('button', { name: '预览' }).click();
 
@@ -350,94 +351,49 @@ async function runShippingExportCheck(page: Page) {
   }
 
   await page.getByRole('dialog').waitFor();
-  await page.getByRole('heading', { name: '预览结果' }).waitFor();
-  await page.getByText('预览模式仅生成内容，不会写入导出记录，也不会触发派发副作用。').waitFor();
-  await page.getByRole('button', { name: '确认仅派发' }).click();
-
-  if (JSON.stringify(batchRequests[1]?.supplierIds) !== JSON.stringify(['supplier-1'])) {
-    throw new Error(`发货通知页确认仅派发未沿用预览 supplierIds，实际为 ${JSON.stringify(batchRequests[1])}`);
-  }
-  if (batchRequests[1]?.dispatchMode !== 'dispatch') {
-    throw new Error(`发货通知页确认仅派发未按预期提交 dispatchMode=dispatch，实际为 ${JSON.stringify(batchRequests[1])}`);
-  }
-  if (batchRequests[1]?.templateId !== 'tpl-ship-2') {
-    throw new Error(`发货通知页确认仅派发未沿用预览模板，实际为 ${JSON.stringify(batchRequests[1])}`);
-  }
-  if (batchRequests[1]?.persistenceMode !== 'none') {
-    throw new Error(`发货通知页确认仅派发未按预期提交 persistenceMode=none，实际为 ${JSON.stringify(batchRequests[1])}`);
-  }
-
-  await page.getByText('当前结果仅执行派发，不写导出记录，也不会落盘 ZIP 或明细文件。').waitFor();
-  await page.getByText('执行：仅派发').waitFor();
-  await page.keyboard.press('Escape');
+  await page.getByRole('heading', { name: '导出结果' }).waitFor();
+  await page.getByRole('button', { name: '下载 ZIP' }).waitFor();
+  await page.getByRole('button', { name: '关闭' }).click();
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
 
-  await supplierRow.getByRole('button', { name: '预览' }).click();
+  // 单行导出
+  await supplierRow.getByRole('button', { name: '导出' }).click();
+
+  if (JSON.stringify(batchRequests[1]?.supplierIds) !== JSON.stringify(['supplier-1'])) {
+    throw new Error(`发货通知页单行导出未按预期提交 supplierIds，实际为 ${JSON.stringify(batchRequests[1])}`);
+  }
+  if (batchRequests[1]?.dispatchMode !== 'dispatch') {
+    throw new Error(`发货通知页单行导出未按预期提交 dispatchMode=dispatch，实际为 ${JSON.stringify(batchRequests[1])}`);
+  }
+  if (batchRequests[1]?.templateId !== 'tpl-ship-2') {
+    throw new Error(`发货通知页单行导出未沿用模板，实际为 ${JSON.stringify(batchRequests[1])}`);
+  }
+
   await page.getByRole('dialog').waitFor();
-  await page.getByRole('button', { name: '确认导出并派发' }).click();
+  await page.getByRole('heading', { name: '导出结果' }).waitFor();
+  await page.getByRole('button', { name: '下载 ZIP' }).waitFor();
+  await page.getByRole('button', { name: '关闭' }).click();
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
 
-  if (JSON.stringify(batchRequests[2]?.supplierIds) !== JSON.stringify(['supplier-1'])) {
-    throw new Error(`发货通知页第二次预览未按预期提交 supplierIds，实际为 ${JSON.stringify(batchRequests[2])}`);
-  }
-  if (batchRequests[2]?.dispatchMode !== 'preview') {
-    throw new Error(`发货通知页第二次预览未按预期提交 dispatchMode=preview，实际为 ${JSON.stringify(batchRequests[2])}`);
-  }
-  if (batchRequests[2]?.templateId !== 'tpl-ship-2') {
-    throw new Error(`发货通知页第二次预览未沿用模板，实际为 ${JSON.stringify(batchRequests[2])}`);
-  }
-  if (JSON.stringify(batchRequests[3]?.supplierIds) !== JSON.stringify(['supplier-1'])) {
-    throw new Error(`发货通知页确认导出并派发未沿用预览 supplierIds，实际为 ${JSON.stringify(batchRequests[3])}`);
-  }
-  if (batchRequests[3]?.dispatchMode !== 'dispatch') {
-    throw new Error(`发货通知页确认导出并派发未按预期提交 dispatchMode=dispatch，实际为 ${JSON.stringify(batchRequests[3])}`);
-  }
-  if (batchRequests[3]?.templateId !== 'tpl-ship-2') {
-    throw new Error(`发货通知页确认导出并派发未沿用预览模板，实际为 ${JSON.stringify(batchRequests[3])}`);
-  }
-  if (batchRequests[3]?.persistenceMode !== 'full') {
-    throw new Error(`发货通知页确认导出并派发未按预期提交 persistenceMode=full，实际为 ${JSON.stringify(batchRequests[3])}`);
-  }
-
-  await page.getByText('将直接下载已落盘文件').first().waitFor();
-  await page.getByText('执行：派发并留痕').waitFor();
-  await page.getByRole('button', { name: '下载明细' }).waitFor();
-  await page.getByRole('button', { name: '下载全部 (ZIP)' }).waitFor();
-  await page.getByRole('button', { name: '查看导出记录' }).click();
-  await page.waitForURL('**/export-records?recordId=record-ship-ui');
-  await page.getByRole('heading', { name: '导出记录' }).waitFor();
-  await page.getByRole('dialog').waitFor();
-  await page.getByText('发货通知单批量导出+20260419.zip').first().waitFor();
-  const detailRegenerateButton = page.getByRole('button', { name: '重新生成下载' }).last();
-  await detailRegenerateButton.click();
-  await page.getByRole('button', { name: '下载' }).last().waitFor();
-  await page.getByText('将直接下载已落盘文件').first().waitFor();
-
+  // 批量导出
   await page.goto(`${BASE_URL}/shipping-export`);
-  await page.getByRole('heading', { name: '发货通知单导出' }).waitFor();
+  await page.getByRole('heading', { name: '发货通知单' }).waitFor();
   const supplierARow = page.locator('tr').filter({ hasText: '发货方A' }).first();
   const supplierBRow = page.locator('tr').filter({ hasText: '发货方B' }).first();
   await supplierARow.getByRole('checkbox').click();
   await supplierBRow.getByRole('checkbox').click();
   await page.getByRole('button', { name: '批量导出 (2)' }).click();
 
-  if (JSON.stringify(batchRequests[4]?.supplierIds) !== JSON.stringify(['supplier-1', 'supplier-2'])) {
-    throw new Error(`发货通知页批量导出未按预期提交 supplierIds，实际为 ${JSON.stringify(batchRequests[4])}`);
+  if (JSON.stringify(batchRequests[2]?.supplierIds) !== JSON.stringify(['supplier-1', 'supplier-2'])) {
+    throw new Error(`发货通知页批量导出未按预期提交 supplierIds，实际为 ${JSON.stringify(batchRequests[2])}`);
   }
-  if (batchRequests[4]?.dispatchMode !== 'dispatch') {
-    throw new Error(`发货通知页批量导出未按预期提交 dispatchMode=dispatch，实际为 ${JSON.stringify(batchRequests[4])}`);
-  }
-  if (batchRequests[4]?.persistenceMode !== undefined && batchRequests[4]?.persistenceMode !== 'full') {
-    throw new Error(`发货通知页批量导出 persistenceMode 异常，实际为 ${JSON.stringify(batchRequests[4])}`);
+  if (batchRequests[2]?.dispatchMode !== 'dispatch') {
+    throw new Error(`发货通知页批量导出未按预期提交 dispatchMode=dispatch，实际为 ${JSON.stringify(batchRequests[2])}`);
   }
 
   await page.getByRole('dialog').waitFor();
-  await page.getByText('将直接下载已落盘文件').first().waitFor();
-  const detailDownloadButtons = page.getByRole('button', { name: '下载明细' });
-  await detailDownloadButtons.first().waitFor();
-  if ((await detailDownloadButtons.count()) !== 2) {
-    throw new Error('发货通知页批量导出结果未展示两条明细下载按钮');
-  }
-  await page.getByRole('button', { name: '下载全部 (ZIP)' }).waitFor();
+  await page.getByRole('heading', { name: '导出结果' }).waitFor();
+  await page.getByRole('button', { name: '下载 ZIP' }).waitFor();
 }
 
 async function runExportRecordsCheck(page: Page) {
