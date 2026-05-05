@@ -358,7 +358,9 @@ export async function GET(request: NextRequest) {
       query = query.gte('created_at', createdFrom);
     }
     if (createdTo) {
-      query = query.lte('created_at', createdTo);
+      // 如果只传了日期（不含时间），则加一天以包含当天全天数据
+      const endDate = createdTo.length === 10 ? createdTo + 'T23:59:59.999Z' : createdTo;
+      query = query.lte('created_at', endDate);
     }
 
     query = query.order('created_at', { ascending: false });

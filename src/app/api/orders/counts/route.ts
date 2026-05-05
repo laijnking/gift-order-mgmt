@@ -5,6 +5,11 @@ import { isManagementRole } from '@/lib/roles';
 import { extractName, getUserRealNameByUsername } from '@/lib/order-service';
 import { PERMISSIONS } from '@/lib/permissions';
 
+// 如果只传了日期（10字符，如"2026-05-05"），补充时间戳以包含当天全天
+function normalizeDateEnd(dateStr: string): string {
+  return dateStr.length === 10 ? dateStr + 'T23:59:59.999Z' : dateStr;
+}
+
 // 获取订单状态统计（用于快捷筛选数量）
 export async function GET(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_VIEW);
@@ -39,7 +44,7 @@ export async function GET(request: NextRequest) {
     if (importBatch) totalQ.eq('import_batch', importBatch);
     if (search) totalQ.or(`order_no.ilike.%${search}%,sys_order_no.ilike.%${search}%,receiver_name.ilike.%${search}%,receiver_phone.ilike.%${search}%`);
     if (createdFrom) totalQ.gte('created_at', createdFrom);
-    if (createdTo) totalQ.lte('created_at', createdTo);
+    if (createdTo) totalQ.lte('created_at', normalizeDateEnd(createdTo));
     const { count: total } = await totalQ;
 
     // Count per status in parallel
@@ -61,7 +66,7 @@ export async function GET(request: NextRequest) {
       if (importBatch) q = q.eq('import_batch', importBatch);
       if (search) q = q.or(`order_no.ilike.%${search}%,sys_order_no.ilike.%${search}%,receiver_name.ilike.%${search}%,receiver_phone.ilike.%${search}%`);
       if (createdFrom) q = q.gte('created_at', createdFrom);
-      if (createdTo) q = q.lte('created_at', createdTo);
+      if (createdTo) q = q.lte('created_at', normalizeDateEnd(createdTo));
       q = q.eq('status', status);
       const { count } = await q;
       counts[status] = count ?? 0;
