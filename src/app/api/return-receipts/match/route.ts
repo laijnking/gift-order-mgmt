@@ -155,25 +155,29 @@ export async function POST(request: NextRequest) {
         const hasExistingReceipt = Boolean(existingTrackingNo) && existingOrder?.status !== 'returned';
         const newStatus = hasExistingReceipt ? 'partial_returned' : 'returned';
 
-        await client
-          .from('orders')
-          .update({
-            tracking_no: newTrackingNo || undefined,
-            express_company: newExpressCompany || undefined,
-            freight_cost: receipt.freight_cost || undefined,
-            status: newStatus,
-            returned_at: now,
-            updated_at: now,
-          })
-          .eq('id', matchedOrder.id);
+        // 只有当回单包含物流信息（快递公司或快递单号）时才更新订单状态为已回单
+        const hasLogisticsInfo = Boolean(receipt.express_company || receipt.tracking_no);
+        if (hasLogisticsInfo) {
+          await client
+            .from('orders')
+            .update({
+              tracking_no: newTrackingNo || undefined,
+              express_company: newExpressCompany || undefined,
+              freight_cost: receipt.freight_cost || undefined,
+              status: newStatus,
+              returned_at: now,
+              updated_at: now,
+            })
+            .eq('id', matchedOrder.id);
 
-        await syncOrderCostHistoryAfterReturn(client, {
-          orderId: matchedOrder.id,
-          expressCompany: receipt.express_company,
-          trackingNo: receipt.tracking_no,
-          freightCost: receipt.freight_cost,
-          returnedAt: now,
-        });
+          await syncOrderCostHistoryAfterReturn(client, {
+            orderId: matchedOrder.id,
+            expressCompany: receipt.express_company,
+            trackingNo: receipt.tracking_no,
+            freightCost: receipt.freight_cost,
+            returnedAt: now,
+          });
+        }
 
         autoMatchedCount++;
         results.push({

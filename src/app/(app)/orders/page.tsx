@@ -29,6 +29,14 @@ import {
 import { PageGuard } from '@/components/auth/page-guard';
 import { toast } from 'sonner';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   Package,
   Download,
   SlidersHorizontal,
@@ -41,6 +49,7 @@ import {
   AlertCircle,
   X,
   RefreshCw,
+  Loader2,
 } from 'lucide-react';
 import {
   getOrderStatusBadgeClass,
@@ -206,6 +215,11 @@ export default function OrdersPage() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
+  // --- Feedback confirm dialog ---
+  const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [feedbackGroups, setFeedbackGroups] = useState<Array<{ customerId: string; customerName: string; orderCount: number }>>([]);
+
   // --- Selection actions (使用 session 函数确保勾选稳定) ---
   const handleSelectAll = () => {
     if (selectedOrderIds.length === filteredOrders.length) {
@@ -356,35 +370,67 @@ export default function OrdersPage() {
   };
 
   // --- Feedback ---
-  const handleFeedback = useCallback(async () => {
+  const openFeedbackConfirm = useCallback(() => {
     const targetIds = selectedOrderIds.length > 0
       ? selectedOrderIds
       : filteredOrders.filter(o => o.status === ORDER_STATUS_RETURNED).map(o => o.id);
     if (targetIds.length === 0) { toast.error('没有可反馈的订单（需已回单状态）'); return; }
     const targetOrders = orders.filter(o => targetIds.includes(o.id) && o.status === ORDER_STATUS_RETURNED);
-    const lines = targetOrders.map(
-      o => `${o.sysOrderNo || o.orderNo}\t${o.receiver.name}\t${o.receiver.phone}\t${o.receiver.address}\t${o.supplierName || '-'}\t${o.trackingNo || '-'}\t${o.expressCompany || '-'}`
-    );
-    const text = `系统单号\t收货人\t电话\t地址\t发货方\t快递单号\t快递公司\n${lines.join('\n')}`;
-    navigator.clipboard.writeText(text);
+    if (targetOrders.length === 0) { toast.error('所选订单中没有已回单状态的记录'); return; }
+    // 按客户分组统计
+    const groupMap = new Map<string, { customerId: string; customerName: string; orderCount: number }>();
+    for (const o of targetOrders) {
+      const cid = o.customerId || 'unknown';
+      if (!groupMap.has(cid)) {
+        groupMap.set(cid, { customerId: cid, customerName: o.customerName || '未知客户', orderCount: 0 });
+      }
+      groupMap.get(cid)!.orderCount++;
+    }
+    setFeedbackGroups(Array.from(groupMap.values()));
+    setFeedbackDialogOpen(true);
+  }, [selectedOrderIds, filteredOrders, orders]);
+
+  const handleFeedbackConfirm = useCallback(async () => {
+    setFeedbackLoading(true);
     try {
-      const promises = targetOrders.map(order =>
-        fetch('/api/orders', {
-          method: 'PATCH',
-          headers: session.authHeaders(),
-          body: JSON.stringify({ id: order.id, status: ORDER_STATUS_FEEDBACKED }),
-        })
-      );
-      const results = await Promise.all(promises);
-      const dataArr = await Promise.all(results.map(r => r.json()));
-      const successCount = dataArr.filter(d => d.success).length;
-      toast.success(`已复制 ${targetOrders.length} 条订单信息，并标记 ${successCount} 条为已反馈`);
+      const customerIds = feedbackGroups.map(g => g.customerId);
+      const res = await fetch('/api/export-feedback/returned-batch', {
+        method: 'POST',
+        headers: { ...session.authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customerIds, persistenceMode: 'none' }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        toast.error(data.error || '导出失败');
+        return;
+      }
+      // 下载 ZIP 文件
+      const zipBase64 = data.data?.zipBase64;
+      if (zipBase64) {
+        const byteChars = atob(zipBase64);
+        const byteNums = new Array(byteChars.length);
+        for (let i = 0; i < byteChars.length; i++) byteNums[i] = byteChars.charCodeAt(i);
+        const byteArr = new Uint8Array(byteNums);
+        const blob = new Blob([byteArr], { type: 'application/zip' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = data.data.zipFileName || '客户反馈批量导出.zip';
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+      const feedbackedCount = data.data?.feedbackedCount || 0;
+      toast.success(`已导出 ${data.data?.totalOrderCount || 0} 条订单，并标记 ${feedbackedCount} 条为已反馈`);
       clearSelection();
       fetchOrders();
-    } catch {
-      toast.warning('已复制反馈内容，但状态标记失败，请稍后重试');
+    } catch (error) {
+      console.error('反馈导出失败:', error);
+      toast.error('反馈导出失败，请稍后重试');
+    } finally {
+      setFeedbackLoading(false);
+      setFeedbackDialogOpen(false);
     }
-  }, [selectedOrderIds, filteredOrders, orders, session.authHeaders, fetchOrders, setSelectedOrderIds]);
+  }, [feedbackGroups, session.authHeaders, fetchOrders, clearSelection]);
 
   // --- Export Kingdee ---
   const handleExportKingdee = useCallback(async () => {
@@ -738,7 +784,7 @@ export default function OrdersPage() {
             onAssign={() => openAssignDialog(null)}
             onShipNotice={handleShipNotice}
             onReturn={() => setReturnDialogOpen(true)}
-            onFeedback={handleFeedback}
+            onFeedback={openFeedbackConfirm}
             onExportKingdee={handleExportKingdee}
             onDelete={() => openDeleteConfirm(selectedOrderIds)}
           />
@@ -1092,6 +1138,48 @@ export default function OrdersPage() {
           onSingleAssign={handleAssign}
           onBatchAssign={handleBatchAssignFromMatch_}
         />
+
+        {/* Feedback confirm dialog */}
+        <Dialog open={feedbackDialogOpen} onOpenChange={setFeedbackDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>确认反馈给客户</DialogTitle>
+              <DialogDescription>
+                将按客户导入时的 Excel 模板格式生成反馈文件并导出，导出后订单状态将变更为"已反馈"。
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2 max-h-[200px] overflow-y-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>客户</TableHead>
+                    <TableHead className="text-right">订单数</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {feedbackGroups.map(g => (
+                    <TableRow key={g.customerId}>
+                      <TableCell>{g.customerName}</TableCell>
+                      <TableCell className="text-right">{g.orderCount}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <p className="text-sm font-medium text-right">
+                合计：{feedbackGroups.reduce((s, g) => s + g.orderCount, 0)} 条订单
+              </p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setFeedbackDialogOpen(false)} disabled={feedbackLoading}>
+                取消
+              </Button>
+              <Button onClick={handleFeedbackConfirm} disabled={feedbackLoading}>
+                {feedbackLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                确认导出并反馈
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </PageGuard>
   );

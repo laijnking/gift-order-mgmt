@@ -276,7 +276,7 @@ export default function ReturnReceiptPage() {
         return {
           customerOrderNo: row['系统订单'] || row['系统订单号'] || row['系统订单号（请勿删除和修改）'] || row['客户订单号'] || row['订单号'] || row.customerOrderNo || row.orderNo || row['单据编号'] || '',
           supplierOrderNo: row['发货方单据号'] || row.supplierOrderNo || '',
-          expressCompany: row['快递公司'] || row.expressCompany || '',
+          expressCompany: row['快递公司'] || (row as Record<string, string>)['物流方'] || row.expressCompany || '',
           trackingNo: row['快递单号'] || row.trackingNo || row['物流单号'] || '',
           shipDate: row['发货日期'] || row.shipDate || row['日期'] || null,
           freightCost,

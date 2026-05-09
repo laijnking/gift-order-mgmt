@@ -88,10 +88,12 @@ export interface Order {
     productName: string;
     productSpec?: string;
     productCode?: string;
+    productBrand?: string;
     unitPrice?: number | null;
     cuProductName?: string;
     cuProductCode?: string;
     cuProductSpec?: string;
+    cuBarcode?: string;
     quantity: number;
     price?: number;
     amount?: number;
@@ -106,6 +108,7 @@ export interface Order {
     product_code?: string;
   }>;
   receiver: { name: string; phone: string; address: string; province?: string; city?: string; district?: string };
+  customerId?: string;
   customerCode?: string;
   customerName?: string;
   salesperson?: string;

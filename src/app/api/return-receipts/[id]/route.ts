@@ -140,35 +140,39 @@ export async function PATCH(
     // 状态判断
     const newStatus = hasExistingReceipt ? 'partial_returned' : 'returned';
 
-    const orderUpdatePayload: Record<string, unknown> = {
-      status: newStatus,
-      returned_at: now,
-      updated_at: now,
-    };
+    // 只有当回单包含物流信息（快递公司或快递单号）时才更新订单状态为已回单
+    const hasLogisticsInfo = Boolean(receipt.express_company || receipt.tracking_no);
+    if (hasLogisticsInfo) {
+      const orderUpdatePayload: Record<string, unknown> = {
+        status: newStatus,
+        returned_at: now,
+        updated_at: now,
+      };
 
-    if (receipt.express_company || receipt.tracking_no) {
-      orderUpdatePayload.express_company = newExpressCompany || undefined;
-      orderUpdatePayload.tracking_no = newTrackingNo || undefined;
+      if (receipt.express_company || receipt.tracking_no) {
+        orderUpdatePayload.express_company = newExpressCompany || undefined;
+        orderUpdatePayload.tracking_no = newTrackingNo || undefined;
+      }
+
+      if (receipt.freight_cost !== undefined && receipt.freight_cost !== null) {
+        orderUpdatePayload.freight_cost = receipt.freight_cost;
+      }
+
+      const { error: orderUpdateError } = await client
+        .from('orders')
+        .update(orderUpdatePayload)
+        .eq('id', orderId);
+
+      if (orderUpdateError) throw new Error(`更新订单物流信息失败: ${orderUpdateError.message}`);
+
+      await syncOrderCostHistoryAfterReturn(client, {
+        orderId,
+        expressCompany: receipt.express_company,
+        trackingNo: receipt.tracking_no,
+        freightCost: receipt.freight_cost,
+        returnedAt: now,
+      });
     }
-
-    if (receipt.freight_cost !== undefined && receipt.freight_cost !== null) {
-      orderUpdatePayload.freight_cost = receipt.freight_cost;
-    }
-
-    const { error: orderUpdateError } = await client
-      .from('orders')
-      .update(orderUpdatePayload)
-      .eq('id', orderId);
-
-    if (orderUpdateError) throw new Error(`更新订单物流信息失败: ${orderUpdateError.message}`);
-
-    await syncOrderCostHistoryAfterReturn(client, {
-      orderId,
-      expressCompany: receipt.express_company,
-      trackingNo: receipt.tracking_no,
-      freightCost: receipt.freight_cost,
-      returnedAt: now,
-    });
 
     // 更新导入记录的匹配数量
     if (receipt) {

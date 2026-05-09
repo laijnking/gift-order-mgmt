@@ -78,7 +78,7 @@ function normalizeImportedReceipt(record: ImportedReceiptInput): NormalizedRecei
       record['客户订单号']
     ),
     supplierOrderNo: normalizeText(record.supplierOrderNo || record.supplier_order_no || record['发货方单据号']),
-    expressCompany: normalizeText(record.expressCompany || record.express_company || record['快递公司']),
+    expressCompany: normalizeText(record.expressCompany || record.express_company || record['快递公司'] || (record as Record<string, unknown>)['物流方']),
     trackingNo: normalizeText(record.trackingNo || record.tracking_no || record['快递单号'] || record['物流单号']),
     shipDate: normalizeText(record.shipDate || record.ship_date || record['发货日期'] || record['日期']) || null,
     freightCost: typeof rawFreight === 'number' ? rawFreight : rawFreight ? Number(rawFreight) : null,

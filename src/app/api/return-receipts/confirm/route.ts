@@ -72,38 +72,42 @@ export async function POST(request: NextRequest) {
         // 状态判断：如果订单已有回单记录，则为部分回单
         const newStatus = hasExistingReceipt ? 'partial_returned' : 'returned';
 
-        // 更新订单物流信息
-        const { error: updateError } = await client
-          .from('orders')
-          .update({
-            express_company: newExpressCompany || undefined,
-            tracking_no: newTrackingNo || undefined,
-            freight_cost: receipt.freight_cost || undefined,
-            status: newStatus,
-            returned_at: now,
-            updated_at: now,
-          })
-          .eq('id', receipt.order_id);
+        // 只有当回单包含物流信息（快递公司或快递单号）时才更新订单状态为已回单
+        const hasLogisticsInfo = Boolean(receipt.express_company || receipt.tracking_no);
+        if (hasLogisticsInfo) {
+          // 更新订单物流信息
+          const { error: updateError } = await client
+            .from('orders')
+            .update({
+              express_company: newExpressCompany || undefined,
+              tracking_no: newTrackingNo || undefined,
+              freight_cost: receipt.freight_cost || undefined,
+              status: newStatus,
+              returned_at: now,
+              updated_at: now,
+            })
+            .eq('id', receipt.order_id);
 
-        if (!updateError) {
-          matchedCount++;
-          if (hasExistingReceipt) partialReturnCount++;
-          updatedOrderIds.push(receipt.order_id);
+          if (!updateError) {
+            matchedCount++;
+            if (hasExistingReceipt) partialReturnCount++;
+            updatedOrderIds.push(receipt.order_id);
 
-          // 更新回单状态为已确认
-          await client
-            .from('return_receipts')
-            .update({ matched_at: now })
-            .eq('id', receipt.id);
-
-          await syncOrderCostHistoryAfterReturn(client, {
-            orderId: receipt.order_id,
-            expressCompany: receipt.express_company,
-            trackingNo: receipt.tracking_no,
-            freightCost: receipt.freight_cost,
-            returnedAt: now,
-          });
+            await syncOrderCostHistoryAfterReturn(client, {
+              orderId: receipt.order_id,
+              expressCompany: receipt.express_company,
+              trackingNo: receipt.tracking_no,
+              freightCost: receipt.freight_cost,
+              returnedAt: now,
+            });
+          }
         }
+
+        // 更新回单状态为已确认
+        await client
+          .from('return_receipts')
+          .update({ matched_at: now })
+          .eq('id', receipt.id);
       }
     }
 

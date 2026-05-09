@@ -235,6 +235,32 @@ export async function POST(request: NextRequest) {
     const zipBase64 = zipBuffer.toString('base64');
     const responseTemplateSource = summarizeTemplateSource(results, templateSource);
 
+    // 导出成功后，将所有已导出订单状态更新为 feedbacked
+    const exportedOrderIds: string[] = [];
+    for (const customerId of customerIds) {
+      const { data: customerOrders } = await client
+        .from('orders')
+        .select('id')
+        .eq('customer_id', customerId)
+        .eq('status', 'returned');
+      if (customerOrders) {
+        for (const o of customerOrders) {
+          exportedOrderIds.push(o.id);
+        }
+      }
+    }
+    let feedbackedCount = 0;
+    if (exportedOrderIds.length > 0) {
+      const now = new Date().toISOString();
+      const { error: feedbackError } = await client
+        .from('orders')
+        .update({ status: 'feedbacked', feedbacked_at: now, updated_at: now })
+        .in('id', exportedOrderIds);
+      if (!feedbackError) {
+        feedbackedCount = exportedOrderIds.length;
+      }
+    }
+
     if (resolvedPersistenceMode === 'none') {
       return NextResponse.json({
         success: true,
@@ -252,6 +278,7 @@ export async function POST(request: NextRequest) {
           templateName,
           templateSource: responseTemplateSource,
           persistenceMode: resolvedPersistenceMode,
+          feedbackedCount,
           details: results,
         },
       });
@@ -310,6 +337,7 @@ export async function POST(request: NextRequest) {
         templateName,
         templateSource: responseTemplateSource,
         persistenceMode: resolvedPersistenceMode,
+        feedbackedCount,
         details: results,
       },
     });

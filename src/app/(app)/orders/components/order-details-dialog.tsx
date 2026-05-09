@@ -243,6 +243,8 @@ export function OrderDetailsDialog({
                     <TableHead>商品名称</TableHead>
                     <TableHead>规格型号</TableHead>
                     <TableHead>商品编码</TableHead>
+                    <TableHead>品牌</TableHead>
+                    <TableHead>客户SKU</TableHead>
                     <TableHead className="text-right">数量</TableHead>
                     <TableHead className="text-right">单价</TableHead>
                     <TableHead className="text-right">小计</TableHead>
@@ -285,6 +287,12 @@ export function OrderDetailsDialog({
                           <div className="text-orange-500">客:{item.cuProductCode}</div>
                         )}
                       </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {item.productBrand || '-'}
+                      </TableCell>
+                      <TableCell className="text-xs font-mono text-muted-foreground">
+                        {item.cuProductCode && item.cuProductCode !== item.product_code ? item.cuProductCode : (item.cuBarcode || '-')}
+                      </TableCell>
                       <TableCell className="text-right">{item.quantity}</TableCell>
                       <TableCell className="text-right">
                         {item.price ? `¥${item.price.toFixed(2)}` : (item.unitPrice ? `¥${item.unitPrice.toFixed(2)}` : '-')}
@@ -304,6 +312,9 @@ export function OrderDetailsDialog({
                 {firstItem.matchType === 'name' && '按商品名称模糊匹配'}
                 {firstItem.matchType === 'mapping' && '按SKU映射匹配'}
                 {firstItem.matchType === 'none' && '未匹配到商品档案'}
+                {firstItem.matchHint && (
+                  <span className="ml-2 text-gray-500">({firstItem.matchHint})</span>
+                )}
               </div>
             )}
           </div>
