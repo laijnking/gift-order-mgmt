@@ -171,19 +171,6 @@ export async function POST(request: NextRequest) {
 
     const newVersion = (existing?.version || 0) + 1;
 
-    // 先将旧的配置标记为非活跃（优先 customer_id）
-    let deactivateQuery = client
-      .from('column_mappings')
-      .update({ is_active: false })
-      .eq('is_active', true);
-
-    if (customerId) {
-      deactivateQuery = deactivateQuery.eq('customer_id', customerId);
-    } else {
-      deactivateQuery = deactivateQuery.eq('customer_code', customerCode);
-    }
-    await deactivateQuery;
-
     const insertPayload: Record<string, unknown> = {
       customer_id: customerId,
       customer_code: customerCode,
@@ -226,6 +213,20 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) throw new Error(`保存字段映射失败: ${error.message}`);
+
+    // 新记录插入成功后，再停用该客户的旧活跃版本（避免插入失败导致无活跃记录）
+    const newMappingId = (data as Record<string, unknown>)?.id;
+    let deactivateQuery = client
+      .from('column_mappings')
+      .update({ is_active: false })
+      .eq('is_active', true)
+      .neq('id', newMappingId as string);
+    if (customerId) {
+      deactivateQuery = deactivateQuery.eq('customer_id', customerId);
+    } else {
+      deactivateQuery = deactivateQuery.eq('customer_code', customerCode);
+    }
+    await deactivateQuery;
 
     return NextResponse.json({
       success: true,

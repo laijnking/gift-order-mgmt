@@ -85,23 +85,30 @@ export async function POST(request: NextRequest) {
         .single();
 
       const customerName = customer?.name || '未知客户';
-      // 优先按 customer_id 匹配，fallback 到 customer_code
+      // 按 customer_id + customer_code 匹配列映射
+      // 先查活跃版本，查不到则取最新版本（容错 is_active=false 的异常情况）
       const orderCustomerCode = orders[0]?.customer_code || '';
-      let mappingQuery = client
-        .from('column_mappings')
-        .select('id, version, mapping_config, feedback_export_headers, column_order')
-        .eq('is_active', true);
-      if (customerId && customerId !== 'unknown') {
-        mappingQuery = mappingQuery.eq('customer_id', customerId);
-      } else if (orderCustomerCode && orderCustomerCode !== 'UNKNOWN') {
-        mappingQuery = mappingQuery.eq('customer_code', orderCustomerCode);
-      } else {
-        mappingQuery = mappingQuery.eq('customer_code', '');
+      const buildMappingQuery = (activeOnly: boolean) => {
+        let q = client
+          .from('column_mappings')
+          .select('id, version, mapping_config, feedback_export_headers, column_order')
+          .order('version', { ascending: false })
+          .limit(1);
+        if (activeOnly) q = q.eq('is_active', true);
+        if (customerId && orderCustomerCode) {
+          q = q.or(`customer_id.eq.${customerId},customer_code.eq.${orderCustomerCode}`);
+        } else if (customerId) {
+          q = q.eq('customer_id', customerId);
+        } else if (orderCustomerCode) {
+          q = q.eq('customer_code', orderCustomerCode);
+        }
+        return q;
+      };
+      let { data: customerMapping } = await buildMappingQuery(true).maybeSingle();
+      if (!customerMapping) {
+        const fallbackRes = await buildMappingQuery(false).maybeSingle();
+        customerMapping = fallbackRes.data ?? null;
       }
-      const { data: customerMapping } = await mappingQuery
-        .order('version', { ascending: false })
-        .limit(1)
-        .maybeSingle();
 
       const rawFeedbackHeaders = customerMapping?.feedback_export_headers;
       let feedbackExportHeaders: Record<string, string> | null = null;

@@ -89,21 +89,27 @@ export async function POST(request: NextRequest) {
 
       const customerName = customer?.name || '未知客户';
       const orderCustomerCode = orders[0]?.customer_code || '';
-      let mappingQuery = client
-        .from('column_mappings')
-        .select('id, version, mapping_config, feedback_export_headers, column_order')
-        .eq('is_active', true);
-      if (customerId && customerId !== 'unknown') {
-        mappingQuery = mappingQuery.eq('customer_id', customerId);
-      } else if (orderCustomerCode && orderCustomerCode !== 'UNKNOWN') {
-        mappingQuery = mappingQuery.eq('customer_code', orderCustomerCode);
-      } else {
-        mappingQuery = mappingQuery.eq('customer_code', '');
+      const buildMappingQuery = (activeOnly: boolean) => {
+        let q = client
+          .from('column_mappings')
+          .select('id, version, mapping_config, feedback_export_headers, column_order')
+          .order('version', { ascending: false })
+          .limit(1);
+        if (activeOnly) q = q.eq('is_active', true);
+        if (customerId && orderCustomerCode) {
+          q = q.or(`customer_id.eq.${customerId},customer_code.eq.${orderCustomerCode}`);
+        } else if (customerId) {
+          q = q.eq('customer_id', customerId);
+        } else if (orderCustomerCode) {
+          q = q.eq('customer_code', orderCustomerCode);
+        }
+        return q;
+      };
+      let { data: customerMapping } = await buildMappingQuery(true).maybeSingle();
+      if (!customerMapping) {
+        const fallbackRes = await buildMappingQuery(false).maybeSingle();
+        customerMapping = fallbackRes.data ?? null;
       }
-      const { data: customerMapping } = await mappingQuery
-        .order('version', { ascending: false })
-        .limit(1)
-        .maybeSingle();
 
       const rawFeedbackHeaders = customerMapping?.feedback_export_headers;
       let feedbackExportHeaders: Record<string, string> | null = null;
