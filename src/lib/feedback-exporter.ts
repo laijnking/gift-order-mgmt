@@ -64,6 +64,38 @@ export const DEFAULT_CUSTOMER_FEEDBACK_MAPPINGS: Record<string, string> = {
   '原订单状态': 'originalStatus',
 };
 
+export const SNAKE_TO_CAMEL: Record<string, string> = {
+  'order_no': 'orderNo',
+  'customer_order_no': 'customerOrderNo',
+  'supplier_order_no': 'supplierOrderNo',
+  'customer_code': 'customerCode',
+  'customer_name': 'customerName',
+  'supplier_name': 'supplierName',
+  'product_name': 'productName',
+  'product_code': 'productCode',
+  'product_spec': 'productSpec',
+  'customer_product_name': 'productName',
+  'customer_product_code': 'productCode',
+  'customer_product_spec': 'productSpec',
+  'receiver_name': 'receiverName',
+  'receiver_phone': 'receiverPhone',
+  'receiver_address': 'receiverAddress',
+  'express_company': 'expressCompany',
+  'tracking_no': 'trackingNo',
+  'salesperson': 'salesperson',
+  'operator': 'operator',
+  'remark': 'remark',
+  'quantity': 'quantity',
+  'price': 'price',
+  'amount': 'amount',
+  'warehouse': 'warehouse',
+  'sys_order_no': 'sysOrderNo',
+  'match_code': 'matchCode',
+  'dispatch_batch': 'dispatchBatch',
+  'unit_cost': 'unitCost',
+  'warehouse_name': 'warehouseName',
+};
+
 export function buildFeedbackRows(
   orders: Record<string, unknown>[],
   fieldMappings: Record<string, string>,
@@ -73,6 +105,16 @@ export function buildFeedbackRows(
   const normalizedMappings = Object.keys(fieldMappings).length > 0
     ? fieldMappings
     : DEFAULT_CUSTOMER_FEEDBACK_MAPPINGS;
+
+  // 将 feedbackExportHeaders 的值从 snake_case 迁移到 camelCase
+  // 以匹配 context 对象的 key（如 customer_product_name → productName）
+  if (feedbackExportHeaders) {
+    const migrated: Record<string, string> = {};
+    for (const [k, v] of Object.entries(feedbackExportHeaders)) {
+      migrated[k] = SNAKE_TO_CAMEL[String(v)] ?? String(v);
+    }
+    feedbackExportHeaders = migrated;
+  }
 
   return orders.flatMap((order) => {
     const items = parseItems(order.items);
