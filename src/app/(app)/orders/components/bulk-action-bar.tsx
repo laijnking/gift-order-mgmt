@@ -97,11 +97,6 @@ export function BulkActionBar({
       >
         <Icon className="w-4 h-4 mr-1.5" />
         {children}
-        {ctx.selectedCount > 0 && (
-          <Badge variant="secondary" className="ml-1.5 h-5 px-1.5 text-xs">
-            {ctx.selectedCount}
-          </Badge>
-        )}
       </Button>
     );
 
@@ -204,9 +199,9 @@ export function BulkActionBar({
         icon={Archive}
       >
         导出金蝶
-        {(ctx.returnedCount + ctx.feedbackableCount) > 0 && (
+        {ctx.feedbackableCount > 0 && (
           <Badge variant="secondary" className="ml-1.5 h-5 px-1.5 text-xs">
-            {ctx.returnedCount + ctx.feedbackableCount}
+            {ctx.feedbackableCount}
           </Badge>
         )}
       </ActionButton>

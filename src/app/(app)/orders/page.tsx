@@ -242,7 +242,10 @@ export default function OrdersPage() {
   const doSmartMatch = useCallback(async () => {
     const targetIds = assigningOrderId
       ? [assigningOrderId]
-      : selectedOrderIds;
+      : selectedOrderIds.filter(id => {
+          const order = orders.find(o => o.id === id);
+          return order && order.status === 'pending';
+        });
     if (targetIds.length === 0) {
       toast.error('请选择要分配的订单');
       return;
@@ -1095,8 +1098,20 @@ export default function OrdersPage() {
           suppliers={suppliers}
           onSubmit={handleUpdateOrder}
           loading={editLoading}
-          productPickerOpen={editProductPickerOpen}
-          setProductPickerOpen={setEditProductPickerOpen}
+          editProductPickerOpen={editProductPickerOpen}
+          setEditProductPickerOpen={setEditProductPickerOpen}
+          onEditProductSelect={(product) => {
+            if (product) {
+              setEditForm(prev => ({
+                ...prev,
+                productId: product.id,
+                productName: product.name,
+                productCode: product.code,
+                productSpec: product.spec || '',
+                productBrand: product.brand || '',
+              }));
+            }
+          }}
           canEdit={true}
           getEditDisabledReason={() => null}
         />

@@ -14,14 +14,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -29,8 +21,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Search } from 'lucide-react';
 import { getOrderStatusBadgeClass, getOrderStatusLabel, ORDER_STATUS_OPTIONS } from '@/lib/order-status';
+import { ProductPickerDialog } from '@/components/product/product-picker-dialog';
+import type { ProductPickerItem } from '@/components/product/product-picker-dialog';
 import type { OrderStatus } from '@/types/order';
 import type { Order } from '../hooks/use-orders-session';
 import type { Supplier } from '../hooks/use-orders-session';
@@ -39,6 +33,7 @@ export interface EditOrderForm {
   id: string;
   orderNo: string;
   customerCode: string;
+  productId: string;
   productName: string;
   productCode: string;
   productSpec: string;
@@ -67,8 +62,9 @@ interface OrderEditDialogProps {
   suppliers: Supplier[];
   onSubmit: () => void;
   loading: boolean;
-  productPickerOpen: boolean;
-  setProductPickerOpen: (open: boolean) => void;
+  editProductPickerOpen: boolean;
+  setEditProductPickerOpen: (open: boolean) => void;
+  onEditProductSelect: (product: ProductPickerItem | null) => void;
   canEdit: boolean;
   getEditDisabledReason: (order: Order) => string | null;
 }
@@ -81,8 +77,9 @@ export function OrderEditDialog({
   suppliers,
   onSubmit,
   loading,
-  productPickerOpen,
-  setProductPickerOpen,
+  editProductPickerOpen,
+  setEditProductPickerOpen,
+  onEditProductSelect,
 }: OrderEditDialogProps) {
   const isLocked = LOCKED_STATUSES.includes(form.status as OrderStatus);
 
@@ -105,7 +102,7 @@ export function OrderEditDialog({
                       </span>
                     ) : (
                       <span className="text-xs text-muted-foreground">
-                        可修改：发货方、状态、物流信息、收货信息
+                        可修改：发货方、状态、物流信息、收货信息、商品信息
                       </span>
                     )}
                   </span>
@@ -133,7 +130,19 @@ export function OrderEditDialog({
                 </div>
               </div>
               <div className="space-y-2 mt-3">
-                <Label className="text-muted-foreground">商品名称</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-muted-foreground">匹配系统商品</Label>
+                  {!isLocked && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditProductPickerOpen(true)}
+                    >
+                      <Search className="w-3 h-3 mr-1" />
+                      选择系统商品
+                    </Button>
+                  )}
+                </div>
                 <div className="flex gap-2">
                   <Input
                     value={form.productName}
@@ -288,6 +297,13 @@ export function OrderEditDialog({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ProductPickerDialog
+        open={editProductPickerOpen}
+        onOpenChange={setEditProductPickerOpen}
+        onSelect={onEditProductSelect}
+        title="选择匹配的系统商品"
+      />
     </>
   );
 }

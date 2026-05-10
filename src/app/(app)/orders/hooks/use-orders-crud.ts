@@ -44,6 +44,7 @@ export function useOrdersCrud({
     id: '',
     orderNo: '',
     customerCode: '',
+    productId: '',
     productName: '',
     productCode: '',
     productSpec: '',
@@ -147,6 +148,8 @@ export function useOrdersCrud({
       id: order.id,
       orderNo: order.orderNo,
       customerCode: order.customerCode || '',
+      productId: (firstItem as Record<string, unknown>).productId as string
+        || (firstItem as Record<string, unknown>).product_id as string || '',
       productName: (firstItem as Record<string, unknown>).cuProductName as string
         || (firstItem as Record<string, unknown>).product_name as string || '',
       productCode: (firstItem as Record<string, unknown>).productCode as string || '',
@@ -186,6 +189,7 @@ export function useOrdersCrud({
           product_spec: editForm.productSpec || '',
           product_brand: editForm.productBrand || '',
           quantity: editForm.quantity || 1,
+          product_id: editForm.productId || '',
         }],
         receiver_name: editForm.receiverName,
         receiver_phone: editForm.receiverPhone,
