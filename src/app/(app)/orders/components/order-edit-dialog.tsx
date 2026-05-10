@@ -21,7 +21,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Loader2, Search } from 'lucide-react';
+import { Loader2, Search, ChevronDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { getOrderStatusBadgeClass, getOrderStatusLabel, ORDER_STATUS_OPTIONS } from '@/lib/order-status';
 import { ProductPickerDialog } from '@/components/product/product-picker-dialog';
 import type { ProductPickerItem } from '@/components/product/product-picker-dialog';
@@ -82,6 +88,9 @@ export function OrderEditDialog({
   onEditProductSelect,
 }: OrderEditDialogProps) {
   const isLocked = LOCKED_STATUSES.includes(form.status as OrderStatus);
+  const [supplierSearchOpen, setSupplierSearchOpen] = useState(false);
+  const [supplierSearch, setSupplierSearch] = useState('');
+  const selectedSupplierName = suppliers.find(s => s.id === form.supplierId)?.name || form.supplierName;
 
   return (
     <>
@@ -172,23 +181,76 @@ export function OrderEditDialog({
               <div className="space-y-3">
                 <div className="space-y-2">
                   <Label>发货方</Label>
-                  <Select
-                    value={form.supplierId}
-                    onValueChange={(val) => {
-                      const supplier = suppliers.find(s => s.id === val);
-                      setForm(prev => ({ ...prev, supplierId: val, supplierName: supplier?.name || '' }));
-                    }}
-                    disabled={isLocked}
-                  >
-                    <SelectTrigger className={isLocked ? 'bg-muted' : ''}>
-                      <SelectValue placeholder="选择发货方" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {suppliers.map(s => (
-                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={supplierSearchOpen} onOpenChange={(open) => { if (!isLocked) setSupplierSearchOpen(open); }}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        disabled={isLocked}
+                        className={cn(
+                          'w-full justify-start text-left font-normal h-9',
+                          !form.supplierId && 'text-muted-foreground',
+                          isLocked && 'bg-muted'
+                        )}
+                      >
+                        {form.supplierId ? (
+                          <span className="truncate">{selectedSupplierName || form.supplierId}</span>
+                        ) : (
+                          <span className="truncate">请搜索并选择发货方...</span>
+                        )}
+                        <ChevronDown className="ml-auto h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                      <div className="p-2 border-b">
+                        <Input
+                          placeholder="输入发货方名称搜索..."
+                          value={supplierSearch}
+                          onChange={(e) => setSupplierSearch(e.target.value)}
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      <div className="p-1 max-h-[240px] overflow-y-auto">
+                        <button
+                          onClick={() => {
+                            setForm(prev => ({ ...prev, supplierId: '', supplierName: '' }));
+                            setSupplierSearch('');
+                            setSupplierSearchOpen(false);
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm rounded hover:bg-muted cursor-pointer text-muted-foreground"
+                        >
+                          -- 不指定 --
+                        </button>
+                        {suppliers
+                          .filter((s) => s.name.toLowerCase().includes(supplierSearch.toLowerCase()))
+                          .slice(0, 50)
+                          .map((s) => (
+                            <button
+                              key={s.id}
+                              onClick={() => {
+                                setForm(prev => ({ ...prev, supplierId: s.id, supplierName: s.name }));
+                                setSupplierSearch('');
+                                setSupplierSearchOpen(false);
+                              }}
+                              className={cn(
+                                'w-full text-left px-3 py-2 text-sm rounded hover:bg-muted cursor-pointer',
+                                form.supplierId === s.id && 'bg-primary/10 text-primary'
+                              )}
+                            >
+                              <div className="flex flex-col">
+                                <span className="font-medium truncate">{s.name}</span>
+                                <span className="text-xs text-muted-foreground">编码: {s.id}</span>
+                              </div>
+                            </button>
+                          ))}
+                        {suppliers.filter((s) => s.name.toLowerCase().includes(supplierSearch.toLowerCase())).length === 0 && (
+                          <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+                            未找到匹配的发货方
+                          </div>
+                        )}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="space-y-2">
                   <Label>订单状态</Label>

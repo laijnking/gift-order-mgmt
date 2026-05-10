@@ -137,12 +137,12 @@ export function useOrdersDispatch({
           id: assigningOrderId,
           supplier_id: selectedSupplierId,
           supplier_name: supplier?.name || '',
-          status: 'pending',
+          status: 'assigned',
         }),
       });
       const data = await res.json();
       if (data.success) {
-        toast.success('已分配发货方，订单待派发');
+        toast.success('已分配发货方，订单已派发');
         fetchOrders();
         setAssignDialogOpen(false);
         setAssigningOrderId(null);
@@ -171,14 +171,14 @@ export function useOrdersDispatch({
             id: orderId,
             supplier_id: supplierId,
             supplier_name: supplier?.name || '',
-            status: 'pending',
+            status: 'assigned',
           }),
         });
       });
       const results = await Promise.all(promises);
       const dataArr = await Promise.all(results.map(r => r.json()));
       const successCount = dataArr.filter(d => d.success).length;
-      toast.success(`成功分配发货方，共 ${successCount} 条订单待派发`);
+      toast.success(`成功分配发货方，共 ${successCount} 条订单已派发`);
       setMatchResults({});
       setSelectedSuppliers({});
       setAssignDialogOpen(false);

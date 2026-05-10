@@ -44,7 +44,6 @@ import {
   Trash2,
   Edit,
   Eye,
-  Send,
   FileDown,
   AlertCircle,
   X,
@@ -179,6 +178,11 @@ export default function OrdersPage() {
     getDeleteDisabledReason, canDeleteOrder, canEditOrder,
   } = crud;
 
+  const handleDeleteWithClear = useCallback(async () => {
+    await handleDeleteOrder();
+    setSelectedOrderIds([]);
+  }, [handleDeleteOrder, setSelectedOrderIds]);
+
   // --- Dispatch hook ---
   const dispatch = useOrdersDispatch({
     authHeaders: session.authHeaders,
@@ -308,13 +312,13 @@ export default function OrdersPage() {
         return fetch('/api/orders', {
           method: 'PATCH',
           headers: session.authHeaders(),
-          body: JSON.stringify({ id: orderId, supplierId, supplier_name: supplier?.name || '', status: 'pending' }),
+          body: JSON.stringify({ id: orderId, supplierId, supplier_name: supplier?.name || '', status: 'assigned' }),
         });
       });
       const results = await Promise.all(promises);
       const dataArr = await Promise.all(results.map(r => r.json()));
       const successCount = dataArr.filter(d => d.success).length;
-      toast.success(`成功分配发货方，共 ${successCount} 条订单待派发`);
+      toast.success(`成功分配发货方，共 ${successCount} 条订单已派发`);
       setMatchResults({});
       setSelectedSuppliers({});
       setAssignDialogOpen(false);
@@ -979,11 +983,6 @@ export default function OrdersPage() {
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           )}
-                          {order.status === ORDER_STATUS_PENDING && (
-                            <Button variant="ghost" size="sm" onClick={() => openAssignDialog(order.id)} title="派发发货方">
-                              <Send className="w-4 h-4" />
-                            </Button>
-                          )}
                           {order.status === ORDER_STATUS_ASSIGNED && order.supplierId && (
                             <Button
                               variant="ghost"
@@ -1120,7 +1119,7 @@ export default function OrdersPage() {
           open={deleteDialogOpen}
           onOpenChange={setDeleteDialogOpen}
           orderIds={deleteOrderIds}
-          onConfirm={handleDeleteOrder}
+          onConfirm={handleDeleteWithClear}
           loading={deleteLoading}
         />
 

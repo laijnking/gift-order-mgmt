@@ -196,7 +196,7 @@ export function useOrdersSession() {
   const [customers, setCustomers] = useState<Customer[]>([]);
 
   // Selection (使用 string[] 确保分页/刷新后勾选稳定)
-  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>(_restored?.selectedOrderIds ?? []);
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
 
   const authHeaders = useCallback(() => ({
     'Content-Type': 'application/json',
@@ -223,13 +223,16 @@ export function useOrdersSession() {
         setTotalCount(data.total || 0);
         setTotalPages(data.totalPages || 1);
         setCurrentPage(data.page || 1);
+        // 清除不在当前订单列表中的失效选中ID（防止 sessionStorage 残留）
+        const validIds = new Set((data.data as Order[] || []).map(o => o.id));
+        setSelectedOrderIds(prev => prev.filter(id => validIds.has(id)));
       }
     } catch {
       console.error('获取订单失败');
     } finally {
       setLoading(false);
     }
-  }, [searchParams, pageSize]);
+  }, [searchParams, pageSize, setSelectedOrderIds]);
 
   // Fetch status counts for quick filter bar
   const fetchStatusCounts = useCallback(async (dateRange?: { createdFrom?: string; createdTo?: string }) => {
@@ -347,12 +350,6 @@ export function useOrdersSession() {
   const clearSelection = useCallback(() => {
     setSelectedOrderIds([]);
   }, []);
-
-  // Selection → sessionStorage (debounced via saveOrdersSession)
-  useEffect(() => {
-    if (_applyingUrlParams.current) return;
-    saveOrdersSession({ selectedOrderIds });
-  }, [selectedOrderIds, saveOrdersSession]);
 
   return {
     _restored,
