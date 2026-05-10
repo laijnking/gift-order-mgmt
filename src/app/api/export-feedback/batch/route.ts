@@ -107,11 +107,20 @@ export async function POST(request: NextRequest) {
         .single();
 
       const customerName = customer?.name || '未知客户';
-      const { data: customerMapping } = await client
+      const orderCustomerCode = orders[0]?.customer_code || '';
+      let mappingQuery = client
         .from('column_mappings')
         .select('id, version, mapping_config, feedback_export_headers, column_order')
-        .eq('customer_code', orders[0]?.customer_code || '')
-        .eq('is_active', true)
+        .eq('is_active', true);
+      if (customerId && customerId !== 'unknown') {
+        mappingQuery = mappingQuery.eq('customer_id', customerId);
+      } else if (orderCustomerCode && orderCustomerCode !== 'UNKNOWN') {
+        mappingQuery = mappingQuery.eq('customer_code', orderCustomerCode);
+      } else {
+        mappingQuery = mappingQuery.eq('customer_code', '');
+      }
+      const { data: customerMapping } = await mappingQuery
+        .order('version', { ascending: false })
         .limit(1)
         .maybeSingle();
 
