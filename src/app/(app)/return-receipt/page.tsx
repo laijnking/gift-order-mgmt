@@ -687,18 +687,6 @@ export default function ReturnReceiptPage() {
                     当前账号可以查看回单记录，但没有导入和处理回单的权限。
                   </div>
                 )}
-
-                {/* Excel格式说明 */}
-                <div className="mt-4 p-3 bg-muted rounded-lg">
-                  <p className="text-xs font-medium mb-2">Excel应包含以下列：</p>
-                  <ul className="text-xs text-muted-foreground space-y-1">
-                    <li>客户订单号 / 订单号（必填）</li>
-                    <li>快递公司</li>
-                    <li>快递单号</li>
-                    <li>发货日期（可选）</li>
-                    <li>运费 / 运费成本 / 快递费（可选）</li>
-                  </ul>
-                </div>
               </CardContent>
             </Card>
 
