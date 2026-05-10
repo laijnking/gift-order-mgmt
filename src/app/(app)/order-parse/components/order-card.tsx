@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
@@ -89,6 +89,7 @@ export function OrderCard({
   onProductSelect,
 }: OrderCardProps) {
   const [productPickerOpen, setProductPickerOpen] = useState(false);
+  const productJustSelectedRef = useRef(false);
 
   const availableSuppliers = supplierMatchResults.availableSuppliers || [];
 
@@ -797,9 +798,15 @@ export function OrderCard({
         open={productPickerOpen}
         onOpenChange={(open) => {
           setProductPickerOpen(open);
-          if (!open) onProductSelect(order.id, null);
+          if (!open) {
+            if (!productJustSelectedRef.current) {
+              onProductSelect(order.id, null);
+            }
+            productJustSelectedRef.current = false;
+          }
         }}
         onSelect={(product) => {
+          productJustSelectedRef.current = true;
           onProductSelect(order.id, product);
           setProductPickerOpen(false);
         }}

@@ -12,7 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ChevronDown, Store } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -43,15 +42,6 @@ interface CustomerSelectorProps {
   salespersonName: string;
   operatorId: string;
   operatorName: string;
-  activeMappingMeta?: {
-    version: number;
-    header_fingerprint?: string;
-    template_signature?: string;
-    source_headers?: string[];
-  } | null;
-  currentPreviewHeaders: string[];
-  activeMappingHeaders: string[];
-  isCurrentHeaderAlignedWithActiveMapping: boolean;
   onCustomerChange: (code: string, customer: Customer) => void;
   onSalespersonChange: (id: string, name: string) => void;
   onOperatorChange: (id: string, name: string) => void;
@@ -65,10 +55,6 @@ export function CustomerSelector({
   salespersonName,
   operatorId,
   operatorName,
-  activeMappingMeta,
-  currentPreviewHeaders,
-  activeMappingHeaders,
-  isCurrentHeaderAlignedWithActiveMapping,
   onCustomerChange,
   onSalespersonChange,
   onOperatorChange,
@@ -281,35 +267,6 @@ export function CustomerSelector({
               </SelectContent>
             </Select>
           </div>
-        </div>
-      )}
-
-      {selectedCustomer && activeMappingMeta && (
-        <div className="rounded-md border border-dashed bg-muted/30 p-2 text-xs text-muted-foreground">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline">当前映射 v{activeMappingMeta.version}</Badge>
-            {activeMappingMeta.header_fingerprint && (
-              <Badge variant="outline">表头指纹 {activeMappingMeta.header_fingerprint}</Badge>
-            )}
-            {activeMappingMeta.template_signature && (
-              <Badge variant="outline">模板签名 {activeMappingMeta.template_signature}</Badge>
-            )}
-          </div>
-          {currentPreviewHeaders.length > 0 && activeMappingHeaders.length > 0 && (
-            <p className="mt-2">
-              当前表头匹配状态：
-              <span
-                className={cn(
-                  'ml-1 font-medium',
-                  isCurrentHeaderAlignedWithActiveMapping ? 'text-green-600' : 'text-orange-600'
-                )}
-              >
-                {isCurrentHeaderAlignedWithActiveMapping
-                  ? '与已保存版本一致'
-                  : '与已保存版本存在差异'}
-              </span>
-            </p>
-          )}
         </div>
       )}
 

@@ -50,6 +50,7 @@ export interface SubmitOptions {
   columnMapping: Record<string, string>;
   headerRow: number;
   excelPreview: string[][];
+  skipMappingSave?: boolean;
   onSuccess: (result: ImportResult) => void;
   onError: (message: string) => void;
   onFinally: () => void;
@@ -136,8 +137,8 @@ export function useOrderSubmit() {
           return;
         }
 
-        // Auto-save mapping after successful submit
-        if (options.customerCode && Object.keys(options.columnMapping).length > 0) {
+        // Auto-save mapping after successful submit (only if mapping changed)
+        if (options.customerCode && Object.keys(options.columnMapping).length > 0 && !options.skipMappingSave) {
           fetch('/api/column-mappings', {
             method: 'POST',
             headers: {

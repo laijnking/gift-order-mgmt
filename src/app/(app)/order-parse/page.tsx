@@ -1070,9 +1070,24 @@ export default function OrderParsePage() {
     setProductPickerOrderId(null);
   };
 
-  // Bridge: OrderPreviewPanel expects (orderId, product), existing handleProductSelect uses (product)
+  // Bridge: handles product selection from any OrderCard-level product picker
   const handleProductSelectFromDialog = (_orderId: string, product: ProductPickerItem | null) => {
-    handleProductSelect(product);
+    if (!product || !_orderId) return;
+    setParsedOrders(orders =>
+      orders.map(o =>
+        o.id === _orderId
+          ? {
+              ...o,
+              mappedProductCode: product.code,
+              mappedProductName: product.name,
+              mappedProductSpec: product.spec || '',
+              mappedProductBrand: product.brand || '',
+              systemProductId: product.id,
+              product_code: product.code,
+            }
+          : o
+      )
+    );
   };
 
   const removeOrder = (id: string) => {
@@ -1268,6 +1283,14 @@ export default function OrderParsePage() {
       );
     }
 
+    // 比较当前映射与活动映射是否一致，一致则跳过保存
+    const currentSourceHeaders = normalizeHeadersForCompare(excelPreview[headerRow] || []);
+    const activeSourceHeaders = normalizeHeadersForCompare(activeMappingMeta?.source_headers || []);
+    const isMappingUnchanged = activeMappingMeta?.mapping_config &&
+      headerRow === activeMappingMeta.header_row &&
+      JSON.stringify(columnMapping) === JSON.stringify(activeMappingMeta.mapping_config) &&
+      JSON.stringify(currentSourceHeaders) === JSON.stringify(activeSourceHeaders);
+
     submitOrders(parsedOrders, {
       customerCode: selectedCustomer,
       customerName: customers.find(c => c.code === selectedCustomer)?.name || '',
@@ -1278,6 +1301,7 @@ export default function OrderParsePage() {
       columnMapping,
       headerRow,
       excelPreview,
+      skipMappingSave: isMappingUnchanged,
       onSuccess: (result) => {
         setImportResult(result);
         handleClear();
@@ -1299,28 +1323,6 @@ export default function OrderParsePage() {
     h.created_by?.includes(mappingSearchTerm)
   );
 
-  const currentPreviewHeaders = normalizeHeadersForCompare(excelPreview[headerRow] || []);
-  const activeMappingHeaders = normalizeHeadersForCompare(activeMappingMeta?.source_headers || []);
-  const isCurrentHeaderAlignedWithActiveMapping =
-    currentPreviewHeaders.length > 0 &&
-    activeMappingHeaders.length > 0 &&
-    headerRow === (activeMappingMeta?.header_row ?? headerRow) &&
-    JSON.stringify(currentPreviewHeaders) === JSON.stringify(activeMappingHeaders);
-  const getHistoryCompatibility = (history: MappingHistory) => {
-    const historyHeaders = normalizeHeadersForCompare(history.source_headers || []);
-    if (currentPreviewHeaders.length === 0 || historyHeaders.length === 0) {
-      return null;
-    }
-
-    const isAligned =
-      headerRow === history.header_row &&
-      JSON.stringify(currentPreviewHeaders) === JSON.stringify(historyHeaders);
-
-    return {
-      isAligned,
-      label: isAligned ? '匹配当前文件' : '与当前文件有差异',
-    };
-  };
   const submitValidation = useMemo(() => getSubmitValidationSummary(parsedOrders), [parsedOrders]);
   const selectedValidOrderCount = useMemo(() => {
     return parsedOrders.filter((order) => order.selected).length - submitValidation.invalidOrderIds.length;
@@ -1498,10 +1500,6 @@ export default function OrderParsePage() {
               salespersonName={salespersonName}
               operatorId={operatorId}
               operatorName={operatorName}
-              activeMappingMeta={activeMappingMeta}
-              currentPreviewHeaders={currentPreviewHeaders}
-              activeMappingHeaders={activeMappingHeaders}
-              isCurrentHeaderAlignedWithActiveMapping={isCurrentHeaderAlignedWithActiveMapping}
               onCustomerChange={handleCustomerChange}
               onSalespersonChange={(id, name) => {
                 const previousName = salespersonName;

@@ -46,6 +46,7 @@ export async function GET(request: NextRequest) {
   const category = searchParams.get('category');
   const lifecycleStatus = searchParams.get('lifecycleStatus');
   const isActive = searchParams.get('isActive');
+  const limit = Math.min(parseInt(searchParams.get('limit') || '9999') || 9999, 9999);
 
   try {
     // 先获取数据
@@ -73,7 +74,7 @@ export async function GET(request: NextRequest) {
 
     dataQuery = dataQuery.order('created_at', { ascending: false });
     
-    const { data, error } = await dataQuery.range(0, 9999);
+    const { data, error } = await dataQuery.range(0, limit - 1);
     if (error) throw new Error(`查询商品失败: ${error.message}`);
 
     // 使用返回的数据长度作为总数

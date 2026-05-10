@@ -63,6 +63,7 @@ export function ProductPickerDialog({
       const params = new URLSearchParams();
       if (keyword) params.set('search', keyword);
       params.set('isActive', 'true');
+      params.set('limit', '50');
 
       const res = await fetch(`/api/products?${params.toString()}`, { headers });
       if (!res.ok) throw new Error('获取商品失败');
