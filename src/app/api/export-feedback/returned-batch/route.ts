@@ -260,8 +260,11 @@ export async function POST(request: NextRequest) {
       const now = new Date().toISOString();
       const { error: feedbackError } = await client
         .from('orders')
-        .update({ status: 'feedbacked', feedbacked_at: now, updated_at: now })
+        .update({ status: 'feedbacked', updated_at: now })
         .in('id', exportedOrderIds);
+      if (feedbackError) {
+        console.error('更新订单状态为 feedbacked 失败:', feedbackError.message);
+      }
       if (!feedbackError) {
         feedbackedCount = exportedOrderIds.length;
       }
