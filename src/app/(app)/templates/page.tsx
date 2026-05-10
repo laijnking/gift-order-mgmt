@@ -640,7 +640,7 @@ export default function TemplatesPage() {
   };
 
   return (
-    <PageGuard permission="settings:view" title="无法访问模板配置">
+    <PageGuard permission={['templates:view', 'settings:view']} title="无法访问模板配置">
       <div className="space-y-6 px-3 pb-4 sm:px-4">
       {/* 头部 */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

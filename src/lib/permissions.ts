@@ -59,6 +59,22 @@ export const PERMISSIONS = {
   // 智能体配置
   AGENT_CONFIGS_VIEW: 'agent_configs:view',
   AGENT_CONFIGS_EDIT: 'agent_configs:edit',
+  // 企业微信
+  WECOM_MANAGE: 'wecom:manage',
+  // 细粒度模块权限
+  RETURN_RECEIPT_VIEW: 'return_receipt:view',
+  ORDER_COST_HISTORY_VIEW: 'order_cost_history:view',
+  EXPORT_RECORDS_VIEW: 'export_records:view',
+  FEEDBACK_EXPORT_VIEW: 'feedback_export:view',
+  REPORTS_VIEW: 'reports:view',
+  USER_MANAGEMENT_VIEW: 'user_management:view',
+  ALERTS_VIEW: 'alerts:view',
+  TEMPLATES_VIEW: 'templates:view',
+  SKU_MAPPINGS_VIEW: 'sku_mappings:view',
+  ORDER_PARSE_CREATE: 'order_parse:create',
+  ARCHIVE_VIEW: 'archive:view',
+  ROLES_VIEW: 'roles:view',
+  SYSTEM_CONFIGS_VIEW: 'system_configs:view',
 } as const;
 
 export type Permission = typeof PERMISSIONS[keyof typeof PERMISSIONS];

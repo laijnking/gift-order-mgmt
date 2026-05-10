@@ -587,7 +587,7 @@ export default function ReturnReceiptPage() {
   ] as const;
 
   return (
-    <PageGuard permission="orders:view" title="无权查看回单" description="当前账号没有查看物流回单的权限。">
+    <PageGuard permission={['return_receipt:view', 'orders:view']} title="无权查看回单" description="当前账号没有查看物流回单的权限。">
     <div className="container mx-auto space-y-6 px-3 py-4 sm:px-4 sm:py-6">
       {/* 页面标题 */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

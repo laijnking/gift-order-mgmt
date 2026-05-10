@@ -379,7 +379,7 @@ export default function AlertsPage() {
   });
 
   return (
-    <PageGuard permission="settings:view" title="无法访问预警设置">
+    <PageGuard permission={['alerts:view', 'settings:view']} title="无法访问预警设置">
       {loadingRecords && records.length === 0 ? (
         <div className="flex items-center justify-center h-96">
           <RefreshCw className="h-8 w-8 animate-spin text-primary" />

@@ -28,6 +28,7 @@ import {
   Truck,
   Warehouse,
   Settings,
+  BarChart3,
 } from 'lucide-react';
 
 interface Permission {
@@ -57,12 +58,14 @@ const DATA_SCOPE_OPTIONS = [
 
 // 分类图标映射
 const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  '订单管理': FileText,
-  '客户管理': Users,
-  '发货方管理': Truck,
-  '商品管理': Package,
-  '库存管理': Warehouse,
-  '系统设置': Settings,
+  '仪表盘': BarChart3,
+  '订单': FileText,
+  '客户': Users,
+  '发货方': Truck,
+  '商品': Package,
+  '库存': Warehouse,
+  '用户': Users,
+  '系统': Settings,
 };
 
 export default function RolesPage() {
@@ -279,7 +282,7 @@ export default function RolesPage() {
   };
 
   return (
-    <PageGuard permission="settings:view" title="无法访问角色与权限">
+    <PageGuard permission={['roles:view', 'settings:view']} title="无法访问角色与权限">
       <div className="space-y-6 px-3 pb-4 sm:px-4">
       {/* 头部 */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

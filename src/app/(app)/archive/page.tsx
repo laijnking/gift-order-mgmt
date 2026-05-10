@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { ShieldAlert } from 'lucide-react';
+import { PageGuard } from '@/components/auth/page-guard';
 import { buildUserInfoHeaders, useAuth, usePermission } from '@/lib/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -302,7 +303,7 @@ export default function ArchiveManagementPage() {
   }
 
   return (
-    <>
+    <PageGuard permission={['archive:view', 'dashboard:view']} title="无权查看档案概览" description="当前账号没有查看档案概览的权限。">
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
         <header className="sticky top-0 z-10 border-b bg-white">
@@ -547,6 +548,6 @@ export default function ArchiveManagementPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </>
+    </PageGuard>
   );
 }

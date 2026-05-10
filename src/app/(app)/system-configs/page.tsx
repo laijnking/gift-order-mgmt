@@ -118,7 +118,7 @@ export default function SystemConfigsPage() {
   }
 
   return (
-    <PageGuard permission="settings:view" title="无权访问系统设置" description="当前账号没有访问系统设置的权限。">
+    <PageGuard permission={['system_configs:view', 'settings:view']} title="无权访问系统设置" description="当前账号没有访问系统设置的权限。">
       <div className="space-y-6 px-3 py-4 sm:px-4 sm:py-6">
         {/* Header */}
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

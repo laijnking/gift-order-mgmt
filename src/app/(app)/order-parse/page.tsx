@@ -1388,7 +1388,7 @@ export default function OrderParsePage() {
 
   return (
     <PageGuard
-      permission="orders:create"
+      permission={['order_parse:create', 'orders:create']}
       title="无权录入订单"
       description="当前账号没有使用订单录入功能的权限。"
     >

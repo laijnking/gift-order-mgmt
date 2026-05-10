@@ -340,7 +340,7 @@ export default function ReportsPage() {
   }
 
   return (
-    <PageGuard permission="dashboard:view" title="无权查看报表" description="当前账号没有查看数据报表的权限。">
+    <PageGuard permission={['reports:view', 'dashboard:view']} title="无权查看报表" description="当前账号没有查看数据报表的权限。">
     <div className="space-y-6 px-3 py-4 sm:px-4 sm:py-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">

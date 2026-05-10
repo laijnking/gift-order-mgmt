@@ -365,7 +365,7 @@ export default function OrderCostHistoryPage() {
 
   return (
     <PageGuard
-      permission="orders:view"
+      permission={['order_cost_history:view', 'orders:view']}
       title="无权查看历史成本"
       description="当前账号没有查看历史成本库的权限。"
     >

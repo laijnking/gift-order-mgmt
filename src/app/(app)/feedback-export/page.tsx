@@ -512,7 +512,7 @@ export default function FeedbackExportPage() {
   };
 
   return (
-    <PageGuard permission="orders:export" title="无法访问客户反馈导出">
+    <PageGuard permission={['feedback_export:view', 'orders:export']} title="无法访问客户反馈导出">
     <div className="container mx-auto space-y-6 px-3 py-4 sm:px-4 sm:py-6">
       {/* 标题 */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

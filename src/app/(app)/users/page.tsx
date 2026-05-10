@@ -494,7 +494,7 @@ export default function UsersPage() {
   };
 
   return (
-    <PageGuard permission="settings:view" title="无法访问用户管理">
+    <PageGuard permission={['user_management:view', 'settings:view']} title="无法访问用户管理">
       {loading ? (
         <div className="flex items-center justify-center h-96">
           <RefreshCw className="h-8 w-8 animate-spin text-primary" />

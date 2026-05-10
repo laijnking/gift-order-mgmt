@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 
 interface PageGuardProps {
   children: ReactNode;
-  permission?: string;
+  permission?: string | string[];
   title?: string;
   description?: string;
 }
@@ -34,7 +34,13 @@ export function PageGuard({
     return null;
   }
 
-  if (permission && !user.permissions.includes(permission)) {
+  const hasAccess = !permission || (
+    Array.isArray(permission)
+      ? permission.some(p => user.permissions.includes(p))
+      : user.permissions.includes(permission)
+  );
+
+  if (!hasAccess) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Card className="w-full max-w-md">

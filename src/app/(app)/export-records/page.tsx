@@ -450,7 +450,7 @@ export default function ExportRecordsPage() {
   };
 
   return (
-    <PageGuard permission="orders:export" title="无法访问导出记录">
+    <PageGuard permission={['export_records:view', 'orders:export']} title="无法访问导出记录">
     <div className="container mx-auto space-y-6 px-3 py-4 sm:px-4 sm:py-6">
       {/* 页面标题 */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

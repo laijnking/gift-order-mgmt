@@ -1002,7 +1002,7 @@ export default function ProductMappingsPage() {
   const partnerLabel = activeTab === 'customer' ? '客户' : '发货方';
 
   return (
-    <PageGuard permission="products:view" title="无权查看 SKU 映射" description="当前账号没有查看 SKU 映射管理的权限。">
+    <PageGuard permission={['sku_mappings:view', 'products:view']} title="无权查看 SKU 映射" description="当前账号没有查看 SKU 映射管理的权限。">
       <div className="space-y-6">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
