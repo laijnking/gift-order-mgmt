@@ -204,6 +204,18 @@ export async function POST(request: NextRequest) {
         normalizedHeaders
       );
       insertPayload.feedback_export_headers = feedbackExportHeaders;
+
+      // 记录原始 Excel 列名顺序（JSONB 对象不保序，数组保序）
+      const columnOrder: string[] = [];
+      Object.entries(mappingConfig as Record<string, string>)
+        .sort(([a], [b]) => parseInt(a) - parseInt(b))
+        .forEach(([colIndex, fieldName]) => {
+          const header = normalizedHeaders[parseInt(colIndex)];
+          if (header && fieldName && fieldName !== 'ignore' && fieldName !== 'ext_keep') {
+            columnOrder.push(header);
+          }
+        });
+      insertPayload.column_order = columnOrder;
     }
 
     // 插入新配置

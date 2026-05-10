@@ -67,7 +67,8 @@ export const DEFAULT_CUSTOMER_FEEDBACK_MAPPINGS: Record<string, string> = {
 export function buildFeedbackRows(
   orders: Record<string, unknown>[],
   fieldMappings: Record<string, string>,
-  feedbackExportHeaders?: Record<string, string>
+  feedbackExportHeaders?: Record<string, string>,
+  columnOrder?: string[]
 ): Record<string, unknown>[] {
   const normalizedMappings = Object.keys(fieldMappings).length > 0
     ? fieldMappings
@@ -111,7 +112,12 @@ export function buildFeedbackRows(
 
       if (feedbackExportHeaders && Object.keys(feedbackExportHeaders).length > 0) {
         const logisticsHeaders = ['快递公司', '运单号'];
-        const allHeaders = [...Object.keys(feedbackExportHeaders), ...logisticsHeaders];
+        // 使用 columnOrder 保证导出列顺序与原始 Excel 导入顺序一致
+        // JSONB 对象不保序，但 JSONB 数组保序
+        const orderedHeaders = columnOrder && columnOrder.length > 0
+          ? columnOrder.filter(h => h in feedbackExportHeaders)
+          : Object.keys(feedbackExportHeaders);
+        const allHeaders = [...orderedHeaders, ...logisticsHeaders];
 
         return Object.fromEntries(
           allHeaders.map((header) => {

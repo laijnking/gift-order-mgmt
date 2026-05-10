@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
       const customerName = customer?.name || '未知客户';
       const { data: customerMapping } = await client
         .from('column_mappings')
-        .select('id, version, mapping_config, feedback_export_headers')
+        .select('id, version, mapping_config, feedback_export_headers, column_order')
         .eq('customer_code', orders[0]?.customer_code || '')
         .eq('is_active', true)
         .limit(1)
@@ -158,6 +158,11 @@ export async function POST(request: NextRequest) {
           }
         } catch { /* ignore parse errors */ }
       }
+      // 获取原始 Excel 列名顺序（JSONB 数组，保序）
+      let columnOrder: string[] | null = null;
+      if (customerMapping?.column_order && Array.isArray(customerMapping.column_order)) {
+        columnOrder = (customerMapping.column_order as unknown[]).map(String);
+      }
       // 从 column_mappings.mapping_config 读取时也需要迁移
       let exportFieldMappings: Record<string, string> = {};
       if (customerMapping?.mapping_config) {
@@ -202,7 +207,7 @@ export async function POST(request: NextRequest) {
       // 生成文件名: 客户名称+订单反馈+日期
       const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
       const fileName = `${customerName}+订单反馈+${today}.xlsx`;
-      const exportRows = buildFeedbackRows(orders as Record<string, unknown>[], exportFieldMappings, feedbackExportHeaders || undefined);
+      const exportRows = buildFeedbackRows(orders as Record<string, unknown>[], exportFieldMappings, feedbackExportHeaders || undefined, columnOrder || undefined);
       const worksheet = XLSX.utils.json_to_sheet(exportRows);
       const headers = Object.keys(exportRows[0] || exportFieldMappings || DEFAULT_CUSTOMER_FEEDBACK_MAPPINGS);
       worksheet['!cols'] = headers.map((header) => ({ wch: Math.max(12, Math.min(40, header.length * 2 + 4)) }));
