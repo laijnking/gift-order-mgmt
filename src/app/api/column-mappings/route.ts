@@ -202,7 +202,7 @@ export async function POST(request: NextRequest) {
             columnOrder.push(header);
           }
         });
-      insertPayload.column_order = columnOrder;
+      insertPayload.column_order = JSON.stringify(columnOrder);
     }
 
     // 插入新配置

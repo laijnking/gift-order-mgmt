@@ -56,29 +56,53 @@ async function scanFeedbackOrders(
  */
 async function buildFeedbackExcelData(
   client: ReturnType<typeof getSupabaseClient>,
-  orders: Array<{ id: string; order_no: string; items: unknown[] }>,
+  orders: Array<{ id: string; order_no: string; items: unknown[]; customer_code?: string }>,
   customerId: string
 ): Promise<{
   headers: string[];
   rows: (string | number | null)[][];
 }> {
-  // 获取客户的列名映射
-  const { data: mapping } = await client
-    .from('column_mappings')
-    .select('feedback_export_headers')
-    .eq('customer_id', customerId)
-    .eq('is_active', true)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  // 获取客户的列名映射（优先 customer_id，fallback customer_code）
+  const orderCustomerCode = orders[0]?.customer_code || '';
+  const buildMappingQuery = (activeOnly: boolean) => {
+    let q = client
+      .from('column_mappings')
+      .select('feedback_export_headers, column_order')
+      .order('version', { ascending: false })
+      .limit(1);
+    if (activeOnly) q = q.eq('is_active', true);
+    if (customerId && orderCustomerCode) {
+      q = q.or(`customer_id.eq.${customerId},customer_code.eq.${orderCustomerCode}`);
+    } else if (customerId) {
+      q = q.eq('customer_id', customerId);
+    } else if (orderCustomerCode) {
+      q = q.eq('customer_code', orderCustomerCode);
+    }
+    return q;
+  };
+  let { data: mapping } = await buildMappingQuery(true).maybeSingle();
+  if (!mapping) {
+    const fallbackRes = await buildMappingQuery(false).maybeSingle();
+    mapping = fallbackRes.data ?? null;
+  }
 
-  const feedbackHeaders = (mapping?.feedback_export_headers || {}) as Record<string, string>;
+  const rawFeedbackHeaders = mapping?.feedback_export_headers;
+  const feedbackHeaders = (rawFeedbackHeaders && typeof rawFeedbackHeaders === 'object' && !Array.isArray(rawFeedbackHeaders)
+    ? rawFeedbackHeaders
+    : {}) as Record<string, string>;
+
+  // 获取原始 Excel 列名顺序
+  let columnOrder: string[] | undefined;
+  if (mapping?.column_order && Array.isArray(mapping.column_order) && mapping.column_order.length > 0) {
+    columnOrder = (mapping.column_order as unknown[]).map(String);
+  }
 
   // 使用共享的 buildFeedbackRows 构建回单行数据
   const rowObjects = buildFeedbackRows(
     orders as Record<string, unknown>[],
     DEFAULT_CUSTOMER_FEEDBACK_MAPPINGS,
-    feedbackHeaders
+    feedbackHeaders,
+    columnOrder
   );
 
   if (rowObjects.length === 0) {

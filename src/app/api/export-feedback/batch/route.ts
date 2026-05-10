@@ -3,7 +3,7 @@ import { requirePermission } from '@/lib/server-auth';
 import { CUSTOMER_FEEDBACK_SOURCE_STATUSES } from '@/lib/order-status';
 import { saveExportArtifact } from '@/lib/export-artifacts';
 import { buildExportRecordDownloadPath } from '@/lib/export-download';
-import { parseTemplateFieldMappings, migrateFieldMappings, resolvePreferredTemplate, type TemplateRecord } from '@/lib/template-utils';
+import { parseTemplateFieldMappings, migrateFieldMappings, type TemplateRecord } from '@/lib/template-utils';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { PERMISSIONS } from '@/lib/permissions';
 import { buildFeedbackRows, DEFAULT_CUSTOMER_FEEDBACK_MAPPINGS } from '@/lib/feedback-exporter';
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     let totalShippedCount = 0;
     let totalPendingReceiptCount = 0;
 
-    let resolvedTemplateId = templateId || null;
+    const resolvedTemplateId = templateId || null;
     let resolvedTemplate: TemplateRecord | null = null;
     let templateName = '默认客户反馈模板';
     let templateSource: 'explicit' | 'default' | 'first' = 'default';
@@ -194,26 +194,14 @@ export async function POST(request: NextRequest) {
         customerMapping ? 'column_mapping' : templateSource;
 
       if (!customerMapping) {
-        let customerScopedTemplate = resolvedTemplate;
-        if (!customerScopedTemplate) {
-          const { template, source } = await resolvePreferredTemplate(client, {
-            type: 'customer_feedback',
-            targetType: 'customer',
-            targetId: customerId,
-          });
-          if (template) {
-            customerScopedTemplate = template;
-            if (!resolvedTemplateId && template.id) resolvedTemplateId = template.id;
-            exportTemplateSource = source === 'first' ? 'first' : 'default';
-          }
-        }
-
-        if (customerScopedTemplate) {
-          exportTemplateId = customerScopedTemplate.id || exportTemplateId;
-          exportTemplateName = String(customerScopedTemplate.name || exportTemplateName);
-          exportFieldMappings = parseTemplateFieldMappings(customerScopedTemplate);
-          feedbackExportHeaders = null; // 模板有自己的字段映射，不使用客户导入列名
-          if (resolvedTemplate?.id === customerScopedTemplate.id && templateSource === 'explicit') {
+        // 无导入映射时：优先使用用户显式选择的模板，否则使用默认映射
+        // 不再自动从模板管理（templates 表）查询模板回退
+        if (resolvedTemplate) {
+          exportTemplateId = resolvedTemplate.id || exportTemplateId;
+          exportTemplateName = String(resolvedTemplate.name || exportTemplateName);
+          exportFieldMappings = parseTemplateFieldMappings(resolvedTemplate);
+          feedbackExportHeaders = null;
+          if (templateSource === 'explicit') {
             exportTemplateSource = 'explicit';
           }
         }
