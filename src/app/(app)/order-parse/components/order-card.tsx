@@ -331,7 +331,8 @@ export function OrderCard({
                         placeholder="客户单据编号"
                       />
                     </div>
-                    <div>
+{/* 隐藏：发货发货方 */}
+                    {/* <div>
                       <Label className="text-xs text-muted-foreground">发货发货方</Label>
                       <Input
                         value={order.supplierName as string || ''}
@@ -339,7 +340,7 @@ export function OrderCard({
                         className="h-7 text-xs"
                         placeholder="发货发货方"
                       />
-                    </div>
+                    </div> */}
                   </div>
 
                   {/* Customer product info */}
@@ -436,8 +437,8 @@ export function OrderCard({
                     )}
                   </div>
 
-                  {/* Price info */}
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                  {/* 隐藏：价格信息区 */}
+                  {/* <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
                     <div>
                       <Label className="text-xs text-muted-foreground">单价</Label>
                       <Input
@@ -494,7 +495,7 @@ export function OrderCard({
                         placeholder="税率"
                       />
                     </div>
-                  </div>
+                  </div> */}
 
                   {/* Receiver info */}
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -529,7 +530,8 @@ export function OrderCard({
 
                   {/* Express info */}
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                    <div>
+                    {/* 隐藏：快递公司 */}
+                    {/* <div>
                       <Label className="text-xs text-muted-foreground">快递公司</Label>
                       <Input
                         value={order.express_company || ''}
@@ -537,8 +539,9 @@ export function OrderCard({
                         className="h-7 text-xs"
                         placeholder="快递公司"
                       />
-                    </div>
-                    <div>
+                    </div> */}
+                    {/* 隐藏：物流单号 */}
+                    {/* <div>
                       <Label className="text-xs text-muted-foreground">物流单号</Label>
                       <Input
                         value={order.tracking_no || ''}
@@ -546,8 +549,9 @@ export function OrderCard({
                         className="h-7 text-xs"
                         placeholder="物流单号"
                       />
-                    </div>
-                    <div>
+                    </div> */}
+                    {/* 隐藏：仓库 */}
+                    {/* <div>
                       <Label className="text-xs text-muted-foreground">仓库</Label>
                       <Input
                         value={order.warehouse as string || ''}
@@ -555,7 +559,7 @@ export function OrderCard({
                         className="h-7 text-xs"
                         placeholder="仓库"
                       />
-                    </div>
+                    </div> */}
                     <div>
                       <Label className="text-xs text-muted-foreground">建议发货方</Label>
                       <Input
@@ -565,7 +569,8 @@ export function OrderCard({
                         placeholder="建议发货方"
                       />
                     </div>
-                    <div>
+                    {/* 隐藏：原订单状态 */}
+                    {/* <div>
                       <Label className="text-xs text-muted-foreground">原订单状态</Label>
                       <Input
                         value={order.original_status as string || ''}
@@ -573,7 +578,7 @@ export function OrderCard({
                         className="h-7 text-xs"
                         placeholder="原订单状态"
                       />
-                    </div>
+                    </div> */}
                   </div>
 
                   {/* Personnel info */}
