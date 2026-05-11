@@ -9,7 +9,7 @@ import {
   Package, BarChart3, Warehouse, Users, Bot, FileText,
   Link2, Settings, ChevronLeft, ChevronRight, LogOut, User,
   Building2, Truck, Menu, X, ChevronDown, Bell, DollarSign,
-  UserCircle, Lock, Mail, Phone, XIcon, MessageSquare
+  UserCircle, Lock, Mail, Phone, XIcon, MessageSquare, BookOpen
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -612,11 +612,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="flex items-center gap-2 ml-4 shrink-0">
           <Button
             variant="ghost"
-            size="icon"
-            onClick={logout}
-            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            size="sm"
+            onClick={() => window.open('/user-guide/index.html', '_blank')}
+            className="h-8 text-muted-foreground hover:text-foreground"
           >
-            <LogOut className="h-4 w-4" />
+            <BookOpen className="mr-1.5 h-4 w-4" />
+            操作指引
           </Button>
         </div>
       </header>
