@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
   const lowStockOnly = searchParams.get('lowStockOnly') === 'true';
   const warehouseId = searchParams.get('warehouseId');
   const page = parseInt(searchParams.get('page') || '1');
-  const pageSize = parseInt(searchParams.get('pageSize') || '50');
+  const pageSize = Math.min(99999, Math.max(1, parseInt(searchParams.get('pageSize') || '50')));
 
   try {
     let query = client.from('stocks').select('*', { count: 'exact' });

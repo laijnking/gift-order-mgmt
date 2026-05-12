@@ -85,10 +85,10 @@ export default function ConsolePage() {
       const headers = buildUserInfoHeaders();
 
       const [ordersRes, customersRes, suppliersRes, stocksRes] = await Promise.all([
-        fetch(`/api/orders${params}`, { headers }),
-        fetch('/api/customers', { headers }),
+        fetch(`/api/orders${params}&pageSize=99999`, { headers }),
+        fetch('/api/customers?pageSize=99999', { headers }),
         fetch('/api/suppliers', { headers }),
-        fetch('/api/stocks', { headers }),
+        fetch('/api/stocks?pageSize=99999', { headers }),
       ]);
 
       const [ordersData, customersData, suppliersData, stocksData] = await Promise.all([

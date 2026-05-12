@@ -110,13 +110,14 @@ export default function LegacyHomePage() {
       }
       
       const params = startDate ? `?startDate=${startDate}` : '';
+      const ordersParams = params ? `${params}&pageSize=99999` : '?pageSize=99999';
       const headers = buildUserInfoHeaders();
       
       const [ordersRes, customersRes, suppliersRes, stocksRes] = await Promise.all([
-        fetch(`/api/orders${params}`, { headers }),
-        fetch('/api/customers', { headers }),
+        fetch(`/api/orders${ordersParams}`, { headers }),
+        fetch('/api/customers?pageSize=99999', { headers }),
         fetch('/api/suppliers', { headers }),
-        fetch('/api/stocks', { headers }),
+        fetch('/api/stocks?pageSize=99999', { headers }),
       ]);
 
       const [ordersData, customersData, suppliersData, stocksData] = await Promise.all([

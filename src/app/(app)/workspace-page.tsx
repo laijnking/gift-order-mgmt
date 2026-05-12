@@ -70,8 +70,8 @@ export default function DashboardPage() {
       const headers = buildUserInfoHeaders();
 
       const [ordersRes, stocksRes] = await Promise.all([
-        fetch('/api/orders?createdFrom=' + new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10), { headers }),
-        fetch('/api/stocks', { headers }),
+        fetch('/api/orders?createdFrom=' + new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10) + '&pageSize=99999', { headers }),
+        fetch('/api/stocks?pageSize=99999', { headers }),
       ]);
 
       const [ordersData, stocksData] = await Promise.all([
