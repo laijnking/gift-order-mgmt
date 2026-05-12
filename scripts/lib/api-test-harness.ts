@@ -1,3 +1,5 @@
+process.env['COZE_PROJECT_ENV'] = 'DEV';
+
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
 import { rmSync, existsSync } from 'fs';
 import { join } from 'path';
