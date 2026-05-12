@@ -25,11 +25,11 @@ import {
 // Excel导入配置
 const IMPORT_CONFIG = {
   title: '发货方管理',
-  fields: ['code', 'name', 'shortName', 'type', 'contactPerson', 'contactPhone', 'province', 'city', 'address', 'sendType', 'settlementType', 'costFactor', 'canJd', 'jdChannelId', 'canPdd', 'pddShopId', 'expressRestrictions', 'remark'],
-  fieldLabels: ['发货方编码', '发货方名称', '简称', '类型', '联系人', '联系电话', '所在省份', '所在城市', '详细地址', '发货方式', '结算方式', '成本系数', '支持京东', '京东渠道ID', '支持拼多多', '拼多多店铺ID', '快递限制', '备注'],
+  fields: ['code', 'name', 'shortName', 'type', 'contactPerson', 'contactPhone', 'province', 'city', 'address', 'settlementType', 'costFactor', 'expressRestrictions', 'remark'],
+  fieldLabels: ['发货方编码', '发货方名称', '简称', '类型', '联系人', '联系电话', '所在省份', '所在城市', '详细地址', '结算方式', '成本系数', '快递限制', '备注'],
   template: [
-    { code: 'FHS-001', name: '广东云海供应链', shortName: '云海', type: '发货方', contactPerson: '张经理', contactPhone: '13800138000', province: '广东', city: '深圳', address: '深圳市宝安区xxx物流园', sendType: '下载发货', settlementType: '月结', costFactor: '1.0', canJd: '否', jdChannelId: '', canPdd: '否', pddShopId: '', expressRestrictions: '', remark: '' },
-    { code: 'FHS-002', name: '京东一件代发', shortName: '京东', type: '京东', contactPerson: '李经理', contactPhone: '13900139000', province: '北京', city: '北京', address: '北京市大兴区京东仓库', sendType: '京东发货', settlementType: '月结预付', costFactor: '1.05', canJd: '是', jdChannelId: 'JD-CHANNEL-001', canPdd: '否', pddShopId: '', expressRestrictions: '', remark: '' },
+    { code: 'FHS-001', name: '广东云海供应链', shortName: '云海', type: '第三方仓', contactPerson: '张经理', contactPhone: '13800138000', province: '广东', city: '深圳', address: '深圳市宝安区xxx物流园', settlementType: '月结', costFactor: '1.0', expressRestrictions: '', remark: '' },
+    { code: 'FHS-002', name: '京东一件代发', shortName: '京东', type: '平台', contactPerson: '李经理', contactPhone: '13900139000', province: '北京', city: '北京', address: '北京市大兴区京东仓库', settlementType: '月结预付', costFactor: '1.05', expressRestrictions: '', remark: '' },
   ],
 };
 
@@ -38,7 +38,7 @@ interface Shipper {
   code: string;
   name: string;
   shortName: string;
-  type: string; // supplier/jd/pdd/self/third_party
+  type: string; // self/third_party/platform
   contactPerson: string;
   contactPhone: string;
   province: string;
@@ -59,19 +59,9 @@ interface Shipper {
 
 // 发货类型选项
 const SHIPPER_TYPES = [
-  { value: 'supplier', label: '发货方' },
-  { value: 'jd', label: '京东' },
-  { value: 'pdd', label: '拼多多' },
   { value: 'self', label: '自有仓' },
   { value: 'third_party', label: '第三方仓' },
-];
-
-// 发货方式选项
-const SEND_TYPES = [
-  { value: 'download', label: '下载发货' },
-  { value: 'jd', label: '京东发货' },
-  { value: 'pdd', label: '拼多多发货' },
-  { value: 'self', label: '自有发货' },
+  { value: 'platform', label: '平台' },
 ];
 
 // 结算方式选项
@@ -103,7 +93,7 @@ export default function ShippersManagePage() {
     code: '',
     name: '',
     shortName: '',
-    type: 'supplier',
+    type: 'platform',
     contactPerson: '',
     contactPhone: '',
     province: '',
@@ -180,7 +170,7 @@ export default function ShippersManagePage() {
       code: '',
       name: '',
       shortName: '',
-      type: 'supplier',
+    type: 'platform',
       contactPerson: '',
       contactPhone: '',
       province: '',
@@ -272,11 +262,9 @@ export default function ShippersManagePage() {
       const shippersData = excelImportData.map(row => {
         // 类型映射
         const typeMap: Record<string, string> = {
-          '发货方': 'supplier', '京东': 'jd', '拼多多': 'pdd', '自有仓': 'self', '第三方仓': 'third_party'
-        };
-        // 发货方式映射
-        const sendTypeMap: Record<string, string> = {
-          '下载发货': 'download', '京东发货': 'jd', '拼多多发货': 'pdd', '自有发货': 'self'
+          '自有仓': 'self', '第三方仓': 'third_party', '平台': 'platform',
+          // 兼容旧数据
+          '发货方': 'platform', '京东': 'platform', '拼多多': 'platform',
         };
         // 结算方式映射
         const settlementMap: Record<string, string> = {
@@ -287,19 +275,15 @@ export default function ShippersManagePage() {
           code: row.code || row['发货方编码'] || '',
           name: row.name || row['发货方名称'] || '',
           shortName: row.shortName || row['简称'] || '',
-          type: typeMap[row.type || row['类型']] || 'supplier',
+          type: typeMap[row.type || row['类型']] || 'platform',
           contactPerson: row.contactPerson || row['联系人'] || '',
           contactPhone: row.contactPhone || row['联系电话'] || '',
           province: row.province || row['所在省份'] || '',
           city: row.city || row['所在城市'] || '',
           address: row.address || row['详细地址'] || '',
-          sendType: sendTypeMap[row.sendType || row['发货方式']] || 'download',
+          sendType: 'download',
           settlementType: settlementMap[row.settlementType || row['结算方式']] || 'monthly',
           costFactor: parseFloat(row.costFactor || row['成本系数'] || '1') || 1.0,
-          canJd: (row.canJd || row['支持京东']) === '是',
-          jdChannelId: row.jdChannelId || row['京东渠道ID'] || '',
-          canPdd: (row.canPdd || row['支持拼多多']) === '是',
-          pddShopId: row.pddShopId || row['拼多多店铺ID'] || '',
           expressRestrictions: (row.expressRestrictions || row['快递限制'] || '').split(/[,，]/).filter(Boolean),
           remark: row.remark || row['备注'] || '',
           isActive: true,
@@ -344,7 +328,7 @@ export default function ShippersManagePage() {
         code: shipper.code || '',
         name: shipper.name,
         shortName: shipper.shortName || '',
-        type: shipper.type || 'supplier',
+        type: shipper.type || 'platform',
         contactPerson: shipper.contactPerson || '',
         contactPhone: shipper.contactPhone || '',
         province: shipper.province || '',
@@ -446,20 +430,16 @@ export default function ShippersManagePage() {
   // 获取类型标签
   const getTypeBadge = (type: string) => {
     const typeConfig: Record<string, { label: string; className: string }> = {
+      self: { label: '自有仓', className: 'bg-green-100 text-green-800' },
+      third_party: { label: '第三方仓', className: 'bg-purple-100 text-purple-800' },
+      platform: { label: '平台', className: 'bg-blue-100 text-blue-800' },
+      // 兼容旧数据
       supplier: { label: '发货方', className: 'bg-blue-100 text-blue-800' },
       jd: { label: '京东', className: 'bg-red-100 text-red-800' },
       pdd: { label: '拼多多', className: 'bg-orange-100 text-orange-800' },
-      self: { label: '自有仓', className: 'bg-green-100 text-green-800' },
-      third_party: { label: '第三方仓', className: 'bg-purple-100 text-purple-800' },
     };
     const config = typeConfig[type] || { label: type, className: '' };
     return <Badge className={config.className}>{config.label}</Badge>;
-  };
-
-  // 获取发货方式标签
-  const getSendTypeBadge = (sendType: string) => {
-    const config = SEND_TYPES.find(s => s.value === sendType);
-    return <Badge variant="outline">{config?.label || sendType}</Badge>;
   };
 
   // 获取结算方式标签
@@ -472,9 +452,7 @@ export default function ShippersManagePage() {
   const stats = {
     total: shippers.length,
     byType: {
-      supplier: shippers.filter(s => s.type === 'supplier').length,
-      jd: shippers.filter(s => s.type === 'jd').length,
-      pdd: shippers.filter(s => s.type === 'pdd').length,
+      platform: shippers.filter(s => ['platform', 'supplier', 'jd', 'pdd'].includes(s.type)).length,
       self: shippers.filter(s => s.type === 'self').length,
       thirdParty: shippers.filter(s => s.type === 'third_party').length,
     },
@@ -515,7 +493,7 @@ export default function ShippersManagePage() {
 
         <main className="container mx-auto px-4 py-6">
           {/* Stats Cards */}
-          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
             <Card>
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
@@ -531,32 +509,10 @@ export default function ShippersManagePage() {
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-500">发货方</p>
-                    <p className="text-2xl font-bold text-blue-600">{stats.byType.supplier}</p>
+                    <p className="text-sm text-gray-500">平台</p>
+                    <p className="text-2xl font-bold text-blue-600">{stats.byType.platform}</p>
                   </div>
                   <Package className="w-8 h-8 text-blue-400" />
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500">京东渠道</p>
-                    <p className="text-2xl font-bold text-red-600">{stats.byType.jd}</p>
-                  </div>
-                  <Truck className="w-8 h-8 text-red-400" />
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500">拼多多渠道</p>
-                    <p className="text-2xl font-bold text-orange-600">{stats.byType.pdd}</p>
-                  </div>
-                  <Truck className="w-8 h-8 text-orange-400" />
                 </div>
               </CardContent>
             </Card>
@@ -568,6 +524,17 @@ export default function ShippersManagePage() {
                     <p className="text-2xl font-bold text-green-600">{stats.byType.self}</p>
                   </div>
                   <Building2 className="w-8 h-8 text-green-400" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">第三方仓</p>
+                    <p className="text-2xl font-bold text-purple-600">{stats.byType.thirdParty}</p>
+                  </div>
+                  <Building2 className="w-8 h-8 text-purple-400" />
                 </div>
               </CardContent>
             </Card>
@@ -746,19 +713,6 @@ export default function ShippersManagePage() {
                         <h3 className="text-sm font-semibold text-gray-700 mb-2 mt-4">发货设置</h3>
                       </div>
                       <div className="space-y-2">
-                        <Label>发货方式</Label>
-                        <Select value={formData.sendType} onValueChange={(v) => setFormData({...formData, sendType: v})}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {SEND_TYPES.map(type => (
-                              <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
                         <Label>结算方式</Label>
                         <Select value={formData.settlementType} onValueChange={(v) => setFormData({...formData, settlementType: v})}>
                           <SelectTrigger>
@@ -783,44 +737,6 @@ export default function ShippersManagePage() {
                       </div>
 
                       {/* 渠道配置 */}
-                      <div className="sm:col-span-2">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-2 mt-4">渠道配置</h3>
-                      </div>
-                      <div className="space-y-3 sm:col-span-2">
-                        <div className="flex items-center justify-between">
-                          <Label>支持京东发货</Label>
-                          <Switch 
-                            checked={formData.canJd}
-                            onCheckedChange={(checked) => setFormData({...formData, canJd: checked})}
-                          />
-                        </div>
-                        {formData.canJd && (
-                          <Input 
-                            value={formData.jdChannelId} 
-                            onChange={(e) => setFormData({...formData, jdChannelId: e.target.value})}
-                            placeholder="京东渠道ID"
-                            className="mt-2"
-                          />
-                        )}
-                      </div>
-                      <div className="space-y-3 sm:col-span-2">
-                        <div className="flex items-center justify-between">
-                          <Label>支持拼多多发货</Label>
-                          <Switch 
-                            checked={formData.canPdd}
-                            onCheckedChange={(checked) => setFormData({...formData, canPdd: checked})}
-                          />
-                        </div>
-                        {formData.canPdd && (
-                          <Input 
-                            value={formData.pddShopId} 
-                            onChange={(e) => setFormData({...formData, pddShopId: e.target.value})}
-                            placeholder="拼多多店铺ID"
-                            className="mt-2"
-                          />
-                        )}
-                      </div>
-
                       {/* 快递限制 */}
                       <div className="sm:col-span-2">
                         <h3 className="text-sm font-semibold text-gray-700 mb-2 mt-4">快递限制</h3>
@@ -891,9 +807,7 @@ export default function ShippersManagePage() {
                     <TableHead>发货方编码</TableHead>
                     <TableHead>发货方名称</TableHead>
                     <TableHead>类型</TableHead>
-                    <TableHead>发货方式</TableHead>
                     <TableHead>结算方式</TableHead>
-                    <TableHead>渠道配置</TableHead>
                     <TableHead>快递限制</TableHead>
                     <TableHead>状态</TableHead>
                     <TableHead className="text-right">操作</TableHead>
@@ -902,13 +816,13 @@ export default function ShippersManagePage() {
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8">
+                      <TableCell colSpan={7} className="text-center py-8">
                         加载中...
                       </TableCell>
                     </TableRow>
                   ) : filteredShippers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                      <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                         暂无发货方数据
                       </TableCell>
                     </TableRow>
@@ -925,21 +839,7 @@ export default function ShippersManagePage() {
                           </div>
                         </TableCell>
                         <TableCell>{getTypeBadge(shipper.type)}</TableCell>
-                        <TableCell>{getSendTypeBadge(shipper.sendType)}</TableCell>
                         <TableCell>{getSettlementBadge(shipper.settlementType)}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            {shipper.canJd && (
-                              <Badge variant="outline" className="text-xs border-red-200 text-red-600">京东</Badge>
-                            )}
-                            {shipper.canPdd && (
-                              <Badge variant="outline" className="text-xs border-orange-200 text-orange-600">拼多多</Badge>
-                            )}
-                            {!shipper.canJd && !shipper.canPdd && (
-                              <span className="text-gray-400 text-sm">-</span>
-                            )}
-                          </div>
-                        </TableCell>
                         <TableCell>
                           {shipper.expressRestrictions && shipper.expressRestrictions.length > 0 ? (
                             <div className="flex flex-wrap gap-1">
@@ -1053,7 +953,6 @@ export default function ShippersManagePage() {
                     <TableRow>
                       <TableHead>发货方名称</TableHead>
                       <TableHead>类型</TableHead>
-                      <TableHead>发货方式</TableHead>
                       <TableHead>联系人</TableHead>
                       <TableHead>联系电话</TableHead>
                       <TableHead>结算方式</TableHead>
@@ -1064,7 +963,6 @@ export default function ShippersManagePage() {
                       <TableRow key={index}>
                         <TableCell>{row.name || row['发货方名称'] || '-'}</TableCell>
                         <TableCell>{row.type || row['类型'] || '-'}</TableCell>
-                        <TableCell>{row.sendType || row['发货方式'] || '-'}</TableCell>
                         <TableCell>{row.contactPerson || row['联系人'] || '-'}</TableCell>
                         <TableCell>{row.contactPhone || row['联系电话'] || '-'}</TableCell>
                         <TableCell>{row.settlementType || row['结算方式'] || '-'}</TableCell>
