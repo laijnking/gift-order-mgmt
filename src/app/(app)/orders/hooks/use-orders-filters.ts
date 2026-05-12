@@ -20,10 +20,10 @@ export const FILTERABLE_FIELDS = [
   { key: 'importBatch', label: '导入批次', placeholder: '输入导入批次号' },
 ];
 
-export function fuzzyMatch(text: string | undefined, query: string): boolean {
+export function fuzzyMatch(text: string | number | undefined, query: string): boolean {
   if (!query) return true;
-  if (!text) return false;
-  const textLower = text.toLowerCase();
+  if (text == null || text === '') return false;
+  const textLower = String(text).toLowerCase();
   const queryLower = query.toLowerCase();
   return textLower.startsWith(queryLower) || textLower.includes(queryLower);
 }

@@ -81,10 +81,10 @@ export function filterOrders(
   }
 ): Order[] {
   const { statusFilter, selectedStatuses, customerFilter, supplierFilter, quantityOp, quantityFilter, searchFields, advancedFields } = options;
-  const fuzzyMatch = (text: string | undefined, query: string): boolean => {
+  const fuzzyMatch = (text: string | number | undefined, query: string): boolean => {
     if (!query) return true;
-    if (!text) return false;
-    const t = text.toLowerCase();
+    if (text == null || text === '') return false;
+    const t = String(text).toLowerCase();
     const q = query.toLowerCase();
     return t.startsWith(q) || t.includes(q);
   };
