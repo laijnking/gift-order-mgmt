@@ -58,6 +58,7 @@ import {
   DollarSign,
   History,
   ArrowUpDown,
+  ArrowRight,
   User,
   Download,
   Upload,
@@ -70,11 +71,11 @@ import { HelpGuide, HelpSection, HelpSteps, HelpNote, HelpLinks } from '@/compon
 // Excel模板配置
 const IMPORT_TEMPLATE = {
   title: '库存管理',
-  fields: ['supplierCode', 'supplierName', 'productName', 'productCode', 'spec', 'quantity', 'price', 'warehouse', 'remark'],
-  fieldLabels: ['发货方编码', '发货方名称', '商品名称', '商品编码', '规格型号', '库存数量', '单价', '仓库', '备注'],
+  fields: ['supplierCode', 'supplierName', 'supplierProductCode', 'supplierProductName', 'supplierProductSpec', 'productName', 'productCode', 'spec', 'quantity', 'price', 'warehouse', 'remark'],
+  fieldLabels: ['发货方编码', '发货方名称', '发货方商品编码', '发货方商品名称', '发货方规格', '商品名称', '商品编码', '规格型号', '库存数量', '单价', '仓库', '备注'],
   template: [
-    { supplierCode: 'GYS-001', supplierName: '首映礼省内仓', productName: '九阳电蒸锅', productCode: 'DZ100HG-GZ605', spec: 'DZ100HG-GZ605', quantity: '15', price: '145.00', warehouse: '默认仓', remark: '' },
-    { supplierCode: 'GYS-001', supplierName: '首映礼省内仓', productName: '苏泊尔果蔬清洗机', productCode: 'GS10', spec: 'GS10', quantity: '3', price: '115.00', warehouse: '默认仓', remark: '尾货预警' },
+    { supplierCode: 'GYS-001', supplierName: '首映礼省内仓', supplierProductCode: 'JD-SKU-001', supplierProductName: '九阳电蒸锅', supplierProductSpec: 'DZ100HG-GZ605', productName: '', productCode: '', spec: '', quantity: '15', price: '145.00', warehouse: '默认仓', remark: '' },
+    { supplierCode: 'GYS-001', supplierName: '首映礼省内仓', supplierProductCode: 'GS10', supplierProductName: '苏泊尔果蔬清洗机', supplierProductSpec: 'GS10', productName: '', productCode: '', spec: '', quantity: '3', price: '115.00', warehouse: '默认仓', remark: '尾货预警' },
   ],
 };
 
@@ -149,6 +150,24 @@ interface PriceHistory {
   createdAt: string;
 }
 
+interface SkippedRow {
+  supplierCode: string;
+  supplierName: string;
+  productName: string;
+  productCode: string;
+  productSpec: string;
+  reason: string;
+}
+
+interface ImportProgress {
+  current: number;
+  total: number;
+  success: number;
+  failed: number;
+  skipped: number;
+  mapped: number;
+}
+
 export default function StocksPage() {
   const { hasPermission } = usePermission();
   const canEditStocks = hasPermission('stocks:edit');
@@ -194,18 +213,23 @@ export default function StocksPage() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importingData, setImportingData] = useState<Record<string, string>[]>([]);
   const [importing, setImporting] = useState(false);
-  const [importProgress, setImportProgress] = useState({ current: 0, total: 0, success: 0, failed: 0 });
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0, success: 0, failed: 0, skipped: 0, mapped: 0 });
+  const [skippedRows, setSkippedRows] = useState<SkippedRow[]>([]);
+  const [showSkippedDialog, setShowSkippedDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 导入配置
   const IMPORT_CONFIG = {
-    fields: ['supplierCode', 'supplierName', 'productName', 'productCode', 'spec', 'quantity', 'price', 'warehouse', 'remark'],
-    fieldLabels: ['发货方编码', '发货方名称', '商品名称', '商品编码', '规格型号', '库存数量', '单价', '仓库', '备注'],
+    fields: ['supplierCode', 'supplierName', 'supplierProductCode', 'supplierProductName', 'supplierProductSpec', 'productName', 'productCode', 'spec', 'quantity', 'price', 'warehouse', 'remark'],
+    fieldLabels: ['发货方编码', '发货方名称', '发货方商品编码', '发货方商品名称', '发货方规格', '商品名称', '商品编码', '规格型号', '库存数量', '单价', '仓库', '备注'],
     columnMappings: {
       supplierCode: ['发货方编码', '发货方代码', '编码'],
       supplierName: ['发货方名称', '发货方', '供货商'],
+      supplierProductCode: ['发货方商品编码', '发货方SKU', '商品编码', 'SKU'],
+      supplierProductName: ['发货方商品名称', '发货方品名'],
+      supplierProductSpec: ['发货方规格', '发货方型号'],
       productName: ['商品名称', '品名', '商品'],
-      productCode: ['商品编码', 'SKU', '货号'],
+      productCode: ['商品编码', '货号'],
       spec: ['规格', '规格型号', '型号规格'],
       quantity: ['库存', '数量', '库存数量'],
       price: ['单价', '价格', '采购价'],
@@ -377,12 +401,14 @@ export default function StocksPage() {
     if (importingData.length === 0) return;
 
     setImporting(true);
-    setImportProgress({ current: 0, total: importingData.length, success: 0, failed: 0 });
+    setImportProgress({ current: 0, total: importingData.length, success: 0, failed: 0, skipped: 0, mapped: 0 });
 
     // 分批导入，每批50条
     const batchSize = 50;
     let totalSuccess = 0;
     let totalFailed = 0;
+    const allSkipped: SkippedRow[] = [];
+    let totalMapped = 0;
 
     try {
       for (let i = 0; i < importingData.length; i += batchSize) {
@@ -392,7 +418,9 @@ export default function StocksPage() {
           current: Math.min(i + batchSize, importingData.length),
           total: importingData.length,
           success: totalSuccess,
-          failed: totalFailed
+          failed: totalFailed,
+          skipped: allSkipped.length,
+          mapped: totalMapped,
         });
 
         const res = await fetch('/api/stocks/import', {
@@ -404,15 +432,23 @@ export default function StocksPage() {
 
         if (result.success) {
           totalSuccess += (result.data?.inserted || 0) + (result.data?.updated || 0);
+          totalMapped += result.data?.supplierMappingMatched || 0;
         } else {
           totalFailed += batch.length;
+        }
+
+        // 收集跳过记录
+        if (result.skippedRows?.length > 0) {
+          allSkipped.push(...result.skippedRows);
         }
 
         setImportProgress({
           current: Math.min(i + batchSize, importingData.length),
           total: importingData.length,
           success: totalSuccess,
-          failed: totalFailed
+          failed: totalFailed,
+          skipped: allSkipped.length,
+          mapped: totalMapped,
         });
       }
 
@@ -421,13 +457,26 @@ export default function StocksPage() {
         current: importingData.length,
         total: importingData.length,
         success: totalSuccess,
-        failed: totalFailed
+        failed: totalFailed,
+        skipped: allSkipped.length,
+        mapped: totalMapped,
       });
 
-      toast.success(`导入完成：成功 ${totalSuccess} 条${totalFailed > 0 ? `，失败 ${totalFailed} 条` : ''}`);
-      setImportDialogOpen(false);
-      setImportingData([]);
-      loadData();
+      setSkippedRows(allSkipped);
+
+      // 根据结果提示并处理
+      if (allSkipped.length > 0) {
+        toast.warning(`导入完成：成功 ${totalSuccess} 条，${allSkipped.length} 条无法匹配已跳过`);
+        setShowSkippedDialog(true);
+        setImportDialogOpen(false);
+        setImportingData([]);
+        loadData();
+      } else {
+        toast.success(`导入完成：成功 ${totalSuccess} 条`);
+        setImportDialogOpen(false);
+        setImportingData([]);
+        loadData();
+      }
     } catch (error) {
       console.error('导入失败:', error);
       toast.error('导入失败，请重试');
@@ -1347,6 +1396,16 @@ export default function StocksPage() {
                       <X className="h-3 w-3" /> 失败 {importProgress.failed}
                     </span>
                   )}
+                  {importProgress.mapped > 0 && (
+                    <span className="text-blue-600 flex items-center gap-1">
+                      <Check className="h-3 w-3" /> SKU映射匹配 {importProgress.mapped}
+                    </span>
+                  )}
+                  {importProgress.skipped > 0 && (
+                    <span className="text-amber-600 flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" /> 无法匹配 {importProgress.skipped}
+                    </span>
+                  )}
                 </div>
                 <span className="text-muted-foreground">
                   {Math.round((importProgress.current / importProgress.total) * 100)}%
@@ -1414,6 +1473,82 @@ export default function StocksPage() {
                   确认导入
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 无法匹配的记录对话框 */}
+      <Dialog open={showSkippedDialog} onOpenChange={setShowSkippedDialog}>
+        <DialogContent className="max-h-[70vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              无法匹配的记录
+            </DialogTitle>
+            <DialogDescription>
+              以下 {skippedRows.length} 条记录无法匹配到系统商品或 SKU 映射关系，已跳过处理。
+              请前往「SKU映射」页面建立发货方商品与系统商品的映射关系后重新导入。
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>发货方编码</TableHead>
+                  <TableHead>发货方名称</TableHead>
+                  <TableHead>商品编码</TableHead>
+                  <TableHead>商品名称</TableHead>
+                  <TableHead>商品规格</TableHead>
+                  <TableHead>无法匹配原因</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {skippedRows.map((row, idx) => (
+                  <TableRow key={idx}>
+                    <TableCell className="whitespace-nowrap">{row.supplierCode || '-'}</TableCell>
+                    <TableCell className="whitespace-nowrap">{row.supplierName || '-'}</TableCell>
+                    <TableCell className="whitespace-nowrap">{row.productCode || '-'}</TableCell>
+                    <TableCell className="max-w-[150px] truncate">{row.productName || '-'}</TableCell>
+                    <TableCell className="whitespace-nowrap">{row.productSpec || '-'}</TableCell>
+                    <TableCell className="text-amber-600 text-xs">{row.reason}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row">
+            <Button variant="outline" onClick={() => setShowSkippedDialog(false)}>
+              关闭
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                const csv = [
+                  ['发货方编码', '发货方名称', '商品编码', '商品名称', '商品规格', '无法匹配原因'],
+                  ...skippedRows.map(r => [
+                    r.supplierCode || '', r.supplierName || '', r.productCode || '',
+                    r.productName || '', r.productSpec || '', r.reason || '',
+                  ])
+                ].map(row => row.join(',')).join('\n');
+
+                const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `无法匹配的记录_${new Date().toISOString().slice(0,10)}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              导出CSV
+            </Button>
+            <Button onClick={() => window.open('/sku-mappings', '_blank')}>
+              <ArrowRight className="mr-2 h-4 w-4" />
+              前往SKU映射
             </Button>
           </DialogFooter>
         </DialogContent>

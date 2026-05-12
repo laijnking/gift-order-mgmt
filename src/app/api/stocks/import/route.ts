@@ -4,7 +4,7 @@ import * as XLSX from 'xlsx';
 import { requirePermission } from '@/lib/server-auth';
 import { PERMISSIONS } from '@/lib/permissions';
 
-type MatchType = 'code' | 'spec' | 'name' | 'none';
+type MatchType = 'mapping' | 'code' | 'spec' | 'name' | 'none';
 
 interface NormalizedStockRow {
   supplierCode: string;
@@ -12,6 +12,10 @@ interface NormalizedStockRow {
   productName: string;
   productCode: string;
   productSpec: string;
+  // 新增：发货方商品信息（来自Excel）
+  supplierProductCode: string;
+  supplierProductName: string;
+  supplierProductSpec: string;
   quantity: number;
   unitPrice: number;
   warehouseName: string;
@@ -19,11 +23,20 @@ interface NormalizedStockRow {
 }
 
 interface ProductMatch {
-  productId: string;
+  productId: string | null;
   productCode: string;
   productName: string;
   matchType: MatchType;
   matchHint: string;
+}
+
+interface SkippedRow {
+  supplierCode: string;
+  supplierName: string;
+  productName: string;
+  productCode: string;
+  productSpec: string;
+  reason: string;
 }
 
 function toNumber(value: unknown, fallback = 0): number {
@@ -49,12 +62,16 @@ function normalizeRows(rawRows: Record<string, unknown>[]): NormalizedStockRow[]
       productName: pick(row, ['productName', 'product_name', '商品名称', '品名', '商品', '货品名称']),
       productCode: pick(row, ['productCode', 'product_code', '商品编码', 'SKU', 'sku', '货号', '商品代码']),
       productSpec: pick(row, ['spec', 'productSpec', 'product_spec', '规格', '规格型号', '型号规格', '型号']),
+      // 新增：发货方商品信息
+      supplierProductCode: pick(row, ['supplierProductCode', 'supplier_product_code', '发货方商品编码', '发货方SKU', '商品编码', 'SKU']),
+      supplierProductName: pick(row, ['supplierProductName', 'supplier_product_name', '发货方商品名称', '发货方品名']),
+      supplierProductSpec: pick(row, ['supplierProductSpec', 'supplier_product_spec', '发货方规格', '发货方型号']),
       quantity: toNumber(pick(row, ['quantity', '库存', '数量', '库存数量', '可用库存'])),
       unitPrice: toNumber(pick(row, ['unitPrice', 'unit_price', 'price', '单价', '价格', '采购价', '成本价'])),
       warehouseName: pick(row, ['warehouseName', 'warehouse_name', 'warehouse', '仓库', '仓库名称']),
       remark: pick(row, ['remark', '备注', '说明']),
     }))
-    .filter((row) => row.productName || row.productCode || row.productSpec);
+    .filter((row) => row.productName || row.productCode || row.productSpec || row.supplierProductCode || row.supplierProductName);
 }
 
 async function parseRequestRows(request: NextRequest): Promise<NormalizedStockRow[]> {
@@ -148,10 +165,59 @@ async function createSupplier(
   return { id, name: supplierName };
 }
 
+async function matchProductBySupplierMapping(
+  client: ReturnType<typeof getSupabaseClient>,
+  supplierId: string,
+  row: NormalizedStockRow
+): Promise<ProductMatch | null> {
+  // 条件：必须有 supplierId + (发货方商品编码 或 发货方商品名称)
+  if (!supplierId || (!row.supplierProductCode && !row.supplierProductName)) {
+    return null;
+  }
+
+  // 查询 product_mappings：supplier_id + supplier_product_code 精确匹配
+  let query = client
+    .from('product_mappings')
+    .select('product_id, product_code, product_name')
+    .eq('supplier_id', supplierId)
+    .eq('is_active', true);
+
+  if (row.supplierProductCode) {
+    query = query.eq('supplier_product_code', row.supplierProductCode);
+  } else if (row.supplierProductName) {
+    query = query.eq('supplier_product_name', row.supplierProductName);
+  }
+
+  const { data } = await query.maybeSingle();
+
+  if (data?.product_id) {
+    // 验证 product_id 在 products 表中存在且启用
+    const { data: product } = await client
+      .from('products')
+      .select('id, code, name')
+      .eq('id', data.product_id)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (product) {
+      return {
+        productId: product.id as string,
+        productCode: product.code as string,
+        productName: product.name as string,
+        matchType: 'mapping',
+        matchHint: `通过发货方SKU映射匹配（发货方编码：${row.supplierProductCode || row.supplierProductName}）`,
+      };
+    }
+  }
+
+  return null;
+}
+
 async function matchProduct(
   client: ReturnType<typeof getSupabaseClient>,
   row: NormalizedStockRow
 ): Promise<ProductMatch> {
+  // 1. 优先：按商品编码精确匹配
   if (row.productCode) {
     const { data } = await client
       .from('products')
@@ -170,6 +236,7 @@ async function matchProduct(
     }
   }
 
+  // 2. 次优先：按规格型号精确匹配
   if (row.productSpec) {
     const { data } = await client
       .from('products')
@@ -188,6 +255,7 @@ async function matchProduct(
     }
   }
 
+  // 3. 按商品名称模糊匹配
   if (row.productName) {
     const { data } = await client
       .from('products')
@@ -206,35 +274,51 @@ async function matchProduct(
     }
   }
 
-  const generatedCode = (row.productCode || row.productSpec || `AUTO-${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 6)}`).slice(0, 50);
-  const generatedName = row.productName || row.productSpec || generatedCode;
-  const { data, error } = await client
-    .from('products')
-    .insert({
-      id: crypto.randomUUID(),
-      code: generatedCode,
-      name: generatedName,
-      spec: row.productSpec || row.productCode || null,
-      cost_price: row.unitPrice || 0,
-      lifecycle_status: '在售',
-      is_active: true,
-      remark: '库存导入时自动创建的商品档案',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .select('id, code, name')
-    .single();
+  // 4. 兜底：用发货方商品编码去匹配系统的 spec 和 name
+  // （适用于 Excel 中只填写了"发货方商品编码"而没有填写"商品编码"的情况）
+  if (row.supplierProductCode) {
+    // 先精确匹配规格
+    const { data: specData } = await client
+      .from('products')
+      .select('id, code, name')
+      .eq('spec', row.supplierProductCode)
+      .eq('is_active', true)
+      .limit(1);
+    if (specData?.[0]) {
+      return {
+        productId: specData[0].id as string,
+        productCode: specData[0].code as string,
+        productName: specData[0].name as string,
+        matchType: 'spec',
+        matchHint: `按发货方商品编码匹配规格：${row.supplierProductCode}`,
+      };
+    }
 
-  if (error) {
-    throw new Error(`自动创建商品档案失败: ${error.message}`);
+    // 再模糊匹配名称
+    const { data: nameData } = await client
+      .from('products')
+      .select('id, code, name')
+      .ilike('name', `%${row.supplierProductCode}%`)
+      .eq('is_active', true)
+      .limit(1);
+    if (nameData?.[0]) {
+      return {
+        productId: nameData[0].id as string,
+        productCode: nameData[0].code as string,
+        productName: nameData[0].name as string,
+        matchType: 'name',
+        matchHint: `按发货方商品编码匹配名称：${row.supplierProductCode}`,
+      };
+    }
   }
 
+  // 无法匹配时返回 null，不再自动创建商品档案
   return {
-    productId: data.id as string,
-    productCode: data.code as string,
-    productName: data.name as string,
+    productId: null,
+    productCode: '',
+    productName: '',
     matchType: 'none',
-    matchHint: `未匹配到商品档案，已自动创建：${generatedName}`,
+    matchHint: '无法匹配到系统商品档案，也无SKU映射关系',
   };
 }
 
@@ -300,16 +384,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: '没有有效的库存数据' }, { status: 400 });
     }
 
-    const stats = { inserted: 0, updated: 0, matched: 0, unmatched: 0 };
+    const stats = {
+      inserted: 0, updated: 0, matched: 0, unmatched: 0,
+      supplierMappingMatched: 0, skuSkipped: 0,
+    };
     const supplierNotFound: string[] = [];
     const errors: string[] = [];
+    const skippedRows: SkippedRow[] = [];
 
     for (const row of rows) {
       let supplier = await findSupplier(client, row);
       if (!supplier) {
         try {
           supplier = await createSupplier(client, row);
-          stats.inserted += 0; // don't double-count; stock insert will add
         } catch (err) {
           const key = row.supplierCode || row.supplierName || '未知发货方';
           if (!supplierNotFound.includes(key)) supplierNotFound.push(key);
@@ -317,9 +404,38 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      const product = await matchProduct(client, row);
-      if (product.productId) stats.matched += 1;
-      else stats.unmatched += 1;
+      let product: ProductMatch | null = null;
+
+      // 1. 优先：通过 SKU 映射匹配
+      const mappedProduct = await matchProductBySupplierMapping(client, supplier.id, row);
+      if (mappedProduct) {
+        product = mappedProduct;
+        stats.supplierMappingMatched += 1;
+        stats.matched += 1;
+      } else {
+        // 2. 次优先：通过 products 表匹配
+        product = await matchProduct(client, row);
+
+        if (!product || !product.productId) {
+          // 3. 兜底：无法匹配 → 记录并跳过，不处理
+          stats.skuSkipped += 1;
+          stats.unmatched += 1;
+          skippedRows.push({
+            supplierCode: row.supplierCode,
+            supplierName: row.supplierName,
+            productName: row.productName || row.supplierProductName,
+            productCode: row.productCode || row.supplierProductCode,
+            productSpec: row.productSpec || row.supplierProductSpec,
+            reason: product?.matchHint || '无法匹配到系统商品，也无SKU映射关系',
+          });
+          continue;
+        }
+        stats.matched += 1;
+      }
+
+      if (!product.productId) {
+        continue;
+      }
 
       const warehouseId = await findWarehouseId(client, row.warehouseName);
       const stockIdentity = { column: 'product_id', value: product.productId };
@@ -410,10 +526,11 @@ export async function POST(request: NextRequest) {
       data: { ...stats, total },
       supplierNotFound,
       errors,
+      skippedRows,
       message: [
         `库存导入完成：新增 ${stats.inserted} 条，更新 ${stats.updated} 条`,
-        stats.matched > 0 ? `匹配商品 ${stats.matched} 条` : '',
-        stats.unmatched > 0 ? `未匹配 ${stats.unmatched} 条` : '',
+        stats.supplierMappingMatched > 0 ? `SKU映射匹配 ${stats.supplierMappingMatched} 条` : '',
+        stats.skuSkipped > 0 ? `有 ${stats.skuSkipped} 条无法匹配，已跳过` : '',
         supplierNotFound.length > 0 ? `有 ${supplierNotFound.length} 个发货方未找到并跳过` : '',
       ].filter(Boolean).join('，'),
     }, { status: errors.length > 0 && total === 0 ? 500 : 200 });
