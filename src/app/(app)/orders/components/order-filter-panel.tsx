@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -38,6 +38,53 @@ const FILTERABLE_FIELDS = [
   { key: 'expressCompany', label: '快递公司', placeholder: '输入快递公司名称' },
   { key: 'importBatch', label: '导入批次', placeholder: '输入导入批次号' },
 ];
+
+// 防抖输入框：输入即时响应，300ms 延迟传播到父组件，避免每次按键触发全局刷新
+function DebouncedSearchInput({
+  value,
+  onChange,
+  delay = 300,
+  ...inputProps
+}: Omit<React.ComponentProps<typeof Input>, 'onChange'> & {
+  onChange: (value: string) => void;
+  delay?: number;
+}) {
+  const [localValue, setLocalValue] = useState(value);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  // 外部值变更时间步本地状态（如 clearAllFilters），同时取消待处理的防抖定时器
+  useEffect(() => {
+    setLocalValue(value);
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, [value]);
+
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const v = e.target.value;
+      setLocalValue(v);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        onChangeRef.current(v);
+      }, delay);
+    },
+    [delay],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  return <Input value={localValue} onChange={handleChange} {...inputProps} />;
+}
 
 interface OrderFilterPanelProps {
   orders: Order[];
@@ -240,10 +287,10 @@ export function OrderFilterPanel({
             <Label className="text-xs text-muted-foreground">订单号</Label>
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
+              <DebouncedSearchInput
                 placeholder="系统单号/客户单号"
                 value={searchFields.orderNo}
-                onChange={(e) => updateSearchField_('orderNo', e.target.value)}
+                onChange={(v) => updateSearchField_('orderNo', v)}
                 className="pl-8 h-8 text-sm"
               />
             </div>
@@ -254,10 +301,10 @@ export function OrderFilterPanel({
             <Label className="text-xs text-muted-foreground">商品名称/型号</Label>
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
+              <DebouncedSearchInput
                 placeholder="输入商品名称或型号"
                 value={searchFields.productName}
-                onChange={(e) => updateSearchField_('productName', e.target.value)}
+                onChange={(v) => updateSearchField_('productName', v)}
                 className="pl-8 h-8 text-sm"
               />
             </div>
@@ -268,10 +315,10 @@ export function OrderFilterPanel({
             <Label className="text-xs text-muted-foreground">电话号码</Label>
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
+              <DebouncedSearchInput
                 placeholder="输入电话号码"
                 value={searchFields.phone}
-                onChange={(e) => updateSearchField_('phone', e.target.value)}
+                onChange={(v) => updateSearchField_('phone', v)}
                 className="pl-8 h-8 text-sm"
               />
             </div>
@@ -511,10 +558,10 @@ export function OrderFilterPanel({
                             <Label className="text-xs text-muted-foreground">{fieldDef?.label || key}</Label>
                             <div className="relative">
                               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                              <Input
+                              <DebouncedSearchInput
                                 placeholder={fieldDef?.placeholder || ''}
                                 value={value}
-                                onChange={(e) => updateAdvancedField_(key, e.target.value)}
+                                onChange={(v) => updateAdvancedField_(key, v)}
                                 className="pl-8 h-8 text-sm"
                               />
                             </div>

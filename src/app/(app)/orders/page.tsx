@@ -149,13 +149,15 @@ export default function OrdersPage() {
   // Date range for API calls
   const dateRange = { createdFrom, createdTo };
 
-  // Reset to page 1 whenever filter state changes (search, status, customer, supplier, date range, etc.)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const filterDeps = [statusFilter, selectedStatuses, customerFilter, supplierFilter, quantityOp, quantityFilter, JSON.stringify(searchFields), JSON.stringify(advancedFields), createdFrom, createdTo];
-  useEffect(() => { fetchOrders(1, dateRange); }, filterDeps); // eslint-disable-line
+  // Server-relevant deps: only date range is sent to the API — avoid re-fetch on every keystroke
+  const serverFilterDeps = [createdFrom, createdTo];
+  useEffect(() => { fetchOrders(1, dateRange); }, serverFilterDeps);
 
-  // Re-fetch status counts when filters change
-  useEffect(() => { fetchStatusCounts(dateRange); }, filterDeps); // eslint-disable-line
+  useEffect(() => { fetchStatusCounts(dateRange); }, serverFilterDeps);
+
+  // Client-side filter deps: reset to page 1 without server round-trip (no loading flash)
+  const clientFilterDeps = [statusFilter, selectedStatuses, customerFilter, supplierFilter, quantityOp, quantityFilter, JSON.stringify(searchFields), JSON.stringify(advancedFields)];
+  useEffect(() => { setCurrentPage(1); }, clientFilterDeps);
 
   // --- Selected counts ---
   const selectedCounts = useSelectedCounts(selectedOrderIds, orders);
