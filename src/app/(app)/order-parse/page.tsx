@@ -208,6 +208,7 @@ import type { InputPanelProps } from './components/input-panel';
 import { CustomerSelector } from './components/customer-selector';
 import { OrderPreviewPanel } from './components/order-preview-panel';
 import { ImportResultDialog } from './components/import-result-dialog';
+import { DuplicateCheckDialog } from './components/duplicate-check-dialog';
 import { MappingHistoryDialog } from './components/mapping-history-dialog';
 import { useOrderSubmit } from './hooks/use-order-submit';
 import type { DuplicateSummary, MatchStatsSummary } from './hooks/use-order-submit';
@@ -481,6 +482,14 @@ export default function OrderParsePage() {
     customerName?: string;
     duplicateSummary?: DuplicateSummary;
     matchStats?: MatchStatsSummary;
+    skipExisting?: boolean;
+  } | null>(null);
+  const [duplicateCheck, setDuplicateCheck] = useState<{
+    open: boolean;
+    existingOrders: Array<{ orderNo: string; receiverName: string; sysOrderNo?: string }>;
+    batchDuplicates: Array<{ orderNo: string; receiverName: string }>;
+    fuzzyDuplicates: Array<{ orderNo: string; receiverName: string; sysOrderNo?: string }>;
+    pendingSubmit: (skipExisting: boolean) => void;
   } | null>(null);
   const [mappingHistory, setMappingHistory] = useState<MappingHistory[]>([]);
   const [activeMappingMeta, setActiveMappingMeta] = useState<MappingHistory | null>(null);
@@ -537,7 +546,7 @@ export default function OrderParsePage() {
       const res = await fetch('/api/customers?isActive=false', { headers: buildUserInfoHeaders() });
       const data = await res.json();
       if (data.success) {
-        setCustomers((data.data || []).filter((c: Customer) => c.code && c.name));
+        setCustomers((data.data || []).filter((c: Customer) => c.code));
       }
     } catch (error) {
       console.error('加载客户失败:', error);
@@ -1291,28 +1300,84 @@ export default function OrderParsePage() {
       JSON.stringify(columnMapping) === JSON.stringify(activeMappingMeta.mapping_config) &&
       JSON.stringify(currentSourceHeaders) === JSON.stringify(activeSourceHeaders);
 
-    submitOrders(parsedOrders, {
-      customerCode: selectedCustomer,
-      customerName: customers.find(c => c.code === selectedCustomer)?.name || '',
-      salespersonId: salespersonId || '',
-      salespersonName: salespersonName || '',
-      operatorId: operatorId || '',
-      operatorName: operatorName || '',
-      columnMapping,
-      headerRow,
-      excelPreview,
-      skipMappingSave: isMappingUnchanged,
-      onSuccess: (result) => {
-        setImportResult(result);
-        handleClear();
-      },
-      onError: (message) => {
-        toast.error(message);
-      },
-      onFinally: () => {
-        // isSubmitting is managed by the hook
-      },
-    });
+    const doSubmit = (skipExisting: boolean) => {
+      submitOrders(parsedOrders, {
+        customerCode: selectedCustomer,
+        customerName: customers.find(c => c.code === selectedCustomer)?.name || '',
+        salespersonId: salespersonId || '',
+        salespersonName: salespersonName || '',
+        operatorId: operatorId || '',
+        operatorName: operatorName || '',
+        columnMapping,
+        headerRow,
+        excelPreview,
+        skipMappingSave: isMappingUnchanged,
+        skipExisting,
+        onSuccess: (result) => {
+          setImportResult(result);
+          handleClear();
+        },
+        onError: (message) => {
+          toast.error(message);
+        },
+        onFinally: () => {
+          // isSubmitting is managed by the hook
+        },
+      });
+    };
+
+    // 收集订单信息进行查重（POST 携带 items 详情）
+    const checkItems = selectedOrders.map((o) => ({
+      orderNo: o.orderNo || o.customerOrderNo || o.billNo || '',
+      customerOrderNo: o.customerOrderNo || o.orderNo || '',
+      productName: o.product_name || '',
+      productSpec: o.product_spec || '',
+      productCode: o.product_code || '',
+      receiverPhone: o.receiver_phone || '',
+      receiverName: o.receiver_name || '',
+      quantity: o.quantity || 0,
+    }));
+
+    try {
+      const checkRes = await fetch('/api/orders/check-duplicates', {
+        method: 'POST',
+        headers: {
+          ...buildUserInfoHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          customerCode: selectedCustomer,
+          items: checkItems,
+        }),
+      });
+      const checkData = await checkRes.json();
+
+      if (checkData.success && checkData.data && typeof checkData.data === 'object' && !Array.isArray(checkData.data)) {
+        const data = checkData.data as Record<string, unknown>;
+        const existingOrders = (Array.isArray(data.existingOrders) ? data.existingOrders : []) as Array<{ orderNo: string; receiverName: string; sysOrderNo?: string }>;
+        const batchDuplicates = (Array.isArray(data.batchDuplicates) ? data.batchDuplicates : []) as Array<{ orderNo: string; receiverName: string }>;
+        const fuzzyDuplicates = (Array.isArray(data.fuzzyDuplicates) ? data.fuzzyDuplicates : []) as Array<{ orderNo: string; receiverName: string; sysOrderNo?: string }>;
+
+        if (existingOrders.length > 0 || batchDuplicates.length > 0 || fuzzyDuplicates.length > 0) {
+          setDuplicateCheck({
+            open: true,
+            existingOrders,
+            batchDuplicates,
+            fuzzyDuplicates,
+            pendingSubmit: (skip: boolean) => doSubmit(skip),
+          });
+          return;
+        }
+      } else {
+        toast.warning('重复检测异常，直接提交订单');
+      }
+    } catch (err) {
+      console.error('查重请求失败，降级直接提交:', err);
+      toast.warning('重复检测请求失败，直接提交订单');
+    }
+
+    // 无重复或查重失败，直接提交
+    doSubmit(false);
   };
 
   // 过滤映射历史
@@ -1592,6 +1657,25 @@ export default function OrderParsePage() {
             title="选择系统商品（按编码或名称搜索）"
           />
 
+          {/* Duplicate Check Dialog */}
+          {duplicateCheck && (
+            <DuplicateCheckDialog
+              open={duplicateCheck.open}
+              onOpenChange={(open) => { if (!open) setDuplicateCheck(null); }}
+              existingOrders={duplicateCheck.existingOrders}
+              batchDuplicates={duplicateCheck.batchDuplicates}
+              fuzzyDuplicates={duplicateCheck.fuzzyDuplicates}
+              remainingCount={
+                parsedOrders.filter((o) => o.selected && o.product_name?.trim()).length -
+                duplicateCheck.batchDuplicates.length -
+                duplicateCheck.existingOrders.length -
+                (duplicateCheck.fuzzyDuplicates?.length || 0)
+              }
+              onSkip={() => duplicateCheck.pendingSubmit(true)}
+              onImportAll={() => duplicateCheck.pendingSubmit(false)}
+            />
+          )}
+
           {/* Import Result Dialog */}
           <ImportResultDialog
             open={!!importResult}
@@ -1601,6 +1685,9 @@ export default function OrderParsePage() {
             sysOrderNos={importResult?.sysOrderNos ?? []}
             message={importResult?.message ?? ''}
             customerName={importResult?.customerName}
+            duplicateTotalSkipped={importResult?.duplicateSummary?.totalSkipped}
+            duplicateSummary={importResult?.duplicateSummary}
+            skipExisting={importResult?.skipExisting}
             onClose={() => setImportResult(null)}
           />
 

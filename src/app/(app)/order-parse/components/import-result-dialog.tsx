@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Copy, Check } from 'lucide-react';
 import { useState } from 'react';
+import type { DuplicateSummary } from '../hooks/use-order-submit';
 
 interface ImportResultDialogProps {
   open: boolean;
@@ -21,6 +22,8 @@ interface ImportResultDialogProps {
   message: string;
   customerName?: string;
   duplicateTotalSkipped?: number;
+  duplicateSummary?: DuplicateSummary;
+  skipExisting?: boolean;
   onClose: () => void;
 }
 
@@ -33,6 +36,8 @@ export function ImportResultDialog({
   message,
   customerName,
   duplicateTotalSkipped,
+  duplicateSummary,
+  skipExisting,
   onClose,
 }: ImportResultDialogProps) {
   const [copied, setCopied] = useState(false);
@@ -70,6 +75,30 @@ export function ImportResultDialog({
               </div>
             )}
           </div>
+
+          {duplicateSummary && duplicateSummary.details.length > 0 && (
+            <div className="rounded bg-amber-50 p-3 border border-amber-200 space-y-1.5">
+              <div className="text-xs font-medium text-amber-700">重复订单详情</div>
+              {duplicateSummary.details
+                .filter((d) => d.reason === 'batch_duplicate')
+                .slice(0, 10)
+                .map((d) => (
+                  <div key={d.orderNo} className="text-xs text-amber-600">
+                    批次内重复: {d.orderNo}（{d.receiverName}）
+                  </div>
+                ))}
+              {duplicateSummary.details.filter((d) => d.reason === 'batch_duplicate').length > 10 && (
+                <div className="text-xs text-amber-500">
+                  ...还有 {duplicateSummary.details.filter((d) => d.reason === 'batch_duplicate').length - 10} 条
+                </div>
+              )}
+              {duplicateSummary.existingDuplicateCount > 0 && (
+                <div className="text-xs text-amber-700 mt-1">
+                  {duplicateSummary.existingDuplicateCount} 条订单在系统中已存在{skipExisting ? '（已跳过）' : ''}
+                </div>
+              )}
+            </div>
+          )}
 
           {importBatch && (
             <div className="rounded bg-muted p-2">

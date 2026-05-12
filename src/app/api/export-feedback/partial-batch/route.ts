@@ -5,7 +5,7 @@ import { buildExportRecordDownloadPath } from '@/lib/export-download';
 import { parseTemplateFieldMappings, migrateFieldMappings, type TemplateRecord } from '@/lib/template-utils';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { PERMISSIONS } from '@/lib/permissions';
-import { buildFeedbackRows, DEFAULT_CUSTOMER_FEEDBACK_MAPPINGS } from '@/lib/feedback-exporter';
+import { buildFeedbackRows, DEFAULT_CUSTOMER_FEEDBACK_MAPPINGS, applyTextFormat } from '@/lib/feedback-exporter';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 
@@ -190,6 +190,7 @@ export async function POST(request: NextRequest) {
       const fileName = `${customerName}+部分回单反馈+${today}.xlsx`;
       const exportRows = buildFeedbackRows(orders as Record<string, unknown>[], exportFieldMappings, feedbackExportHeaders || undefined, columnOrder || undefined);
       const worksheet = XLSX.utils.json_to_sheet(exportRows);
+      applyTextFormat(worksheet);
       const headers = Object.keys(exportRows[0] || exportFieldMappings || DEFAULT_CUSTOMER_FEEDBACK_MAPPINGS);
       worksheet['!cols'] = headers.map((header) => ({ wch: Math.max(12, Math.min(40, header.length * 2 + 4)) }));
       const workbook = XLSX.utils.book_new();

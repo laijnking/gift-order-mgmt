@@ -94,4 +94,5 @@ export interface ParsedOrderBundleDraft {
   channelRemark: string;
   suggestedShipper: string;
   originalStatus: string;
+  extFields?: Record<string, string>;
 }

@@ -64,6 +64,15 @@ export function CustomerSelector({
   const [searchResults, setSearchResults] = useState<Customer[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const lastSelectedRef = useRef<Customer | null>(null);
+
+  // 从 sessionStorage 恢复时，用 customers 列表初始化缓存的客户名称
+  useEffect(() => {
+    if (selectedCustomer && !lastSelectedRef.current) {
+      const match = customers.find((c) => c.code === selectedCustomer);
+      if (match) lastSelectedRef.current = match;
+    }
+  }, [selectedCustomer, customers]);
 
   // 服务端搜索（防抖 300ms）
   useEffect(() => {
@@ -81,7 +90,7 @@ export function CustomerSelector({
         });
         const data = await res.json();
         if (data.success) {
-          setSearchResults((data.data || []).filter((c: Customer) => !!(String(c.code ?? '').trim() && String(c.name ?? '').trim())));
+          setSearchResults((data.data || []).filter((c: Customer) => !!String(c.code ?? '').trim()));
         }
       } catch {
         // ignore
@@ -117,7 +126,8 @@ export function CustomerSelector({
           >
             {selectedCustomer ? (
               <span className="truncate">
-                {customers.find((c) => c.code === selectedCustomer)?.name ||
+                {lastSelectedRef.current?.name ||
+                 customers.find((c) => c.code === selectedCustomer)?.name ||
                  searchResults.find((c) => c.code === selectedCustomer)?.name ||
                  selectedCustomer}
               </span>
@@ -146,6 +156,7 @@ export function CustomerSelector({
                         <button
                           key={c.code}
                           onClick={() => {
+                            lastSelectedRef.current = c;
                             onCustomerChange(c.code, c);
                             setSearch('');
                             setSearchOpen(false);
@@ -156,7 +167,7 @@ export function CustomerSelector({
                           )}
                         >
                           <div className="flex flex-col">
-                            <span className="font-medium truncate">{c.name}</span>
+                            <span className="font-medium truncate">{c.name || c.code}</span>
                             <span className="text-xs text-muted-foreground">编码: {c.code}</span>
                           </div>
                         </button>
@@ -166,6 +177,7 @@ export function CustomerSelector({
                   <button
                     key={c.code}
                     onClick={() => {
+                      lastSelectedRef.current = c;
                       onCustomerChange(c.code, c);
                       setSearch('');
                       setSearchOpen(false);
@@ -176,7 +188,7 @@ export function CustomerSelector({
                     )}
                   >
                     <div className="flex flex-col">
-                      <span className="font-medium truncate">{c.name}</span>
+                      <span className="font-medium truncate">{c.name || c.code}</span>
                       <span className="text-xs text-muted-foreground">编码: {c.code}</span>
                     </div>
                   </button>

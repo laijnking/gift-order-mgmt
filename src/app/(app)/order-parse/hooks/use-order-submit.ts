@@ -7,7 +7,7 @@ import type { ParsedOrder } from './use-order-parse-session';
 export interface DuplicateDetail {
   orderNo: string;
   receiverName: string;
-  reason: 'batch_duplicate' | 'existing_order';
+  reason: 'batch_duplicate' | 'existing_order' | 'fuzzy_match';
   existingSysOrderNo?: string;
 }
 
@@ -15,6 +15,7 @@ export interface DuplicateSummary {
   totalSkipped: number;
   batchDuplicateCount: number;
   existingDuplicateCount: number;
+  fuzzyDuplicateCount?: number;
   details: DuplicateDetail[];
 }
 
@@ -38,6 +39,7 @@ export interface ImportResult {
   customerName?: string;
   duplicateSummary?: DuplicateSummary;
   matchStats?: MatchStatsSummary;
+  skipExisting?: boolean;
 }
 
 export interface SubmitOptions {
@@ -51,6 +53,7 @@ export interface SubmitOptions {
   headerRow: number;
   excelPreview: string[][];
   skipMappingSave?: boolean;
+  skipExisting?: boolean;
   onSuccess: (result: ImportResult) => void;
   onError: (message: string) => void;
   onFinally: () => void;
@@ -65,6 +68,7 @@ export function useOrderSubmit() {
     const selectedOrders = orders.filter((o) => o.selected && o.product_name?.trim());
 
     const orderData = {
+      skipExisting: options.skipExisting || false,
       customerCode: options.customerCode,
       customerName: options.customerName,
       salespersonId: options.salespersonId || '',
@@ -109,6 +113,9 @@ export function useOrderSubmit() {
           operatorId: o.operatorId as string || '',
           operator: o.operator ?? '',
           extFields: o.extFields as Record<string, string> || {},
+          channel_remark: o.channel_remark ?? null,
+          suggested_shipper: o.suggested_shipper ?? null,
+          original_status: o.original_status ?? null,
         };
       }),
     };
@@ -165,6 +172,7 @@ export function useOrderSubmit() {
           customerName: options.customerName || options.customerCode,
           duplicateSummary: data.duplicateSummary,
           matchStats: data.matchStats,
+          skipExisting: options.skipExisting || false,
         });
       } else {
         options.onError(data.error || '创建订单失败');

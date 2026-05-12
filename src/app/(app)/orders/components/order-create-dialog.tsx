@@ -38,11 +38,16 @@ export interface CreateOrderForm {
   productCode: string;
   productSpec: string;
   productBrand: string;
+  cuProductName: string;
+  cuProductCode: string;
+  cuProductSpec: string;
   quantity: number;
+  price: string;
   receiverName: string;
   receiverPhone: string;
   receiverAddress: string;
-  receiverProvince: string;
+  freightCost: string;
+  channelRemark: string;
   expressRequirement: string;
   remark: string;
 }
@@ -367,10 +372,10 @@ export function OrderCreateDialog({
             </div>
 
             <div className="space-y-2">
-              <Label>商品名称 <span className="text-destructive">*</span></Label>
+              <Label>商品名称</Label>
               <div className="flex gap-2">
                 <Input
-                  placeholder="商品名称"
+                  placeholder={'商品名称，选填，默认"商品待匹配"'}
                   value={form.productName}
                   onChange={(e) => setForm(prev => ({ ...prev, productName: e.target.value }))}
                   className="flex-1"
@@ -392,7 +397,32 @@ export function OrderCreateDialog({
                 </div>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-4">
+
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">客户商品信息</Label>
+              <Input
+                placeholder="客户商品名称"
+                value={form.cuProductName}
+                onChange={(e) => setForm(prev => ({ ...prev, cuProductName: e.target.value }))}
+                className="h-9"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  placeholder="客户商品编码"
+                  value={form.cuProductCode}
+                  onChange={(e) => setForm(prev => ({ ...prev, cuProductCode: e.target.value }))}
+                  className="h-9"
+                />
+                <Input
+                  placeholder="客户商品型号"
+                  value={form.cuProductSpec}
+                  onChange={(e) => setForm(prev => ({ ...prev, cuProductSpec: e.target.value }))}
+                  className="h-9"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>数量</Label>
                 <Input
@@ -403,6 +433,26 @@ export function OrderCreateDialog({
                 />
               </div>
               <div className="space-y-2">
+                <Label>商品单价</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="¥"
+                  value={form.price}
+                  onChange={(e) => setForm(prev => ({ ...prev, price: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>商品总价</Label>
+                <div className="h-9 px-3 py-2 border rounded-md bg-muted/50 text-sm">
+                  ¥{(parseFloat(form.price) || 0) * form.quantity}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
                 <Label>收货人 <span className="text-destructive">*</span></Label>
                 <Input
                   placeholder="收货人姓名"
@@ -410,23 +460,16 @@ export function OrderCreateDialog({
                   onChange={(e) => setForm(prev => ({ ...prev, receiverName: e.target.value }))}
                 />
               </div>
+              <div className="space-y-2">
+                <Label>联系电话 <span className="text-destructive">*</span></Label>
+                <Input
+                  placeholder="手机号码"
+                  value={form.receiverPhone}
+                  onChange={(e) => setForm(prev => ({ ...prev, receiverPhone: e.target.value }))}
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>联系电话 <span className="text-destructive">*</span></Label>
-              <Input
-                placeholder="手机号码"
-                value={form.receiverPhone}
-                onChange={(e) => setForm(prev => ({ ...prev, receiverPhone: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>收货省份</Label>
-              <Input
-                placeholder="如：福建、北京"
-                value={form.receiverProvince}
-                onChange={(e) => setForm(prev => ({ ...prev, receiverProvince: e.target.value }))}
-              />
-            </div>
+
             <div className="space-y-2">
               <Label>收货地址 <span className="text-destructive">*</span></Label>
               <Textarea
@@ -436,21 +479,45 @@ export function OrderCreateDialog({
                 onChange={(e) => setForm(prev => ({ ...prev, receiverAddress: e.target.value }))}
               />
             </div>
+
+            <div className="space-y-2">
+              <Label>运费</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="运费金额"
+                value={form.freightCost}
+                onChange={(e) => setForm(prev => ({ ...prev, freightCost: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">客户备注（原渠道备注）</Label>
+              <Textarea
+                placeholder="客户下单时的原始备注"
+                rows={2}
+                value={form.channelRemark}
+                onChange={(e) => setForm(prev => ({ ...prev, channelRemark: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">内部运营备注</Label>
+              <Textarea
+                placeholder="运营人员备注"
+                rows={2}
+                value={form.remark}
+                onChange={(e) => setForm(prev => ({ ...prev, remark: e.target.value }))}
+              />
+            </div>
+
             <div className="space-y-2">
               <Label>快递要求</Label>
               <Input
                 placeholder="如：顺丰优先"
                 value={form.expressRequirement}
                 onChange={(e) => setForm(prev => ({ ...prev, expressRequirement: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>备注</Label>
-              <Textarea
-                placeholder="订单备注"
-                rows={2}
-                value={form.remark}
-                onChange={(e) => setForm(prev => ({ ...prev, remark: e.target.value }))}
               />
             </div>
           </div>

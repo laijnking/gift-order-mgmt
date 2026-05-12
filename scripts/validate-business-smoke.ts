@@ -615,6 +615,21 @@ async function runOrderIntakeToOrdersCheck(page: Page) {
     });
   });
 
+  await page.route('**/api/orders/check-duplicates**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          existingOrders: [],
+          batchDuplicates: [],
+          fuzzyDuplicates: [],
+        },
+      }),
+    });
+  });
+
   await page.goto(`${BASE_URL}/order-parse`);
   await page.getByRole('heading', { name: 'AI智能订单录入' }).waitFor();
 
@@ -631,12 +646,12 @@ async function runOrderIntakeToOrdersCheck(page: Page) {
   await page.getByText('测试商品A').first().waitFor();
   await page.getByRole('button', { name: '提交订单' }).click();
 
+  await page.getByRole('dialog').waitFor();
+
   const submittedOrderRequest = createOrderRequest as { customerCode?: string } | null;
   if (!submittedOrderRequest || submittedOrderRequest.customerCode !== 'C001') {
     throw new Error(`录单页提交订单未携带预期客户，实际为 ${JSON.stringify(submittedOrderRequest)}`);
   }
-
-  await page.getByRole('dialog').waitFor();
   await page.getByText('订单导入完成').waitFor();
   await page.getByText(IMPORT_BATCH).waitFor();
   await page.getByRole('button', { name: '确定' }).click();

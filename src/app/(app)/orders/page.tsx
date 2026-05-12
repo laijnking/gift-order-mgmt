@@ -908,6 +908,11 @@ export default function OrdersPage() {
                           <div className="text-sm">
                             <div>{order.receiver.name}</div>
                             <div className="text-muted-foreground text-xs">{order.receiver.phone}</div>
+                            {order.receiver.province && (
+                              <div className="text-muted-foreground text-xs">
+                                {order.receiver.province}{order.receiver.city ? ` ${order.receiver.city}` : ''}
+                              </div>
+                            )}
                           </div>
                         </TableCell>
                       )}

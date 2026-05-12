@@ -6,7 +6,7 @@
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { WeComAPIClient } from './api-client';
 import { getWeComAppConfig } from './shared';
-import { buildFeedbackRows, DEFAULT_CUSTOMER_FEEDBACK_MAPPINGS } from '@/lib/feedback-exporter';
+import { buildFeedbackRows, DEFAULT_CUSTOMER_FEEDBACK_MAPPINGS, applyTextFormat } from '@/lib/feedback-exporter';
 import type { WeComGroupMapping } from './types';
 
 /**
@@ -130,6 +130,7 @@ async function generateFeedbackExcel(
 ): Promise<Buffer> {
   const XLSX = await import('xlsx');
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  applyTextFormat(ws);
 
   ws['!cols'] = headers.map(() => ({ wch: 15 }));
 

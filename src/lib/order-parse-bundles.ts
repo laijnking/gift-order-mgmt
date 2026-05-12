@@ -49,6 +49,7 @@ export function buildBundleDraftsFromFlatOrders(
       channelRemark: order.channel_remark || '',
       suggestedShipper: order.suggested_shipper || '',
       originalStatus: order.original_status || '',
+      extFields: order.extFields || {},
     };
   });
 }
@@ -90,6 +91,7 @@ export function flattenBundleDraftsToFlatOrders(
       customerPrice: item.price ?? item.systemProductPrice ?? undefined,
       supplierId: item.supplierMatches?.[0]?.supplierId,
       supplierName: item.supplierMatches?.[0]?.supplierName,
+      extFields: bundle.extFields || {},
     }))
   );
 }

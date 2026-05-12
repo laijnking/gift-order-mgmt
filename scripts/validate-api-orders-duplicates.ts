@@ -16,7 +16,7 @@ type RouteModule = {
   POST: (request: Request) => Promise<Response>;
 };
 
-type DuplicateReason = 'batch_duplicate' | 'existing_order';
+type DuplicateReason = 'batch_duplicate' | 'existing_order' | 'fuzzy_match';
 
 type DuplicateDetail = {
   orderNo: string;
@@ -372,12 +372,16 @@ function seedScenario(db: MemoryDatabase, scenario: Scenario) {
     operator_user_name: '默认跟单员',
   });
 
+  // 使用1天前的时间确保在3天窗口内
+  const oneDayAgo = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString();
+
   for (const order of scenario.seedOrders) {
     db.seed('orders', {
       ...order,
+      created_at: oneDayAgo,
       status: 'pending',
       source: 'ai_parse',
-      updated_at: order.created_at,
+      updated_at: oneDayAgo,
     });
   }
 }

@@ -12,7 +12,7 @@ import { generateSysOrderNo, bulkUpdateOrderStatus, extractName, getUserRealName
 interface DuplicateOrderDetail {
   orderNo: string;
   receiverName: string;
-  reason: 'batch_duplicate' | 'existing_order';
+  reason: 'batch_duplicate' | 'existing_order' | 'fuzzy_match';
   existingSysOrderNo?: string;
 }
 
@@ -423,7 +423,10 @@ export async function POST(request: NextRequest) {
         items,
         receiver,
         supplierId,
-        supplierName
+        supplierName,
+        freightCost,
+        source: bodySource,
+        skipExisting,
       } = body;
 
       if (!items || !Array.isArray(items) || items.length === 0) {
@@ -492,9 +495,9 @@ export async function POST(request: NextRequest) {
             product_spec: item.systemProductSpec || item.mappedProductSpec || item.productSpec || '',
             product_code: item.systemProductCode || item.mappedProductCode || item.productCode || '',
             product_brand: item.systemProductBrand || item.mappedProductBrand || '',
-            cu_product_name: item.productName,
-            cu_product_spec: item.productSpec || '',
-            cu_product_code: item.productCode || '',
+            cu_product_name: item.cuProductName || item.productName,
+            cu_product_spec: item.cuProductSpec || item.productSpec || '',
+            cu_product_code: item.cuProductCode || item.productCode || '',
             cu_barcode: item.cuBarcode || item.barcode || '',
             quantity: item.quantity || 1,
             price: item.price ?? null,
@@ -528,6 +531,7 @@ export async function POST(request: NextRequest) {
           warehouse: itemWarehouseInfo?.name || item.warehouse || '',
           // 其他字段
           express_company: item.express_company || null,
+          freight_cost: freightCost || null,
           tracking_no: item.tracking_no || null,
           amount: item.amount || null,
           discount: item.discount || null,
@@ -535,7 +539,7 @@ export async function POST(request: NextRequest) {
           income_name: item.income_name || null,
           income_amount: item.income_amount || null,
           invoice_required: item.invoice_required || null,
-          source: 'ai_parse',
+          source: bodySource || 'ai_parse',
           channel_remark: item.channel_remark || null,
           suggested_shipper: item.suggested_shipper || null,
           original_status: item.original_status || null,
@@ -559,79 +563,210 @@ export async function POST(request: NextRequest) {
       const batchSeen = new Set<string>();
       const deduplicatedOrders = ordersToInsert.filter((order) => {
         const orderNo = String(order.order_no || '').trim();
-        if (!orderNo) {
+        const customerOrderNo = String(order.customer_order_no || '').trim();
+        if (!orderNo && !customerOrderNo) {
           return true;
         }
 
-        const key = buildDuplicateOrderKey(String(order.customer_code || ''), orderNo);
-        if (batchSeen.has(key)) {
-          duplicateDetails.push({
-            orderNo,
-            receiverName: String(order.receiver_name || ''),
-            reason: 'batch_duplicate',
-          });
-          batchSkippedCount++;
-          return false;
+        const identifiers = [...new Set([orderNo, customerOrderNo].filter(Boolean))];
+        for (const id of identifiers) {
+          const key = buildDuplicateOrderKey(String(order.customer_code || ''), id);
+          if (batchSeen.has(key)) {
+            duplicateDetails.push({
+              orderNo: id,
+              receiverName: String(order.receiver_name || ''),
+              reason: 'batch_duplicate',
+            });
+            batchSkippedCount++;
+            return false;
+          }
         }
-
-        batchSeen.add(key);
+        for (const id of identifiers) {
+          batchSeen.add(buildDuplicateOrderKey(String(order.customer_code || ''), id));
+        }
         return true;
       });
 
-      const candidateOrderNos = Array.from(
+      const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+
+      // 收集所有候选标识符（order_no + customer_order_no）
+      const allCandidateIdentifiers = Array.from(
         new Set(
-          deduplicatedOrders
-            .map((order) => String(order.order_no || '').trim())
-            .filter(Boolean)
+          deduplicatedOrders.flatMap((order) => {
+            const identifiers: string[] = [];
+            const on = String(order.order_no || '').trim();
+            const con = String(order.customer_order_no || '').trim();
+            if (on) identifiers.push(on);
+            if (con && con !== on) identifiers.push(con);
+            return identifiers;
+          })
         )
       );
-      const existingOrderMap = new Map<string, { sysOrderNo: string }>();
 
-      if (candidateOrderNos.length > 0 && customerCode) {
-        const { data: existingOrders, error: existingError } = await client
+      // 查 3 天内已有订单（含 items 用于模糊匹配）
+      const recentOrderMap = new Map<string, {
+        id: string;
+        sysOrderNo: string;
+        orderNo: string;
+        customerOrderNo: string;
+        receiverPhone: string;
+        items: Record<string, unknown>[];
+      }>();
+      const allRecentOrders: Array<{
+        id: string; sysOrderNo: string; orderNo: string; customerOrderNo: string;
+        receiverPhone: string; items: Record<string, unknown>[];
+      }> = [];
+
+      if (customerCode) {
+        const { data: recentOrders, error: recentError } = await client
           .from('orders')
-          .select('order_no, sys_order_no, customer_code')
+          .select('id, order_no, customer_order_no, customer_code, sys_order_no, receiver_name, receiver_phone, items')
           .eq('customer_code', customerCode)
-          .in('order_no', candidateOrderNos);
+          .gte('created_at', threeDaysAgo);
 
-        if (existingError) {
-          throw new Error(`查询重复订单失败: ${existingError.message}`);
+        if (recentError) {
+          throw new Error(`查询重复订单失败: ${recentError.message}`);
         }
 
-        for (const existing of existingOrders || []) {
-          const key = buildDuplicateOrderKey(
-            String(existing.customer_code || ''),
-            String(existing.order_no || '')
-          );
-          existingOrderMap.set(key, {
-            sysOrderNo: String(existing.sys_order_no || ''),
-          });
+        const identifierSet = new Set(allCandidateIdentifiers.map((n) => n.toUpperCase().trim()));
+
+        for (const existing of recentOrders || []) {
+          const o = existing as Record<string, unknown>;
+          const dbOrderNo = String(o.order_no || '').trim().toUpperCase();
+          const dbCustomerOrderNo = String(o.customer_order_no || '').trim().toUpperCase();
+
+          const parsed = {
+            id: String(o.id || ''),
+            sysOrderNo: String(o.sys_order_no || ''),
+            orderNo: String(o.order_no || ''),
+            customerOrderNo: String(o.customer_order_no || ''),
+            receiverPhone: String(o.receiver_phone || ''),
+            items: Array.isArray(o.items) ? (o.items as Record<string, unknown>[]) : [],
+          };
+          allRecentOrders.push(parsed);
+
+          // 按 order_no 或 customer_order_no 任一匹配（用于精确去重）
+          if ((dbOrderNo && identifierSet.has(dbOrderNo)) || (dbCustomerOrderNo && identifierSet.has(dbCustomerOrderNo))) {
+            const key = buildDuplicateOrderKey(
+              String(o.customer_code || ''),
+              dbOrderNo || dbCustomerOrderNo
+            );
+            recentOrderMap.set(key, parsed);
+          }
         }
       }
 
+      // 已匹配 order_no 的订单 ID 集合，用于后续模糊匹配去重
+      const matchedOrderIds = new Set<string>();
+
       const freshOrders = deduplicatedOrders.filter((order) => {
         const orderNo = String(order.order_no || '').trim();
-        if (!orderNo) {
-          return true;
+        const customerOrderNo = String(order.customer_order_no || '').trim();
+
+        if (!orderNo && !customerOrderNo) {
+          return true; // 无编码，稍后由模糊匹配判断
         }
 
-        const key = buildDuplicateOrderKey(String(order.customer_code || ''), orderNo);
-        const existing = existingOrderMap.get(key);
-        if (!existing) {
-          return true;
+        // 检查 order_no
+        if (orderNo) {
+          const key = buildDuplicateOrderKey(String(order.customer_code || ''), orderNo.toUpperCase());
+          const existing = recentOrderMap.get(key);
+          if (existing) {
+            matchedOrderIds.add(existing.id);
+            duplicateDetails.push({
+              orderNo,
+              receiverName: String(order.receiver_name || ''),
+              reason: 'existing_order',
+              existingSysOrderNo: existing.sysOrderNo,
+            });
+            return !skipExisting;
+          }
         }
 
-        duplicateDetails.push({
-          orderNo,
-          receiverName: String(order.receiver_name || ''),
-          reason: 'existing_order',
-          existingSysOrderNo: existing.sysOrderNo,
-        });
-        // 允许保存重复订单（客户一个订单可能有多个商品），但记录警告
+        // 检查 customer_order_no
+        if (customerOrderNo) {
+          const key = buildDuplicateOrderKey(String(order.customer_code || ''), customerOrderNo.toUpperCase());
+          const existing = recentOrderMap.get(key);
+          if (existing) {
+            matchedOrderIds.add(existing.id);
+            duplicateDetails.push({
+              orderNo: customerOrderNo,
+              receiverName: String(order.receiver_name || ''),
+              reason: 'existing_order',
+              existingSysOrderNo: existing.sysOrderNo,
+            });
+            return !skipExisting;
+          }
+        }
+
         return true;
       });
 
-      if (freshOrders.length === 0) {
+      // 模糊维度检测：product + phone + quantity
+      for (const order of freshOrders) {
+        const orderNo = String(order.order_no || '').trim();
+        const customerOrderNo = String(order.customer_order_no || '').trim();
+        const phone = String(order.receiver_phone || '').trim();
+        const orderItems = (order.items as Array<Record<string, unknown>>) || [];
+        const qty = orderItems[0]?.quantity ? Number(orderItems[0].quantity) : 0;
+
+        if (!phone || !qty) continue;
+
+        for (const recent of allRecentOrders) {
+          if (matchedOrderIds.has(recent.id)) continue;
+
+          const dbPhone = recent.receiverPhone.trim();
+          if (dbPhone !== phone) continue;
+
+          const dbItems = recent.items;
+          if (!Array.isArray(dbItems) || dbItems.length === 0) continue;
+
+          const itemMatch = dbItems.some((dbItem: Record<string, unknown>) => {
+            const targetItem = orderItems[0] || {};
+            const cuName = String(dbItem.cu_product_name || dbItem.product_name || '').trim();
+            const cuSpec = String(dbItem.cu_product_spec || dbItem.product_spec || '').trim();
+            const cuCode = String(dbItem.cu_product_code || dbItem.product_code || '').trim();
+
+            const targetName = String(targetItem.cu_product_name || targetItem.product_name || '').trim();
+            const targetSpec = String(targetItem.cu_product_spec || targetItem.product_spec || '').trim();
+            const targetCode = String(targetItem.cu_product_code || targetItem.product_code || '').trim();
+
+            const productMatch =
+              (targetName && cuName === targetName) ||
+              (targetSpec && cuSpec === targetSpec) ||
+              (targetCode && cuCode === targetCode);
+
+            const qtyMatch = Number(dbItem.quantity) === qty;
+            return productMatch && qtyMatch;
+          });
+
+          if (itemMatch) {
+            matchedOrderIds.add(recent.id);
+            duplicateDetails.push({
+              orderNo: orderNo || customerOrderNo || '',
+              receiverName: String(order.receiver_name || ''),
+              reason: 'fuzzy_match',
+              existingSysOrderNo: recent.sysOrderNo,
+            });
+            break;
+          }
+        }
+      }
+
+      // 根据模糊匹配结果过滤
+      const finalOrders = skipExisting
+        ? freshOrders.filter((order) => {
+            const orderNo = String(order.order_no || '').trim();
+            const customerOrderNo = String(order.customer_order_no || '').trim();
+            return !duplicateDetails.some(
+              (d) =>
+                d.reason === 'fuzzy_match' &&
+                (d.orderNo === orderNo || d.orderNo === customerOrderNo)
+            );
+          })
+        : freshOrders;
+
+      if (finalOrders.length === 0) {
         return NextResponse.json({
           success: true,
           data: [],
@@ -647,7 +782,7 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      const { data, error } = await client.from('orders').insert(freshOrders).select();
+      const { data, error } = await client.from('orders').insert(finalOrders).select();
       if (error) throw new Error(`创建订单失败: ${error.message}`);
 
       return NextResponse.json({
@@ -656,9 +791,10 @@ export async function POST(request: NextRequest) {
         total: data?.length || 0,
         importBatch,
         duplicateSummary: {
-          totalSkipped: batchSkippedCount,
+          totalSkipped: batchSkippedCount + (skipExisting ? duplicateDetails.filter((item) => item.reason === 'existing_order' || item.reason === 'fuzzy_match').length : 0),
           batchDuplicateCount: duplicateDetails.filter((item) => item.reason === 'batch_duplicate').length,
           existingDuplicateCount: duplicateDetails.filter((item) => item.reason === 'existing_order').length,
+          fuzzyDuplicateCount: duplicateDetails.filter((item) => item.reason === 'fuzzy_match').length,
           details: duplicateDetails,
         },
         message:
@@ -674,6 +810,7 @@ export async function POST(request: NextRequest) {
     const customerCode = formData.get('customerCode') as string || 'UNKNOWN';
     const customerName = formData.get('customerName') as string || '未知客户';
     const salesperson = formData.get('salesperson') as string || '未知业务员';
+    const skipExisting = formData.get('skipExisting') === 'true';
 
     if (!file) {
       return NextResponse.json({ 
@@ -789,6 +926,7 @@ export async function POST(request: NextRequest) {
       ordersToInsert.push({
         sys_order_no: sysOrderNo,
         order_no: orderNo,
+        customer_order_no: orderNo,
         status: 'pending',
         // items中保存客户原始信息和系统匹配信息
         items: [{
@@ -848,79 +986,150 @@ export async function POST(request: NextRequest) {
     const batchSeen = new Set<string>();
     const deduplicatedOrders = ordersToInsert.filter((order) => {
       const orderNo = String(order.order_no || '').trim();
-      if (!orderNo) {
-        return true;
-      }
+      const customerOrderNo = String(order.customer_order_no || '').trim();
+      if (!orderNo && !customerOrderNo) return true;
 
-      const key = buildDuplicateOrderKey(String(order.customer_code || ''), orderNo);
-      if (batchSeen.has(key)) {
-        duplicateDetails.push({
-          orderNo,
-          receiverName: String(order.receiver_name || ''),
-          reason: 'batch_duplicate',
-        });
-        batchSkippedCount++;
-        return false;
+      const identifiers = [...new Set([orderNo, customerOrderNo].filter(Boolean))];
+      for (const id of identifiers) {
+        const key = buildDuplicateOrderKey(String(order.customer_code || ''), id);
+        if (batchSeen.has(key)) {
+          duplicateDetails.push({ orderNo: id, receiverName: String(order.receiver_name || ''), reason: 'batch_duplicate' });
+          batchSkippedCount++;
+          return false;
+        }
       }
-
-      batchSeen.add(key);
+      for (const id of identifiers) {
+        batchSeen.add(buildDuplicateOrderKey(String(order.customer_code || ''), id));
+      }
       return true;
     });
 
-    const candidateOrderNos = Array.from(
+    const threeDaysAgoFd = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+
+    // 收集候选标识符
+    const allCandidatesFd = Array.from(
       new Set(
-        deduplicatedOrders
-          .map((order) => String(order.order_no || '').trim())
-          .filter(Boolean)
+        deduplicatedOrders.flatMap((order) => {
+          const ids: string[] = [];
+          const on = String(order.order_no || '').trim();
+          const con = String(order.customer_order_no || '').trim();
+          if (on) ids.push(on);
+          if (con && con !== on) ids.push(con);
+          return ids;
+        })
       )
     );
-    const existingOrderMap = new Map<string, { sysOrderNo: string }>();
 
-    if (candidateOrderNos.length > 0 && customerCode) {
-      const { data: existingOrders, error: existingError } = await client
+    const recentOrderMapFd = new Map<string, {
+      id: string; sysOrderNo: string; orderNo: string; customerOrderNo: string;
+      receiverPhone: string; items: Record<string, unknown>[];
+    }>();
+    const allRecentOrdersFd: Array<{
+      id: string; sysOrderNo: string; orderNo: string; customerOrderNo: string;
+      receiverPhone: string; items: Record<string, unknown>[];
+    }> = [];
+
+    if (customerCode) {
+      const { data: recentFd, error: recentErrFd } = await client
         .from('orders')
-        .select('order_no, sys_order_no, customer_code')
+        .select('id, order_no, customer_order_no, customer_code, sys_order_no, receiver_name, receiver_phone, items')
         .eq('customer_code', customerCode)
-        .in('order_no', candidateOrderNos);
+        .gte('created_at', threeDaysAgoFd);
 
-      if (existingError) {
-        throw new Error(`查询重复订单失败: ${existingError.message}`);
-      }
+      if (recentErrFd) throw new Error(`查询重复订单失败: ${recentErrFd.message}`);
 
-      for (const existing of existingOrders || []) {
-        const key = buildDuplicateOrderKey(
-          String(existing.customer_code || ''),
-          String(existing.order_no || '')
-        );
-        existingOrderMap.set(key, {
-          sysOrderNo: String(existing.sys_order_no || ''),
-        });
+      const idSetFd = new Set(allCandidatesFd.map((n) => n.toUpperCase().trim()));
+      for (const existing of recentFd || []) {
+        const o = existing as Record<string, unknown>;
+        const dbOn = String(o.order_no || '').trim().toUpperCase();
+        const dbCon = String(o.customer_order_no || '').trim().toUpperCase();
+
+        const parsedFd = {
+          id: String(o.id || ''), sysOrderNo: String(o.sys_order_no || ''),
+          orderNo: String(o.order_no || ''), customerOrderNo: String(o.customer_order_no || ''),
+          receiverPhone: String(o.receiver_phone || ''),
+          items: Array.isArray(o.items) ? (o.items as Record<string, unknown>[]) : [],
+        };
+        allRecentOrdersFd.push(parsedFd);
+
+        if ((dbOn && idSetFd.has(dbOn)) || (dbCon && idSetFd.has(dbCon))) {
+          const key = buildDuplicateOrderKey(String(o.customer_code || ''), dbOn || dbCon);
+          recentOrderMapFd.set(key, parsedFd);
+        }
       }
     }
 
+    const matchedOrderIdsFd = new Set<string>();
+
     const freshOrders = deduplicatedOrders.filter((order) => {
       const orderNo = String(order.order_no || '').trim();
-      if (!orderNo) {
-        return true;
-      }
+      const customerOrderNo = String(order.customer_order_no || '').trim();
+      if (!orderNo && !customerOrderNo) return true;
 
-      const key = buildDuplicateOrderKey(String(order.customer_code || ''), orderNo);
-      const existing = existingOrderMap.get(key);
-      if (!existing) {
-        return true;
+      if (orderNo) {
+        const key = buildDuplicateOrderKey(String(order.customer_code || ''), orderNo.toUpperCase());
+        const existing = recentOrderMapFd.get(key);
+        if (existing) {
+          matchedOrderIdsFd.add(existing.id);
+          duplicateDetails.push({ orderNo, receiverName: String(order.receiver_name || ''), reason: 'existing_order', existingSysOrderNo: existing.sysOrderNo });
+          return !skipExisting;
+        }
       }
-
-      duplicateDetails.push({
-        orderNo,
-        receiverName: String(order.receiver_name || ''),
-        reason: 'existing_order',
-        existingSysOrderNo: existing.sysOrderNo,
-      });
-      // 允许保存重复订单（客户一个订单可能有多个商品），但记录警告
+      if (customerOrderNo) {
+        const key = buildDuplicateOrderKey(String(order.customer_code || ''), customerOrderNo.toUpperCase());
+        const existing = recentOrderMapFd.get(key);
+        if (existing) {
+          matchedOrderIdsFd.add(existing.id);
+          duplicateDetails.push({ orderNo: customerOrderNo, receiverName: String(order.receiver_name || ''), reason: 'existing_order', existingSysOrderNo: existing.sysOrderNo });
+          return !skipExisting;
+        }
+      }
       return true;
     });
 
-    if (freshOrders.length === 0) {
+    // 模糊维度检测
+    for (const order of freshOrders) {
+      const orderNo = String(order.order_no || '').trim();
+      const customerOrderNo = String(order.customer_order_no || '').trim();
+      const phone = String(order.receiver_phone || '').trim();
+      const orderItems = (order.items as Array<Record<string, unknown>>) || [];
+      const qty = orderItems[0]?.quantity ? Number(orderItems[0].quantity) : 0;
+      if (!phone || !qty) continue;
+
+      for (const recent of allRecentOrdersFd) {
+        if (matchedOrderIdsFd.has(recent.id)) continue;
+        if (recent.receiverPhone.trim() !== phone) continue;
+        const dbItems = recent.items;
+        if (!Array.isArray(dbItems) || dbItems.length === 0) continue;
+
+        const itemMatch = dbItems.some((dbItem: Record<string, unknown>) => {
+          const targetItem = orderItems[0] || {};
+          const cuName = String(dbItem.cu_product_name || dbItem.product_name || '').trim();
+          const cuSpec = String(dbItem.cu_product_spec || dbItem.product_spec || '').trim();
+          const cuCode = String(dbItem.cu_product_code || dbItem.product_code || '').trim();
+          const tName = String(targetItem.cu_product_name || targetItem.product_name || '').trim();
+          const tSpec = String(targetItem.cu_product_spec || targetItem.product_spec || '').trim();
+          const tCode = String(targetItem.cu_product_code || targetItem.product_code || '').trim();
+          return ((tName && cuName === tName) || (tSpec && cuSpec === tSpec) || (tCode && cuCode === tCode)) && Number(dbItem.quantity) === qty;
+        });
+
+        if (itemMatch) {
+          matchedOrderIdsFd.add(recent.id);
+          duplicateDetails.push({ orderNo: orderNo || customerOrderNo || '', receiverName: String(order.receiver_name || ''), reason: 'fuzzy_match', existingSysOrderNo: recent.sysOrderNo });
+          break;
+        }
+      }
+    }
+
+    const finalOrdersFd = skipExisting
+      ? freshOrders.filter((order) => {
+          const on = String(order.order_no || '').trim();
+          const con = String(order.customer_order_no || '').trim();
+          return !duplicateDetails.some((d) => d.reason === 'fuzzy_match' && (d.orderNo === on || d.orderNo === con));
+        })
+      : freshOrders;
+
+    if (finalOrdersFd.length === 0) {
       return NextResponse.json({
         success: true,
         data: [],
@@ -930,23 +1139,15 @@ export async function POST(request: NextRequest) {
           totalSkipped: batchSkippedCount,
           batchDuplicateCount: duplicateDetails.filter((item) => item.reason === 'batch_duplicate').length,
           existingDuplicateCount: duplicateDetails.filter((item) => item.reason === 'existing_order').length,
+          fuzzyDuplicateCount: duplicateDetails.filter((item) => item.reason === 'fuzzy_match').length,
           details: duplicateDetails,
         },
-        matchStats: {
-          total: 0,
-          bySpec: matchStats.spec,
-          byName: matchStats.name,
-          byMapping: matchStats.mapping,
-          none: matchStats.none,
-          matched: 0,
-          matchRate: '0.0%'
-        },
+        matchStats: { total: 0, bySpec: matchStats.spec, byName: matchStats.name, byMapping: matchStats.mapping, none: matchStats.none, matched: 0, matchRate: '0.0%' },
         message: `没有导入新订单，${batchSkippedCount} 条记录因重复被跳过`
       });
     }
 
-    // 批量插入
-    const { data, error } = await client.from('orders').insert(freshOrders).select();
+    const { data, error } = await client.from('orders').insert(finalOrdersFd).select();
     if (error) throw new Error(`导入订单失败: ${error.message}`);
 
     return NextResponse.json({
@@ -955,27 +1156,27 @@ export async function POST(request: NextRequest) {
       total: data?.length || 0,
       importBatch,
       duplicateSummary: {
-        totalSkipped: batchSkippedCount,
+        totalSkipped: batchSkippedCount + (skipExisting ? duplicateDetails.filter((item) => item.reason === 'existing_order' || item.reason === 'fuzzy_match').length : 0),
         batchDuplicateCount: duplicateDetails.filter((item) => item.reason === 'batch_duplicate').length,
         existingDuplicateCount: duplicateDetails.filter((item) => item.reason === 'existing_order').length,
+        fuzzyDuplicateCount: duplicateDetails.filter((item) => item.reason === 'fuzzy_match').length,
         details: duplicateDetails,
       },
-      // 商品匹配统计
       matchStats: {
-        total: freshOrders.length,
+        total: finalOrdersFd.length,
         bySpec: matchStats.spec,
         byName: matchStats.name,
         byMapping: matchStats.mapping,
         none: matchStats.none,
-        matched: Math.max(freshOrders.length - matchStats.none, 0),
-        matchRate: freshOrders.length > 0
-          ? ((Math.max(freshOrders.length - matchStats.none, 0) / freshOrders.length) * 100).toFixed(1) + '%'
+        matched: Math.max(finalOrdersFd.length - matchStats.none, 0),
+        matchRate: finalOrdersFd.length > 0
+          ? ((Math.max(finalOrdersFd.length - matchStats.none, 0) / finalOrdersFd.length) * 100).toFixed(1) + '%'
           : '0.0%'
       },
       message:
         batchSkippedCount > 0
           ? `成功导入 ${data?.length || 0} 条订单，另有 ${batchSkippedCount} 条重复记录已跳过`
-          : `成功导入 ${data?.length || 0} 条订单，其中 ${Math.max(freshOrders.length - matchStats.none, 0)} 条已匹配商品档案`
+          : `成功导入 ${data?.length || 0} 条订单，其中 ${Math.max(finalOrdersFd.length - matchStats.none, 0)} 条已匹配商品档案`
     });
 
   } catch (error) {

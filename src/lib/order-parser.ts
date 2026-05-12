@@ -323,6 +323,17 @@ export async function parseExcelData(
       const suggestedShipper = getFieldValue(row, columnMapping, 'suggested_shipper');
       const originalStatus = getFieldValue(row, columnMapping, 'original_status');
 
+      // 提取扩展字段
+      const extFields: Record<string, string> = {};
+      for (const [colIdx, mappedField] of Object.entries(columnMapping)) {
+        if (mappedField.startsWith('ext_field_')) {
+          const value = getFieldValue(row, columnMapping, mappedField);
+          if (value) {
+            extFields[mappedField] = value;
+          }
+        }
+      }
+
       const finalProductName = customerProductName || productName;
       const finalProductSpec = customerProductSpec || productSpec;
       const finalProductCode = customerProductCode || productCode;
@@ -351,6 +362,7 @@ export async function parseExcelData(
             channelRemark,
             suggestedShipper,
             originalStatus,
+            extFields,
           };
           orders.set(orderNo, order);
         } catch (orderErr) {

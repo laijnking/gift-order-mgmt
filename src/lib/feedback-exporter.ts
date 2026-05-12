@@ -5,6 +5,8 @@
  * 供 API route 和 WeCom Worker 共用。
  */
 
+import * as XLSX from 'xlsx';
+
 type OrderItem = Record<string, unknown>;
 
 function parseItems(value: unknown): OrderItem[] {
@@ -33,6 +35,20 @@ function itemText(item: OrderItem, ...keys: string[]) {
     }
   }
   return '';
+}
+
+export function applyTextFormat(worksheet: XLSX.WorkSheet): void {
+  if (!worksheet['!ref']) return;
+  const range = XLSX.utils.decode_range(worksheet['!ref']);
+  for (let R = range.s.r + 1; R <= range.e.r; R++) {
+    for (let C = range.s.c; C <= range.e.c; C++) {
+      const addr = XLSX.utils.encode_cell({ r: R, c: C });
+      const cell = worksheet[addr];
+      if (cell && cell.t === 's' && typeof cell.v === 'string' && /^\d{14,}$/.test(cell.v)) {
+        cell.z = '@';
+      }
+    }
+  }
 }
 
 export const DEFAULT_CUSTOMER_FEEDBACK_MAPPINGS: Record<string, string> = {

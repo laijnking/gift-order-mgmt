@@ -100,8 +100,16 @@ function normalizeDbValue(value: unknown): unknown {
     );
   }
 
+  // 安全转换数字字符串：超过 JS 安全整数范围时保留为字符串
   if (typeof value === 'string' && /^-?\d+(\.\d+)?$/.test(value)) {
-    return Number(value);
+    if (value.includes('.')) {
+      return Number(value);
+    }
+    const num = Number(value);
+    if (Number.isSafeInteger(num) && String(num) === value) {
+      return num;
+    }
+    return value; // 大整数或无法精确表示，保留字符串
   }
 
   return value;
