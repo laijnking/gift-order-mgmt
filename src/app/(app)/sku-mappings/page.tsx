@@ -400,6 +400,11 @@ export default function ProductMappingsPage() {
     loadData(activeTab);
   }, [searchTerm]);
 
+  // 页码或页大小变化时重新加载数据
+  useEffect(() => {
+    loadData(activeTab);
+  }, [currentPage, pageSize]);
+
   // 获取当前Tab的选项列表
   const getPartnerOptions = (activeTab === 'customer'
     ? customers.filter(c => !!String(c.code ?? '').trim()).map(c => ({ value: c.code, label: c.name }))
@@ -1695,7 +1700,7 @@ export default function ProductMappingsPage() {
               )}
             </div>
             <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button variant="outline" onClick={() => setExcelImportDialogOpen(false)} disabled={importing} className="w-full sm:w-auto">取消</Button>
+              <Button variant="outline" onClick={() => setExcelImportDialogOpen(false)} className="w-full sm:w-auto">取消</Button>
               <Button onClick={confirmExcelImport} disabled={importing || !canEditProducts} className="w-full sm:w-auto">
                 {importing ? (
                   <>
