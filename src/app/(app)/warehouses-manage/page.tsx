@@ -122,7 +122,7 @@ export default function WarehousesManagePage() {
     if (!searchTerm && !typeFilter) return true;
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      if (!wh.code.toLowerCase().includes(term) && !wh.name.toLowerCase().includes(term)) {
+      if (!String(wh.code).toLowerCase().includes(term) && !wh.name.toLowerCase().includes(term)) {
         return false;
       }
     }

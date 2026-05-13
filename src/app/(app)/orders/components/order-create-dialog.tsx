@@ -179,7 +179,7 @@ export function OrderCreateDialog({
                         .filter(
                           (c) =>
                             c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
-                            c.code.toLowerCase().includes(customerSearch.toLowerCase())
+                            String(c.code).toLowerCase().includes(customerSearch.toLowerCase())
                         )
                         .slice(0, 50)
                         .map((c) => (
@@ -204,7 +204,7 @@ export function OrderCreateDialog({
                       {customers.filter(
                         (c) =>
                           c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
-                          c.code.toLowerCase().includes(customerSearch.toLowerCase())
+                          String(c.code).toLowerCase().includes(customerSearch.toLowerCase())
                       ).length === 0 && (
                         <div className="px-3 py-6 text-center text-sm text-muted-foreground">
                           未找到匹配的客户

@@ -147,9 +147,9 @@ export default function ProductsPage() {
     if (!searchTerm && !brandFilter && selectedBrands.length === 0 && !lifecycleFilter) return true;
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      if (!product.code?.toLowerCase().includes(term) &&
-          !product.name?.toLowerCase().includes(term) &&
-          !product.barcode?.toLowerCase().includes(term)) {
+      if (!String(product.code ?? '').toLowerCase().includes(term) &&
+          !String(product.name ?? '').toLowerCase().includes(term) &&
+          !String(product.barcode ?? '').toLowerCase().includes(term)) {
         return false;
       }
     }

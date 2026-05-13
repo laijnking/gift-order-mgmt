@@ -157,7 +157,7 @@ export default function ShippersManagePage() {
       const term = searchTerm.toLowerCase();
       if (!shipper.name.toLowerCase().includes(term) && 
           !shipper.shortName?.toLowerCase().includes(term) &&
-          !shipper.code?.toLowerCase().includes(term)) {
+          !String(shipper.code ?? '').toLowerCase().includes(term)) {
         return false;
       }
     }

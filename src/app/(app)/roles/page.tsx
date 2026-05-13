@@ -128,7 +128,7 @@ export default function RolesPage() {
     const term = searchTerm.toLowerCase();
     return (
       role.name.toLowerCase().includes(term) ||
-      role.code.toLowerCase().includes(term) ||
+      String(role.code).toLowerCase().includes(term) ||
       role.description?.toLowerCase().includes(term)
     );
   });

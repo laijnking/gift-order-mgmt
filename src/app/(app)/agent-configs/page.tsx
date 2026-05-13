@@ -131,7 +131,7 @@ export default function AgentConfigsPage() {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(a =>
         a.name.toLowerCase().includes(term) ||
-        a.code.toLowerCase().includes(term) ||
+        String(a.code).toLowerCase().includes(term) ||
         a.description?.toLowerCase().includes(term)
       );
     }

@@ -287,7 +287,7 @@ export default function TemplatesPage() {
       const term = searchTerm.toLowerCase();
       const match = 
         template.name.toLowerCase().includes(term) ||
-        template.code.toLowerCase().includes(term) ||
+        String(template.code).toLowerCase().includes(term) ||
         template.description?.toLowerCase().includes(term) ||
         template.targetName?.toLowerCase().includes(term);
       if (!match) return false;
