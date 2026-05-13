@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { PERMISSIONS } from '@/lib/permissions';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 
 interface OrderItem {
   product_id?: string | null;
@@ -194,6 +195,7 @@ function normalizeTransientOrder(input: Record<string, unknown>): Record<string,
 export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_VIEW);
   if (authError) return authError;
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
 
   try {
@@ -209,11 +211,11 @@ export async function POST(request: NextRequest) {
 
     const [{ data: dbOrders, error: orderError }, { data: shippers, error: shipperError }, { data: stocks, error: stockError }, { data: costHistory }] = await Promise.all([
       orderIds.length > 0
-        ? client.from('orders').select('*').in('id', orderIds)
+        ? client.from('orders').select('*').eq('tenant_id', tenant.tenantId).in('id', orderIds)
         : Promise.resolve({ data: [], error: null }),
-      client.from('shippers').select('*').eq('is_active', true),
-      client.from('stocks').select('*').eq('status', 'active'),
-      client.from('order_cost_history').select('product_code, supplier_id, unit_cost').order('created_at', { ascending: false }),
+      client.from('shippers').select('*').eq('tenant_id', tenant.tenantId).eq('is_active', true),
+      client.from('stocks').select('*').eq('tenant_id', tenant.tenantId).eq('status', 'active'),
+      client.from('order_cost_history').select('product_code, supplier_id, unit_cost').eq('tenant_id', tenant.tenantId).order('created_at', { ascending: false }),
     ]);
 
     if (orderError) throw new Error(`查询订单失败: ${orderError.message}`);

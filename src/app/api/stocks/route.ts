@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission } from '@/lib/server-auth';
 import { PERMISSIONS } from '@/lib/permissions';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 
 const LOW_STOCK_THRESHOLD = 2;
 
@@ -49,6 +50,7 @@ function enhanceStock(stock: Record<string, unknown>): EnhancedStock {
 export async function GET(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.STOCKS_VIEW);
   if (authError) return authError;
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
   const search = searchParams.get('search');
@@ -60,7 +62,7 @@ export async function GET(request: NextRequest) {
   const pageSize = Math.min(99999, Math.max(1, parseInt(searchParams.get('pageSize') || '50')));
 
   try {
-    let query = client.from('stocks').select('*', { count: 'exact' });
+    let query = client.from('stocks').select('*', { count: 'exact' }).eq('tenant_id', tenant.tenantId);
 
     if (search) {
       query = query.or(`product_code.ilike.%${search}%,product_name.ilike.%${search}%,supplier_name.ilike.%${search}%`);
@@ -106,6 +108,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.STOCKS_EDIT);
   if (authError) return authError;
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
 
   try {
@@ -132,6 +135,8 @@ export async function POST(request: NextRequest) {
           cost_price: unitPrice,
           lifecycle_status: '在售',
           is_active: true,
+          visibility: 'private',
+          owner_tenant_id: tenant.tenantId,
           remark: '库存新增时自动创建的商品档案',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -143,6 +148,7 @@ export async function POST(request: NextRequest) {
     }
 
     const stockData = {
+      tenant_id: tenant.tenantId,
       product_id: productId,
       product_code: body.productCode || body.product_code || null,
       product_name: body.productName || body.product_name || '',
@@ -165,6 +171,7 @@ export async function POST(request: NextRequest) {
       const { data } = await client
         .from('stocks')
         .select('*')
+        .eq('tenant_id', tenant.tenantId)
         .eq('supplier_id', supplierId)
         .eq('product_id', productId)
         .maybeSingle();
@@ -212,6 +219,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.STOCKS_EDIT);
   if (authError) return authError;
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
 
   try {
@@ -234,6 +242,7 @@ export async function PATCH(request: NextRequest) {
     const { data, error } = await client
       .from('stocks')
       .update(updateData)
+      .eq('tenant_id', tenant.tenantId)
       .eq('id', body.id)
       .select()
       .single();

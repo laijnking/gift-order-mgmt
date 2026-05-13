@@ -3,12 +3,14 @@ import { requirePermission } from '@/lib/server-auth';
 import { PERMISSIONS } from '@/lib/permissions';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { buildCustomerMutationData, getCustomerSchemaMode, transformCustomerRecord } from '@/lib/customer-schema';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 
 // 获取客户列表
 export async function GET(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.CUSTOMERS_VIEW);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
   const search = searchParams.get('search');
@@ -29,7 +31,7 @@ export async function GET(request: NextRequest) {
       ? 'id,code,name,contact_person,contact_phone,contact_email,sales_user_id,sales_user_name,operator_user_id,operator_user_name,is_active,created_at,updated_at'
       : 'id,code,name,contact,phone,region,status,salesperson_id,salesperson_name,order_taker_id,order_taker_name,created_at,updated_at';
 
-    let query = client.from('customers').select(listColumns, { count: 'exact' });
+    let query = client.from('customers').select(listColumns, { count: 'exact' }).eq('tenant_id', tenant.tenantId);
 
     if (search) {
       query = schemaMode === 'modern'
@@ -82,12 +84,14 @@ export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.CUSTOMERS_CREATE);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
-  
+
   try {
     const body = await request.json();
     const schemaMode = await getCustomerSchemaMode(client);
-    const customerData = buildCustomerMutationData(body, schemaMode);
+    const customerData = buildCustomerMutationData(body, schemaMode) as Record<string, unknown>;
+    customerData.tenant_id = tenant.tenantId;
 
     const { data, error } = await client
       .from('customers')

@@ -3,6 +3,7 @@ import { requirePermission } from '@/lib/server-auth';
 import { parseTemplateFieldMappingsArray, resolvePreferredTemplate, type TemplateRecord } from '@/lib/template-utils';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { PERMISSIONS } from '@/lib/permissions';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import * as XLSX from 'xlsx';
 
 type OrderItem = Record<string, unknown>;
@@ -98,6 +99,7 @@ export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
 
   try {
@@ -111,14 +113,14 @@ export async function POST(request: NextRequest) {
     // 获取金蝶模板（使用 kingdee 类型）
     const { template, source: templateSource } = await resolvePreferredTemplate(client, { type: 'kingdee' });
 
-    // 获取模板字段映射（有序数组格式）
+    // 获取模板字段映射
     const fieldMappings = template ? parseTemplateFieldMappingsArray(template) : DEFAULT_KINGDEE_FIELD_MAPPINGS;
-    const templateName = template?.name || '金蝶导出模板';
 
     // 查询订单数据
     const { data: orders, error: ordersError } = await client
       .from('orders')
       .select('*')
+      .eq('tenant_id', tenant.tenantId)
       .in('id', orderIds);
 
     if (ordersError) {

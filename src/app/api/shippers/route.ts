@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { PERMISSIONS } from '@/lib/permissions';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 
 // 数据库字段转前端格式
 function transformShipper(dbShipper: Record<string, unknown>) {
@@ -38,6 +39,7 @@ export async function GET(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.SUPPLIERS_VIEW);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
   const search = searchParams.get('search');
@@ -48,7 +50,7 @@ export async function GET(request: NextRequest) {
   const pageSize = parseInt(searchParams.get('pageSize') || '50');
 
   try {
-    let query = client.from('shippers').select('*', { count: 'exact' });
+    let query = client.from('shippers').select('*', { count: 'exact' }).eq('tenant_id', tenant.tenantId);
 
     if (search) {
       query = query.or(`code.ilike.%${search}%,name.ilike.%${search}%,short_name.ilike.%${search}%`);
@@ -98,16 +100,18 @@ export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.SUPPLIERS_CREATE);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
-  
+
   try {
     const body = await request.json();
-    
-    // 检查编码唯一性
+
+    // 检查编码唯一性（租户内唯一）
     if (body.code) {
       const { data: existing } = await client
         .from('shippers')
         .select('id')
+        .eq('tenant_id', tenant.tenantId)
         .eq('code', body.code)
         .maybeSingle();
       
@@ -120,6 +124,7 @@ export async function POST(request: NextRequest) {
     }
 
     const shipperData = {
+      tenant_id: tenant.tenantId,
       code: body.code,
       name: body.name,
       short_name: body.shortName,
