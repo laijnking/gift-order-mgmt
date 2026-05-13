@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import { buildUserInfoHeaders } from '@/lib/auth';
 import { toast } from 'sonner';
+import { useTenantConfig } from '@/hooks/use-tenant-config';
 import type { Order } from './use-orders-session';
 
 export function useOrdersCrud({
@@ -12,6 +13,7 @@ export function useOrdersCrud({
   authHeaders: () => Record<string, string>;
   fetchOrders: () => Promise<void>;
 }) {
+  const { config: tcfg } = useTenantConfig();
   // Create form
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [createForm, setCreateForm] = useState({
@@ -272,8 +274,8 @@ export function useOrdersCrud({
     if (s === 'assigned') return '订单已派发发货方，无法删除';
     if (s === 'partial_returned') return '订单正在回单处理中，无法删除';
     if (s === 'returned') return '订单已回单，需先完成客户反馈/财务处理，无法删除';
-    if (s === 'feedbacked') return '订单已反馈客户，等待导出金蝶，无法删除';
-    if (s === 'completed') return '订单已导出金蝶归档，无法删除';
+    if (s === 'feedbacked') return `订单已反馈客户，等待${tcfg.actionLabels.exportKingdee}，无法删除`;
+    if (s === 'completed') return `订单已${tcfg.actionLabels.completeAction}归档，无法删除`;
     return null;
   };
 

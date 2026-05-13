@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/table';
 import { PageGuard } from '@/components/auth/page-guard';
 import { toast } from 'sonner';
+import { useTenantConfig } from '@/hooks/use-tenant-config';
 import {
   Dialog,
   DialogContent,
@@ -80,6 +81,7 @@ import { OrderAssignDialog } from './components/order-assign-dialog';
 import { OrderWarningsPanel, AlertPanelToggle } from './components/order-warnings-panel';
 
 export default function OrdersPage() {
+  const { config: tcfg } = useTenantConfig();
   // --- Core session hook ---
   const session = useOrdersSession();
   const {
@@ -446,7 +448,7 @@ export default function OrdersPage() {
     const targetIds: string[] = selectedOrderIds.length > 0
       ? selectedOrderIds
       : filteredOrders.filter(o => o.status === ORDER_STATUS_FEEDBACKED).map(o => o.id);
-    if (targetIds.length === 0) { toast.error('没有可导出金蝶的订单（需已反馈状态）'); return; }
+    if (targetIds.length === 0) { toast.error(`没有可${tcfg.actionLabels.exportKingdee}的订单（需已反馈状态）`); return; }
 
     try {
       const res = await fetch('/api/export-kingdee/batch', {
@@ -457,7 +459,7 @@ export default function OrdersPage() {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({ error: '导出失败' }));
-        toast.error(errorData.error || '导出金蝶失败');
+        toast.error(errorData.error || `${tcfg.actionLabels.exportKingdee}失败`);
         return;
       }
 
@@ -465,7 +467,7 @@ export default function OrdersPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `金蝶导出_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      a.download = `${tcfg.exportPrefixes.kingdee}_${new Date().toISOString().slice(0, 10)}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
 
@@ -480,12 +482,12 @@ export default function OrdersPage() {
       const results = await Promise.all(promises);
       const dataArr = await Promise.all(results.map(r => r.json()));
       const successCount = dataArr.filter(d => d.success).length;
-      toast.success(`已导出金蝶并归档 ${successCount} 条订单`);
+      toast.success(`已${tcfg.actionLabels.completeAction}并归档 ${successCount} 条订单`);
       clearSelection();
       fetchOrders();
     } catch (error) {
-      console.error('导出金蝶失败:', error);
-      toast.error('导出金蝶失败，请稍后重试');
+      console.error(`${tcfg.actionLabels.exportKingdee}失败:`, error);
+      toast.error(`${tcfg.actionLabels.exportKingdee}失败，请稍后重试`);
     }
   }, [selectedOrderIds, filteredOrders, orders, session.authHeaders, fetchOrders, setSelectedOrderIds]);
 
@@ -517,7 +519,7 @@ export default function OrdersPage() {
 
   // 从 order-workflow-config EDITABLE_FIELDS_BY_STATUS 驱动
   const getEditDisabledReason = (order: Order): string | null => {
-    if (order.status === ORDER_STATUS_COMPLETED) return '订单已导出金蝶归档，无法编辑';
+    if (order.status === ORDER_STATUS_COMPLETED) return `订单已${tcfg.actionLabels.completeAction}归档，无法编辑`;
     if (order.status === ORDER_STATUS_FEEDBACKED) return '订单已反馈客户，无法编辑';
     if (order.status === 'partial_returned') return '订单正在回单处理中，无法编辑';
     if (order.status === ORDER_STATUS_RETURNED) return '订单已回单，无法编辑';

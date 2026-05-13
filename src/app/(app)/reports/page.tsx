@@ -251,7 +251,7 @@ export default function ReportsPage() {
         ['部分回单', reportData.orderStatus.partial_returned],
         ['已回单', reportData.orderStatus.returned],
         ['已反馈', reportData.orderStatus.feedbacked],
-        ['已导金蝶', reportData.orderStatus.completed],
+        [getOrderStatusLabel('completed'), reportData.orderStatus.completed],
         ['已取消', reportData.orderStatus.cancelled],
       ]
         .map(row => row.map(cell => `"${cell}"`).join(','))

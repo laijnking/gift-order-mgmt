@@ -6,7 +6,7 @@ export type OrderStatus =
   | 'partial_returned'  // 部分回单
   | 'returned'      // 已回单
   | 'feedbacked'    // 已反馈客户
-  | 'completed'     // 已导出金蝶/归档
+  | 'completed'     // 已完成/归档
   | 'cancelled';    // 已取消
 
 // 订单来源

@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Send, Bell, Truck, MessageSquare, Archive, FileInput, HelpCircle, FileDown, FileSpreadsheet, ChevronDown, ChevronUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useTenantConfig } from '@/hooks/use-tenant-config';
 import {
   BULK_ACTIONS,
   computeBulkActionContext,
@@ -42,6 +43,7 @@ export function BulkActionBar({
   onExportPartial,
 }: BulkActionBarProps) {
   const router = useRouter();
+  const { config: tcfg } = useTenantConfig();
   const [mobileExpanded, setMobileExpanded] = useState(false);
 
   // 从已选订单 ID 和当前订单列表计算上下文
@@ -192,13 +194,12 @@ export function BulkActionBar({
         )}
       </ActionButton>
 
-      {/* 导出金蝶 */}
       <ActionButton
         actionKey="complete"
         onClick={onExportKingdee}
         icon={Archive}
       >
-        导出金蝶
+        {tcfg.actionLabels.exportKingdee}
         {ctx.feedbackableCount > 0 && (
           <Badge variant="secondary" className="ml-1.5 h-5 px-1.5 text-xs">
             {ctx.feedbackableCount}
@@ -252,7 +253,7 @@ export function BulkActionBar({
             <p>发货通知：选中已派发订单后可用</p>
             <p>物流回单：选中已派发/通知发货订单后可用</p>
             <p>反馈给客户：选中已回单/部分回单订单后可用</p>
-            <p>导出金蝶：选中已回单/已反馈订单后可用</p>
+            <p>{tcfg.actionLabels.exportKingdee}：选中已回单/已反馈订单后可用</p>
             <p>导出已回单：选中已回单订单后可用</p>
             <p>导出部分回单：选中部分回单订单后可用</p>
           </div>
