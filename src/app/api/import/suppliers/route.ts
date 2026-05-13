@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { PERMISSIONS } from '@/lib/permissions';
+import { detectDuplicates, ENTITY_DEDUP_KEYS } from '@/lib/import-dedup';
 
 export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.SUPPLIERS_CREATE);
@@ -15,16 +16,37 @@ export async function POST(request: NextRequest) {
     }
 
     const client = getSupabaseClient();
+
+    // 去重检测
+    const normalizedRows = data.map((item) => ({
+      code: (item.code || item['发货方编码']) as string | undefined,
+      name: (item.name || item['发货方名称'] || item['名称']) as string | undefined,
+    }));
+
+    const dedupResult = await detectDuplicates({
+      client,
+      table: 'shippers',
+      keys: ENTITY_DEDUP_KEYS.shippers,
+      rows: normalizedRows,
+      dataStartRow: 1,
+    });
+
+    const duplicateRowSet = new Set(dedupResult.duplicates.map((d) => d.row));
+
     let imported = 0;
-    let skipped = 0;
+    let skipped = dedupResult.duplicates.length;
     const errors: string[] = [];
 
-    for (const item of data) {
+    for (let i = 0; i < data.length; i++) {
+      const item = data[i];
+      const rowNum = i + 1;
+
+      if (duplicateRowSet.has(rowNum)) continue;
       try {
         const name = item.name || item['发货方名称'] || item['名称'] || '';
         
         if (!name) {
-          errors.push(`第 ${imported + skipped + 1} 行：缺少名称`);
+          errors.push(`第 ${rowNum} 行：缺少名称`);
           skipped++;
           continue;
         }
@@ -85,13 +107,13 @@ export async function POST(request: NextRequest) {
           .insert(shipperData);
 
         if (error) {
-          errors.push(`第 ${imported + skipped + 1} 行：${error.message}`);
+          errors.push(`第 ${rowNum} 行：${error.message}`);
           skipped++;
         } else {
           imported++;
         }
       } catch (err) {
-        errors.push(`第 ${imported + skipped + 1} 行：处理失败`);
+        errors.push(`第 ${rowNum} 行：处理失败`);
         skipped++;
       }
     }
@@ -101,6 +123,7 @@ export async function POST(request: NextRequest) {
       imported,
       skipped,
       total: data.length,
+      duplicates: dedupResult.duplicates,
       errors: errors.slice(0, 10),
     });
   } catch (error) {

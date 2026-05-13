@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { PERMISSIONS } from '@/lib/permissions';
+import { detectDuplicates, ENTITY_DEDUP_KEYS } from '@/lib/import-dedup';
 
 // 字段映射：前端字段名 -> 数据库字段名
 const FIELD_MAPPING: Record<string, string> = {
@@ -80,21 +81,65 @@ export async function POST(request: NextRequest) {
 
   try {
     const { data } = await request.json();
-    
+
     if (!Array.isArray(data) || data.length === 0) {
       return NextResponse.json({ success: false, error: '数据格式无效' }, { status: 400 });
     }
 
     const client = getSupabaseClient();
+
+    // 辅助函数：从行数据中获取字段值（优先英文字段名，其次中文列名）
+    function getField(row: Record<string, unknown>, fieldName: string): string | undefined {
+      if (row[fieldName] !== undefined && row[fieldName] !== null && row[fieldName] !== '') {
+        return String(row[fieldName]).trim();
+      }
+      for (const [chineseName, mappedField] of Object.entries(CHINESE_MAPPING)) {
+        if (mappedField === fieldName && row[chineseName] !== undefined && row[chineseName] !== null && row[chineseName] !== '') {
+          return String(row[chineseName]).trim();
+        }
+      }
+      // spec 字段的额外中文映射
+      if (fieldName === 'spec') {
+        const specKeys = ['规格型号', '规格', '型号', '商品规格'];
+        for (const key of specKeys) {
+          if (row[key] !== undefined && row[key] !== null && row[key] !== '') {
+            return String(row[key]).trim();
+          }
+        }
+      }
+      return undefined;
+    }
+
+    // 去重检测
+    const normalizedRows = data.map((item) => ({
+      code: getField(item, 'code') || undefined,
+      name: getField(item, 'name') || undefined,
+      spec: getField(item, 'spec') || undefined,
+    }));
+
+    const dedupResult = await detectDuplicates({
+      client,
+      table: 'products',
+      keys: ENTITY_DEDUP_KEYS.products,
+      rows: normalizedRows,
+      dataStartRow: 1,
+    });
+
+    const duplicateRowSet = new Set(dedupResult.duplicates.map((d) => d.row));
+
     let imported = 0;
-    let skipped = 0;
+    let skipped = dedupResult.duplicates.length;
     const errors: string[] = [];
 
-    for (const item of data) {
+    for (let i = 0; i < data.length; i++) {
+      const item = data[i];
+      const rowNum = i + 1;
+
+      if (duplicateRowSet.has(rowNum)) continue;
       try {
         // 验证必需字段
         if (!item.name && !item['商品名称']) {
-          errors.push(`第 ${imported + skipped + 1} 行：缺少商品名称`);
+          errors.push(`第 ${rowNum} 行：缺少商品名称`);
           skipped++;
           continue;
         }
@@ -157,13 +202,13 @@ export async function POST(request: NextRequest) {
           .insert(productData);
 
         if (error) {
-          errors.push(`第 ${imported + skipped + 1} 行：${error.message}`);
+          errors.push(`第 ${rowNum} 行：${error.message}`);
           skipped++;
         } else {
           imported++;
         }
       } catch (err) {
-        errors.push(`第 ${imported + skipped + 1} 行：处理失败`);
+        errors.push(`第 ${rowNum} 行：处理失败`);
         skipped++;
       }
     }
@@ -173,6 +218,7 @@ export async function POST(request: NextRequest) {
       imported,
       skipped,
       total: data.length,
+      duplicates: dedupResult.duplicates,
       errors: errors.slice(0, 10),
     });
   } catch (error) {

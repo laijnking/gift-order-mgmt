@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { PERMISSIONS } from '@/lib/permissions';
+import { detectDuplicates, ENTITY_DEDUP_KEYS } from '@/lib/import-dedup';
 
 // 根据客户编码查找客户ID
 async function findCustomerIdByCode(client: ReturnType<typeof getSupabaseClient>, code: string): Promise<string | null> {
@@ -185,23 +186,49 @@ export async function POST(request: NextRequest) {
       };
     });
 
+    // 去重检测（使用已解析 ID 的数据）
+    const dedupResult = await detectDuplicates({
+      client,
+      table: 'product_mappings',
+      keys: ENTITY_DEDUP_KEYS.product_mappings,
+      rows: insertData,
+      dataStartRow: 1,
+    });
+
+    const duplicateRowSet = new Set(dedupResult.duplicates.map((d) => d.row));
+    const uniqueMappings = insertData.filter((_, idx) => !duplicateRowSet.has(idx + 1));
+
+    if (uniqueMappings.length === 0) {
+      return NextResponse.json({
+        success: true,
+        data: 0,
+        message: `成功导入 0 条映射（${dedupResult.duplicates.length} 条重复已跳过）`,
+        imported: 0,
+        skipped: dedupResult.duplicates.length,
+        duplicates: dedupResult.duplicates,
+      });
+    }
+
     const { data, error } = await client
       .from('product_mappings')
-      .insert(insertData)
+      .insert(uniqueMappings)
       .select();
-    
+
     if (error) {
       console.error('批量导入SKU映射失败:', error);
-      return NextResponse.json({ 
-        success: false, 
-        error: `批量导入失败: ${error.message}` 
+      return NextResponse.json({
+        success: false,
+        error: `批量导入失败: ${error.message}`
       }, { status: 500 });
     }
 
     return NextResponse.json({
       success: true,
       data: data?.length || 0,
-      message: `成功导入 ${data?.length || 0} 条映射`
+      message: `成功导入 ${data?.length || 0} 条映射${dedupResult.duplicates.length > 0 ? `（${dedupResult.duplicates.length} 条重复已跳过）` : ''}`,
+      imported: data?.length || 0,
+      skipped: dedupResult.duplicates.length,
+      duplicates: dedupResult.duplicates,
     });
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);

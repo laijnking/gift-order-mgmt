@@ -18,6 +18,8 @@ import { isOperatorAssignableRole, isSalesAssignableRole } from '@/lib/roles';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { Upload, Download, ArrowLeft, Search, Plus, Edit, Trash2, Users, UsersRound, Loader2, X, Check } from 'lucide-react';
+import { ImportDuplicateFeedback } from '@/components/import-duplicate-feedback';
+import type { DuplicateInfo } from '@/lib/import-dedup';
 
 // Excel导入配置
 const IMPORT_CONFIG = {
@@ -82,6 +84,9 @@ export default function CustomersPage() {
   const [importingData, setImportingData] = useState<Record<string, string>[]>([]);
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0, success: 0, failed: 0 });
+  // 重复反馈
+  const [duplicateFeedbackOpen, setDuplicateFeedbackOpen] = useState(false);
+  const [allDuplicates, setAllDuplicates] = useState<DuplicateInfo[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // 分页状态
   const [currentPage, setCurrentPage] = useState(1);
@@ -366,59 +371,75 @@ export default function CustomersPage() {
   // 确认导入
   const confirmImport = async () => {
     if (importingData.length === 0) return;
-    
+
     setImporting(true);
     setImportProgress({ current: 0, total: importingData.length, success: 0, failed: 0 });
-    
+
     // 分批导入，每批100条
     const batchSize = 100;
     let totalSuccess = 0;
     let totalFailed = 0;
-    
+    const allDups: DuplicateInfo[] = [];
+    let dupOffset = 0;
+
     try {
       for (let i = 0; i < importingData.length; i += batchSize) {
         const batch = importingData.slice(i, i + batchSize);
-        
-        setImportProgress({ 
-          current: Math.min(i + batchSize, importingData.length), 
-          total: importingData.length, 
-          success: totalSuccess, 
-          failed: totalFailed 
+
+        setImportProgress({
+          current: Math.min(i + batchSize, importingData.length),
+          total: importingData.length,
+          success: totalSuccess,
+          failed: totalFailed
         });
-        
+
         const res = await fetch('/api/import/customers', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...authHeaders() },
           body: JSON.stringify({ data: batch }),
         });
         const result = await res.json();
-        
+
         if (result.success) {
           totalSuccess += result.imported || 0;
           totalFailed += result.skipped || 0;
+          // 调整行号偏移并累积重复记录
+          if (result.duplicates?.length) {
+            for (const dup of result.duplicates) {
+              allDups.push({ ...dup, row: dup.row + dupOffset });
+            }
+          }
         } else {
           totalFailed += batch.length;
         }
-        
-        setImportProgress({ 
-          current: Math.min(i + batchSize, importingData.length), 
-          total: importingData.length, 
-          success: totalSuccess, 
-          failed: totalFailed 
+
+        dupOffset += batch.length;
+
+        setImportProgress({
+          current: Math.min(i + batchSize, importingData.length),
+          total: importingData.length,
+          success: totalSuccess,
+          failed: totalFailed
         });
       }
-      
+
       // 最终结果
-      setImportProgress({ 
-        current: importingData.length, 
-        total: importingData.length, 
-        success: totalSuccess, 
-        failed: totalFailed 
+      setImportProgress({
+        current: importingData.length,
+        total: importingData.length,
+        success: totalSuccess,
+        failed: totalFailed
       });
-      
+
       toast.success(`导入完成：成功 ${totalSuccess} 条${totalFailed > 0 ? `，失败 ${totalFailed} 条` : ''}`);
       setImportDialogOpen(false);
       setImportingData([]);
+
+      if (allDups.length > 0) {
+        setAllDuplicates(allDups);
+        setDuplicateFeedbackOpen(true);
+      }
+
       fetchCustomers();
     } catch (err) {
       console.error('导入失败:', err);
@@ -1060,6 +1081,19 @@ export default function CustomersPage() {
         </Card>
       </main>
     </div>
+
+    {/* 重复记录反馈弹窗 */}
+    <ImportDuplicateFeedback
+      duplicates={allDuplicates}
+      columns={IMPORT_CONFIG.fieldLabels}
+      filename="客户管理"
+      open={duplicateFeedbackOpen}
+      onClose={() => {
+        setDuplicateFeedbackOpen(false);
+        setAllDuplicates([]);
+      }}
+    />
+
     </PageGuard>
   );
 }

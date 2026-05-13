@@ -16,6 +16,8 @@ import { buildUserInfoHeaders, useAuth, usePermission } from '@/lib/auth';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { ArrowLeft, Search, Plus, Edit, Package, Tag, Trash2, Check, Upload, Download, ChevronDown, Loader2, AlertCircle, X } from 'lucide-react';
+import { ImportDuplicateFeedback } from '@/components/import-duplicate-feedback';
+import type { DuplicateInfo } from '@/lib/import-dedup';
 import {
   Popover,
   PopoverContent,
@@ -114,6 +116,9 @@ export default function ProductsPage() {
   const [importingData, setImportingData] = useState<Record<string, string>[]>([]);
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0, success: 0, failed: 0 });
+  // 重复反馈
+  const [duplicateFeedbackOpen, setDuplicateFeedbackOpen] = useState(false);
+  const [allDuplicates, setAllDuplicates] = useState<DuplicateInfo[]>([]);
   // 分页状态
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
@@ -359,53 +364,68 @@ export default function ProductsPage() {
     const batchSize = 100;
     let totalSuccess = 0;
     let totalFailed = 0;
-    
+    const allDups: DuplicateInfo[] = [];
+    let dupOffset = 0;
+
     try {
       for (let i = 0; i < importingData.length; i += batchSize) {
         const batch = importingData.slice(i, i + batchSize);
         const batchIndex = Math.floor(i / batchSize) + 1;
         const totalBatches = Math.ceil(importingData.length / batchSize);
-        
-        setImportProgress({ 
-          current: Math.min(i + batchSize, importingData.length), 
-          total: importingData.length, 
-          success: totalSuccess, 
-          failed: totalFailed 
+
+        setImportProgress({
+          current: Math.min(i + batchSize, importingData.length),
+          total: importingData.length,
+          success: totalSuccess,
+          failed: totalFailed
         });
-        
+
         const res = await fetch('/api/import/products', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...authHeaders() },
           body: JSON.stringify({ data: batch }),
         });
         const result = await res.json();
-        
+
         if (result.success) {
           totalSuccess += result.imported || 0;
           totalFailed += result.skipped || 0;
+          if (result.duplicates?.length) {
+            for (const dup of result.duplicates) {
+              allDups.push({ ...dup, row: dup.row + dupOffset });
+            }
+          }
         } else {
           totalFailed += batch.length;
         }
-        
-        setImportProgress({ 
-          current: Math.min(i + batchSize, importingData.length), 
-          total: importingData.length, 
-          success: totalSuccess, 
-          failed: totalFailed 
+
+        dupOffset += batch.length;
+
+        setImportProgress({
+          current: Math.min(i + batchSize, importingData.length),
+          total: importingData.length,
+          success: totalSuccess,
+          failed: totalFailed
         });
       }
-      
+
       // 最终结果
-      setImportProgress({ 
-        current: importingData.length, 
-        total: importingData.length, 
-        success: totalSuccess, 
-        failed: totalFailed 
+      setImportProgress({
+        current: importingData.length,
+        total: importingData.length,
+        success: totalSuccess,
+        failed: totalFailed
       });
-      
+
       toast.success(`导入完成：成功 ${totalSuccess} 条${totalFailed > 0 ? `，失败 ${totalFailed} 条` : ''}`);
       setImportDialogOpen(false);
       setImportingData([]);
+
+      if (allDups.length > 0) {
+        setAllDuplicates(allDups);
+        setDuplicateFeedbackOpen(true);
+      }
+
       fetchProducts();
     } catch (error) {
       console.error('导入失败:', error);
@@ -1043,6 +1063,19 @@ export default function ProductsPage() {
         </Card>
       </main>
     </div>
+
+    {/* 重复记录反馈弹窗 */}
+    <ImportDuplicateFeedback
+      duplicates={allDuplicates}
+      columns={IMPORT_CONFIG.fieldLabels}
+      filename="商品管理"
+      open={duplicateFeedbackOpen}
+      onClose={() => {
+        setDuplicateFeedbackOpen(false);
+        setAllDuplicates([]);
+      }}
+    />
+
     </PageGuard>
   );
 }

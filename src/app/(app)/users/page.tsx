@@ -49,6 +49,8 @@ import {
   Upload,
   Download,
 } from 'lucide-react';
+import { ImportDuplicateFeedback } from '@/components/import-duplicate-feedback';
+import type { DuplicateInfo } from '@/lib/import-dedup';
 
 // Excel导入配置
 const IMPORT_CONFIG = {
@@ -150,6 +152,9 @@ export default function UsersPage() {
   const [excelImportData, setExcelImportData] = useState<Record<string, string>[]>([]);
   const [excelImportDialogOpen, setExcelImportDialogOpen] = useState(false);
   const [importing, setImporting] = useState(false);
+  // 重复反馈
+  const [duplicateFeedbackOpen, setDuplicateFeedbackOpen] = useState(false);
+  const [allDuplicates, setAllDuplicates] = useState<DuplicateInfo[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 构建认证头（user 加载完成前为空，避免 401）
@@ -453,9 +458,17 @@ export default function UsersPage() {
 
       const result = await res.json();
       if (result.success) {
-        toast.success(`成功导入 ${usersData.length} 个用户`);
+        const imported = result.imported ?? usersData.length;
+        const skipped = result.skipped ?? 0;
+        toast.success(`成功导入 ${imported} 个用户${skipped > 0 ? `，跳过 ${skipped} 条重复` : ''}`);
         setExcelImportDialogOpen(false);
         setExcelImportData([]);
+
+        if (result.duplicates?.length) {
+          setAllDuplicates(result.duplicates);
+          setDuplicateFeedbackOpen(true);
+        }
+
         loadUsers();
       } else {
         toast.error(result.error || '导入失败');
@@ -845,6 +858,19 @@ export default function UsersPage() {
       </Dialog>
         </>
       )}
+
+      {/* 重复记录反馈弹窗 */}
+      <ImportDuplicateFeedback
+        duplicates={allDuplicates}
+        columns={IMPORT_CONFIG.fieldLabels}
+        filename="用户管理"
+        open={duplicateFeedbackOpen}
+        onClose={() => {
+          setDuplicateFeedbackOpen(false);
+          setAllDuplicates([]);
+        }}
+      />
+
     </PageGuard>
   );
 }

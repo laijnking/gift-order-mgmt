@@ -17,10 +17,12 @@ import { buildUserInfoHeaders, useAuth, usePermission } from '@/lib/auth';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
-import { 
-  ArrowLeft, Search, Plus, Edit, Building2, Truck, 
+import {
+  ArrowLeft, Search, Plus, Edit, Building2, Truck,
   AlertTriangle, Trash2, Check, X, Package, Upload, Download
 } from 'lucide-react';
+import { ImportDuplicateFeedback } from '@/components/import-duplicate-feedback';
+import type { DuplicateInfo } from '@/lib/import-dedup';
 
 // Excel导入配置
 const IMPORT_CONFIG = {
@@ -116,6 +118,9 @@ export default function ShippersManagePage() {
   const [excelImportData, setExcelImportData] = useState<Record<string, string>[]>([]);
   const [excelImportDialogOpen, setExcelImportDialogOpen] = useState(false);
   const [importing, setImporting] = useState(false);
+  // 重复反馈
+  const [duplicateFeedbackOpen, setDuplicateFeedbackOpen] = useState(false);
+  const [allDuplicates, setAllDuplicates] = useState<DuplicateInfo[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 分页相关状态
@@ -306,9 +311,17 @@ export default function ShippersManagePage() {
 
       const result = await res.json();
       if (result.success) {
-        toast.success(`成功导入 ${shippersData.length} 条发货方`);
+        const imported = result.imported ?? shippersData.length;
+        const skipped = result.skipped ?? 0;
+        toast.success(`成功导入 ${imported} 条发货方${skipped > 0 ? `，跳过 ${skipped} 条重复` : ''}`);
         setExcelImportDialogOpen(false);
         setExcelImportData([]);
+
+        if (result.duplicates?.length) {
+          setAllDuplicates(result.duplicates);
+          setDuplicateFeedbackOpen(true);
+        }
+
         fetchShippers();
       } else {
         toast.error(result.error || '导入失败');
@@ -987,6 +1000,19 @@ export default function ShippersManagePage() {
           </Dialog>
         </main>
       </div>
+
+      {/* 重复记录反馈弹窗 */}
+      <ImportDuplicateFeedback
+        duplicates={allDuplicates}
+        columns={IMPORT_CONFIG.fieldLabels}
+        filename="发货方管理"
+        open={duplicateFeedbackOpen}
+        onClose={() => {
+          setDuplicateFeedbackOpen(false);
+          setAllDuplicates([]);
+        }}
+      />
+
     </PageGuard>
   );
 }

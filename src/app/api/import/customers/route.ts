@@ -3,6 +3,7 @@ import { requirePermission } from '@/lib/server-auth';
 import { PERMISSIONS } from '@/lib/permissions';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { buildCustomerMutationData, getCustomerSchemaMode } from '@/lib/customer-schema';
+import { detectDuplicates, ENTITY_DEDUP_KEYS } from '@/lib/import-dedup';
 
 // 中文列名映射到字段名
 const CHINESE_MAPPING: Record<string, string> = {
@@ -67,23 +68,43 @@ export async function POST(request: NextRequest) {
 
     const supabase = getSupabaseClient();
     const schemaMode = await getCustomerSchemaMode(supabase);
+
+    // 去重检测：将行数据归一化为 DB 字段名
+    const normalizedRows = data.map((item) => ({
+      code: getFieldValue(item, 'code') || undefined,
+      name: getFieldValue(item, 'name') || undefined,
+    }));
+
+    const dedupResult = await detectDuplicates({
+      client: supabase,
+      table: 'customers',
+      keys: ENTITY_DEDUP_KEYS.customers,
+      rows: normalizedRows,
+      dataStartRow: 1,
+    });
+
+    const duplicateRowSet = new Set(dedupResult.duplicates.map((d) => d.row));
+
     let imported = 0;
-    let skipped = 0;
+    let skipped = dedupResult.duplicates.length;
     const errors: string[] = [];
 
-    for (const item of data) {
+    for (let i = 0; i < data.length; i++) {
+      const item = data[i];
+      const rowNum = i + 1;
+
+      // 跳过数据库已存在的重复行
+      if (duplicateRowSet.has(rowNum)) continue;
+
       try {
-        // 获取标准化字段值
         const name = getFieldValue(item, 'name') as string;
-        
-        // 验证必需字段
+
         if (!name) {
-          errors.push(`第 ${imported + skipped + 1} 行：缺少客户名称`);
+          errors.push(`第 ${rowNum} 行：缺少客户名称`);
           skipped++;
           continue;
         }
 
-        // 构建客户数据
         const customerData = buildCustomerMutationData({
           code: String(getFieldValue(item, 'code') || `C${Date.now()}${imported + skipped}`),
           name,
@@ -108,13 +129,13 @@ export async function POST(request: NextRequest) {
           .insert(customerData);
 
         if (error) {
-          errors.push(`第 ${imported + skipped + 1} 行：${error.message}`);
+          errors.push(`第 ${rowNum} 行：${error.message}`);
           skipped++;
         } else {
           imported++;
         }
       } catch {
-        errors.push(`第 ${imported + skipped + 1} 行：处理失败`);
+        errors.push(`第 ${rowNum} 行：处理失败`);
         skipped++;
       }
     }
@@ -124,6 +145,7 @@ export async function POST(request: NextRequest) {
       imported,
       skipped,
       total: data.length,
+      duplicates: dedupResult.duplicates,
       errors: errors.slice(0, 10),
     });
   } catch (error) {

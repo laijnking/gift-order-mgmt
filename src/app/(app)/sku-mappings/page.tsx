@@ -62,6 +62,8 @@ import {
   Check,
   X,
 } from 'lucide-react';
+import { ImportDuplicateFeedback } from '@/components/import-duplicate-feedback';
+import type { DuplicateInfo } from '@/lib/import-dedup';
 
 // ============================================================
 // 客户商品映射 - 导入配置
@@ -268,6 +270,11 @@ export default function ProductMappingsPage() {
   // 导入进度状态
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0, success: 0, failed: 0 });
   const [importErrors, setImportErrors] = useState<string[]>([]);
+  // 重复反馈
+  const [duplicateFeedbackOpen, setDuplicateFeedbackOpen] = useState(false);
+  const [allDuplicates, setAllDuplicates] = useState<DuplicateInfo[]>([]);
+  const [dupFeedbackColumns, setDupFeedbackColumns] = useState<string[]>([]);
+  const [dupFeedbackFilename, setDupFeedbackFilename] = useState('');
   // 字段映射对话框状态
   const [fieldMappingDialogOpen, setFieldMappingDialogOpen] = useState(false);
   const [excelColumns, setExcelColumns] = useState<string[]>([]);
@@ -627,11 +634,21 @@ export default function ProductMappingsPage() {
 
       const data = await res.json();
       if (data.success) {
-        toast.success(`成功导入 ${mappings.length} 条映射`);
+        const imported = data.imported ?? mappings.length;
+        const skipped = data.skipped ?? 0;
+        toast.success(`成功导入 ${imported} 条映射${skipped > 0 ? `，跳过 ${skipped} 条重复` : ''}`);
         setIsImportDialogOpen(false);
         setImportText('');
         setSelectedCustomer('');
         setSelectedSupplier('');
+
+        if (data.duplicates?.length) {
+          setAllDuplicates(data.duplicates);
+          setDupFeedbackColumns(['客户名称', '客户商品名称', '客户商品编码', '系统商品编码', '系统商品名称']);
+          setDupFeedbackFilename('SKU映射');
+          setDuplicateFeedbackOpen(true);
+        }
+
         loadData(activeTab);
       } else {
         toast.error(data.error || '导入失败');
@@ -953,10 +970,12 @@ export default function ProductMappingsPage() {
       // 分批导入，每批100条
       const batchSize = 100;
       let totalSuccess = 0;
-      
+      const allDups: DuplicateInfo[] = [];
+      let dupOffset = 0;
+
       for (let i = 0; i < mappings.length; i += batchSize) {
         const batch = mappings.slice(i, i + batchSize);
-        
+
         const res = await fetch('/api/product-mappings/batch', {
           method: 'POST',
           headers: {
@@ -968,21 +987,37 @@ export default function ProductMappingsPage() {
 
         const result = await res.json();
         if (result.success) {
-          totalSuccess += batch.length;
+          totalSuccess += result.imported ?? batch.length;
+          if (result.duplicates?.length) {
+            for (const dup of result.duplicates) {
+              allDups.push({ ...dup, row: dup.row + dupOffset });
+            }
+          }
         }
-        
+
+        dupOffset += batch.length;
         setImportProgress(prev => ({ ...prev, success: totalSuccess }));
       }
-      
-      toast.success(`成功导入 ${totalSuccess} 条映射`);
+
+      const totalSkipped = allDups.length + errors.length;
+      toast.success(`成功导入 ${totalSuccess} 条映射${totalSkipped > 0 ? `，跳过 ${totalSkipped} 条` : ''}`);
       if (errors.length > 0) {
         toast.warning(`${errors.length} 条数据因客户不存在或其他原因被跳过`);
       }
-      
+
       setExcelImportDialogOpen(false);
       setExcelImportData([]);
       setSelectedCustomer('');
       setSelectedSupplier('');
+
+      if (allDups.length > 0) {
+        const currentConfig = getImportConfig(activeTab);
+        setAllDuplicates(allDups);
+        setDupFeedbackColumns(currentConfig.fieldLabels);
+        setDupFeedbackFilename(currentConfig.title);
+        setDuplicateFeedbackOpen(true);
+      }
+
       loadData(activeTab);
     } catch {
       toast.error('导入失败');
@@ -1713,6 +1748,19 @@ export default function ProductMappingsPage() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* 重复记录反馈弹窗 */}
+      <ImportDuplicateFeedback
+        duplicates={allDuplicates}
+        columns={dupFeedbackColumns}
+        filename={dupFeedbackFilename}
+        open={duplicateFeedbackOpen}
+        onClose={() => {
+          setDuplicateFeedbackOpen(false);
+          setAllDuplicates([]);
+        }}
+      />
+
     </PageGuard>
   );
 }

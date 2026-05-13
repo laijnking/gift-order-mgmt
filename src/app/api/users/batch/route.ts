@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { requirePermission } from '@/lib/server-auth';
 import { PERMISSIONS } from '@/lib/permissions';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { detectDuplicates, ENTITY_DEDUP_KEYS } from '@/lib/import-dedup';
 
 function hashPassword(password: string): string {
   return crypto.createHash('sha256').update(password).digest('hex');
@@ -39,10 +40,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: '未解析到有效的用户数据' }, { status: 400 });
     }
 
+    // 去重检测
+    const dedupResult = await detectDuplicates({
+      client: supabase,
+      table: 'users',
+      keys: ENTITY_DEDUP_KEYS.users,
+      rows: usersData,
+      dataStartRow: 1,
+    });
+
+    const duplicateRowSet = new Set(dedupResult.duplicates.map((d) => d.row));
+    const uniqueUsers = usersData.filter((_, idx) => !duplicateRowSet.has(idx + 1));
+
+    if (uniqueUsers.length === 0) {
+      return NextResponse.json({
+        success: true,
+        data: [],
+        count: 0,
+        imported: 0,
+        skipped: dedupResult.duplicates.length,
+        duplicates: dedupResult.duplicates,
+      });
+    }
+
     // 批量插入用户数据到 public.users 表
     const { data, error } = await supabase
       .from('users')
-      .insert(usersData)
+      .insert(uniqueUsers)
       .select();
 
     if (error) {
@@ -50,7 +74,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, data, count: data?.length || 0 });
+    return NextResponse.json({
+      success: true,
+      data,
+      count: data?.length || 0,
+      imported: data?.length || 0,
+      skipped: dedupResult.duplicates.length,
+      duplicates: dedupResult.duplicates,
+    });
   } catch (error) {
     console.error('批量导入用户失败:', error);
     return NextResponse.json({ success: false, error: '批量导入失败' }, { status: 500 });
