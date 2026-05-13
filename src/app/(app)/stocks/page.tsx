@@ -74,8 +74,8 @@ const IMPORT_TEMPLATE = {
   fields: ['supplierCode', 'supplierName', 'supplierProductCode', 'supplierProductName', 'supplierProductSpec', 'productName', 'productCode', 'spec', 'quantity', 'price', 'warehouse', 'remark'],
   fieldLabels: ['发货方编码', '发货方名称', '发货方商品编码', '发货方商品名称', '发货方规格', '商品名称', '商品编码', '规格型号', '库存数量', '单价', '仓库', '备注'],
   template: [
-    { supplierCode: 'GYS-001', supplierName: '首映礼省内仓', supplierProductCode: 'JD-SKU-001', supplierProductName: '九阳电蒸锅', supplierProductSpec: 'DZ100HG-GZ605', productName: '', productCode: '', spec: '', quantity: '15', price: '145.00', warehouse: '默认仓', remark: '' },
-    { supplierCode: 'GYS-001', supplierName: '首映礼省内仓', supplierProductCode: 'GS10', supplierProductName: '苏泊尔果蔬清洗机', supplierProductSpec: 'GS10', productName: '', productCode: '', spec: '', quantity: '3', price: '115.00', warehouse: '默认仓', remark: '尾货预警' },
+    { supplierCode: 'GYS-001', supplierName: '示例发货方', supplierProductCode: 'JD-SKU-001', supplierProductName: '示例商品A', supplierProductSpec: 'SP001', productName: '', productCode: '', spec: '', quantity: '15', price: '145.00', warehouse: '默认仓', remark: '' },
+    { supplierCode: 'GYS-001', supplierName: '示例发货方', supplierProductCode: 'GS10', supplierProductName: '示例商品B', supplierProductSpec: 'GS10', productName: '', productCode: '', spec: '', quantity: '3', price: '115.00', warehouse: '默认仓', remark: '尾货预警' },
   ],
 };
 

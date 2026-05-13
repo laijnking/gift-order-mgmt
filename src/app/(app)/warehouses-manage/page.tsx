@@ -435,7 +435,7 @@ export default function WarehousesManagePage() {
                           <Input 
                             value={formData.shortName} 
                             onChange={(e) => setFormData({...formData, shortName: e.target.value})}
-                            placeholder="如: 首映礼"
+                            placeholder="如: 默认仓"
                           />
                         </div>
                         <div className="space-y-2">

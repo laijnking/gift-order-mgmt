@@ -139,12 +139,12 @@ export async function POST(request: NextRequest) {
     const headers = fieldMappings.length > 0 ? fieldMappings.map(m => m.excelColumn) : DEFAULT_KINGDEE_FIELD_MAPPINGS.map(m => m.excelColumn);
     worksheet['!cols'] = headers.map((header) => ({ wch: Math.max(12, Math.min(40, header.length * 2 + 4)) }));
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, '金蝶导出');
+    XLSX.utils.book_append_sheet(workbook, worksheet, '导出数据');
     const workbookBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 
     // 生成文件名
     const today = new Date().toISOString().slice(0, 10);
-    const fileName = `金蝶导出_${today}.xlsx`;
+    const fileName = `订单导出_${today}.xlsx`;
 
     return new NextResponse(workbookBuffer, {
       headers: {
