@@ -156,7 +156,7 @@ async function verifyUserSignature(
   // 获取用户在数据库中的真实权限
   const { data: user, error } = await client
     .from('users')
-    .select('id, username, role, is_active')
+    .select('id, username, role, is_active, is_superadmin')
     .eq('id', userId)
     .maybeSingle();
 
@@ -259,7 +259,7 @@ export async function POST(request: NextRequest) {
 
     const { data: user, error } = await client
       .from('users')
-      .select('id, username, real_name, role, department, is_active, password_hash')
+      .select('id, username, real_name, role, department, is_active, is_superadmin, password_hash')
       .eq('username', username)
       .maybeSingle();
 
@@ -296,6 +296,45 @@ export async function POST(request: NextRequest) {
       .update({ last_login_at: new Date().toISOString() })
       .eq('id', user.id);
 
+    // 获取用户的租户列表
+    const { data: userTenants } = await client
+      .from('user_tenants')
+      .select('id, tenant_id, role, is_default')
+      .eq('user_id', user.id);
+
+    let tenantsMap: Record<string, { id: string; code: string; name: string; status: string }> = {};
+    if (userTenants && userTenants.length > 0) {
+      const tenantIds = [...new Set(userTenants.map((ut: Record<string, unknown>) => ut.tenant_id as string))];
+      const { data: tenantRecords } = await client
+        .from('tenants')
+        .select('id, code, name, status')
+        .in('id', tenantIds);
+      if (tenantRecords) {
+        for (const t of tenantRecords) {
+          tenantsMap[t.id as string] = {
+            id: t.id as string,
+            code: t.code as string,
+            name: t.name as string,
+            status: t.status as string,
+          };
+        }
+      }
+    }
+
+    const tenantsList = (userTenants || []).map((ut: Record<string, unknown>) => {
+      const tenant = tenantsMap[ut.tenant_id as string] || { id: '', code: '', name: '', status: 'active' };
+      return {
+        id: tenant.id,
+        code: tenant.code,
+        name: tenant.name,
+        status: tenant.status,
+        role: ut.role as string,
+        isDefault: ut.is_default as boolean,
+      };
+    });
+
+    const defaultTenant = tenantsList.find((t: { isDefault: boolean }) => t.isDefault) || tenantsList[0];
+
     return NextResponse.json({
       success: true,
       data: {
@@ -305,11 +344,13 @@ export async function POST(request: NextRequest) {
         role: user.role || '',
         roleName: roleMeta.roleName,
         department: user.department || '',
+        isSuperadmin: (user as Record<string, unknown>).is_superadmin === true,
         dataScope: roleMeta.dataScope,
         permissions: roleMeta.permissions,
-        // 添加签名信息
         authSignature: signature,
         authTimestamp: timestamp,
+        tenants: tenantsList,
+        currentTenant: defaultTenant,
       },
     });
   } catch (error) {

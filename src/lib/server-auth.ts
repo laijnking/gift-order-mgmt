@@ -7,8 +7,11 @@ export type ServerAuthUser = {
   id?: string;
   username?: string;
   role?: string;
+  isSuperadmin?: boolean;
   dataScope?: string;
   permissions?: string[];
+  tenantId?: string;
+  tenantCode?: string;
 };
 
 const AUTH_SECRET = process.env.AUTH_SECRET || 'gift-order-mgmt-secret-key-change-in-production';

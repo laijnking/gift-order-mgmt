@@ -33,6 +33,7 @@ interface MenuItem {
   icon: React.ComponentType<{ className?: string }>;
   roles?: string[];
   permissions?: string[];
+  superadminOnly?: boolean;
   children?: MenuItem[];
 }
 
@@ -73,7 +74,7 @@ const menuItems: MenuItem[] = [
   {
     label: '平台管理',
     icon: Settings,
-    roles: ['superadmin'],
+    superadminOnly: true,
     children: [
       { label: '租户管理', href: '/admin/tenants', icon: Building2 },
       { label: '角色定义', href: '/roles', icon: Settings },
@@ -342,6 +343,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     : null;
 
   const visibleMenuItems = menuItems.filter(item => {
+    if (item.superadminOnly && !user.isSuperadmin) return false;
     const roleAllowed = !item.roles || item.roles.includes(user.role);
     const permissionAllowed = !item.permissions || item.permissions.some(permission => user.permissions.includes(permission));
     return roleAllowed && permissionAllowed;

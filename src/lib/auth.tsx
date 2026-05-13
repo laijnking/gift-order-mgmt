@@ -4,6 +4,15 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { useRouter } from 'next/navigation';
 import { PERMISSIONS, type Permission } from '@/lib/permissions';
 
+export interface Tenant {
+  id: string;
+  code: string;
+  name: string;
+  status?: string;
+  role?: string;
+  isDefault?: boolean;
+}
+
 export interface AuthUser {
   id: string;
   username: string;
@@ -13,8 +22,11 @@ export interface AuthUser {
   department?: string;
   dataScope: string;
   permissions: string[];
+  isSuperadmin?: boolean;
   authSignature?: string;
   authTimestamp?: number;
+  tenants?: Tenant[];
+  currentTenant?: Tenant | null;
 }
 
 interface AuthContextType {
@@ -41,6 +53,28 @@ function normalizeStoredUser(value: unknown): AuthUser | null {
     return null;
   }
 
+  let tenants: Tenant[] = [];
+  if (Array.isArray(record.tenants)) {
+    tenants = record.tenants.filter((t): t is Tenant =>
+      t !== null && typeof t === 'object' && typeof t.id === 'string'
+    );
+  }
+
+  let currentTenant: Tenant | null = null;
+  if (record.currentTenant && typeof record.currentTenant === 'object') {
+    const ct = record.currentTenant as Record<string, unknown>;
+    if (typeof ct.id === 'string') {
+      currentTenant = {
+        id: ct.id,
+        code: typeof ct.code === 'string' ? ct.code : '',
+        name: typeof ct.name === 'string' ? ct.name : '',
+        status: typeof ct.status === 'string' ? ct.status : 'active',
+        role: typeof ct.role === 'string' ? ct.role : undefined,
+        isDefault: typeof ct.isDefault === 'boolean' ? ct.isDefault : undefined,
+      };
+    }
+  }
+
   return {
     id,
     username,
@@ -52,8 +86,11 @@ function normalizeStoredUser(value: unknown): AuthUser | null {
     permissions: Array.isArray(record.permissions)
       ? record.permissions.filter((permission): permission is string => typeof permission === 'string')
       : [],
+    isSuperadmin: typeof record.isSuperadmin === 'boolean' ? record.isSuperadmin : false,
     authSignature: typeof record.authSignature === 'string' ? record.authSignature : undefined,
     authTimestamp: typeof record.authTimestamp === 'number' ? record.authTimestamp : undefined,
+    tenants,
+    currentTenant,
   };
 }
 
@@ -126,6 +163,15 @@ export function buildUserInfoHeaders(user?: AuthUser | null): Record<string, str
   if (currentUser.authSignature && currentUser.authTimestamp) {
     headers['x-user-signature'] = currentUser.authSignature;
     headers['x-timestamp'] = String(currentUser.authTimestamp);
+  }
+
+  // 添加租户上下文头
+  const tenant = currentUser.currentTenant || currentUser.tenants?.[0];
+  if (tenant?.id) {
+    headers['x-tenant-id'] = tenant.id;
+    if (tenant.code) {
+      headers['x-tenant-code'] = tenant.code;
+    }
   }
 
   return headers;
