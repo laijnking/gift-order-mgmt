@@ -24,6 +24,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { buildUserInfoHeaders } from '@/lib/auth';
+import { TenantProvider, type Tenant } from '@/hooks/use-tenant';
+import { TenantSelector } from '@/components/tenant/TenantSelector';
 
 interface MenuItem {
   label: string;
@@ -57,16 +59,26 @@ const menuItems: MenuItem[] = [
     ]
   },
   {
-    label: '系统设置',
-    href: '/users',
+    label: '系统管理',
     icon: Settings,
     permissions: ['settings:view'],
     children: [
-      { label: '用户管理', href: '/users', icon: Users },
-      { label: '角色与权限', href: '/roles', icon: Settings },
+      { label: '业务规则配置', href: '/settings/business-rules', icon: Settings },
+      { label: '成员管理', href: '/settings/members', icon: Users },
       { label: '预警设置', href: '/alerts', icon: Bell },
       { label: '模板配置', href: '/templates', icon: Settings },
-      { label: '系统配置', href: '/system-configs', icon: Settings },
+      { label: '租户设置', href: '/settings/tenant', icon: Building2 },
+    ]
+  },
+  {
+    label: '平台管理',
+    icon: Settings,
+    roles: ['superadmin'],
+    children: [
+      { label: '租户管理', href: '/admin/tenants', icon: Building2 },
+      { label: '角色定义', href: '/roles', icon: Settings },
+      { label: '用户管理', href: '/users', icon: Users },
+      { label: '全局默认配置', href: '/admin/global-configs', icon: Settings },
     ]
   },
   {
@@ -317,6 +329,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return null;
   }
 
+  const userTenants: Tenant[] = (user.tenants || []).map(t => ({
+    id: t.id,
+    code: t.code,
+    name: t.name,
+    status: (t.status === 'inactive' ? 'inactive' as const : 'active' as const),
+    role: t.role,
+    isDefault: t.isDefault,
+  }));
+  const userCurrentTenant: Tenant | null = user.currentTenant
+    ? { id: user.currentTenant.id, code: user.currentTenant.code, name: user.currentTenant.name, status: (user.currentTenant.status === 'inactive' ? 'inactive' as const : 'active' as const), role: user.currentTenant.role, isDefault: user.currentTenant.isDefault }
+    : null;
+
   const visibleMenuItems = menuItems.filter(item => {
     const roleAllowed = !item.roles || item.roles.includes(user.role);
     const permissionAllowed = !item.permissions || item.permissions.some(permission => user.permissions.includes(permission));
@@ -425,6 +449,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   };
 
   return (
+    <TenantProvider initialTenants={userTenants} initialCurrentTenant={userCurrentTenant}>
     <div className="min-h-screen bg-background flex flex-col">
       {/* Mobile menu button */}
       <div className="lg:hidden fixed left-3 top-3 z-50">
@@ -498,6 +523,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             )}
           </Button>
         </div>
+
+        {/* Tenant Selector */}
+        {!collapsed && (
+          <div className="px-3 py-2 border-t border-sidebar-border shrink-0">
+            <TenantSelector />
+          </div>
+        )}
 
         {/* User info */}
         <div className={`p-3 border-t border-sidebar-border bg-sidebar/50 shrink-0 ${collapsed ? 'text-center' : ''}`}>
@@ -778,5 +810,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </DialogContent>
       </Dialog>
     </div>
+    </TenantProvider>
   );
 }

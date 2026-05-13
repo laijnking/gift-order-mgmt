@@ -3,6 +3,7 @@ import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { PERMISSIONS } from '@/lib/permissions';
 import { getTenantFromRequest } from '@/lib/tenant-context';
+import { MATCH_CONFIG, getProvinceScore, extractProvince, getProvinceMatchText } from '@/lib/config';
 
 interface OrderItem {
   product_id?: string | null;
@@ -39,46 +40,6 @@ function toNumber(value: unknown, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
-function extractProvince(address: string): string | null {
-  if (!address) return null;
-  const directCities = ['北京', '天津', '上海', '重庆'];
-  for (const city of directCities) {
-    if (address.includes(city)) return city;
-  }
-
-  const match = address.match(/(河北|山西|辽宁|吉林|黑龙江|江苏|浙江|安徽|福建|江西|山东|河南|湖北|湖南|广东|海南|四川|贵州|云南|陕西|甘肃|青海|台湾|内蒙古|广西|西藏|宁夏|新疆|香港|澳门)/);
-  return match?.[1] || null;
-}
-
-function getProvinceScore(supplierProvince: string | undefined, receiverProvince: string | null): number {
-  if (!receiverProvince) return 30;
-  if (!supplierProvince) return 10;
-  if (supplierProvince.includes(receiverProvince) || receiverProvince.includes(supplierProvince)) return 100;
-
-  const adjacent: Record<string, string[]> = {
-    广东: ['广西', '海南', '湖南', '江西', '福建'],
-    北京: ['天津', '河北', '山东'],
-    上海: ['江苏', '浙江', '安徽'],
-    浙江: ['上海', '江苏', '安徽', '江西', '福建'],
-    江苏: ['上海', '浙江', '安徽', '山东'],
-    山东: ['江苏', '河北', '河南'],
-    河南: ['山东', '河北', '湖北', '安徽'],
-    湖北: ['河南', '湖南', '江西', '安徽'],
-    湖南: ['湖北', '江西', '广东', '广西', '贵州'],
-    四川: ['重庆', '云南', '贵州', '陕西', '甘肃', '青海'],
-  };
-  return adjacent[receiverProvince]?.includes(supplierProvince) ? 60 : 20;
-}
-
-function provinceText(supplierProvince: string | undefined, receiverProvince: string | null): string {
-  if (!receiverProvince) return '';
-  if (!supplierProvince) return '省份未知';
-  const score = getProvinceScore(supplierProvince, receiverProvince);
-  if (score >= 100) return '同省';
-  if (score >= 60) return '邻近';
-  return '较远';
-}
-
 function expressAllowed(supplier: Record<string, unknown>, order: Record<string, unknown>): boolean {
   const req = String(order.express_requirement || '');
   if (req.includes('京东') && supplier.can_jd === false) return false;
@@ -92,7 +53,7 @@ function expressAllowed(supplier: Record<string, unknown>, order: Record<string,
     : restrictions;
 
   const list = Array.isArray(parsed) ? parsed : [];
-  if (list.includes('不发偏远地区') && (address.includes('新疆') || address.includes('西藏'))) {
+  if (list.includes('不发偏远地区') && MATCH_CONFIG.remoteRegions.some((r) => address.includes(r))) {
     return false;
   }
   return true;
@@ -262,7 +223,7 @@ export async function POST(request: NextRequest) {
             supplierName: supplier.name as string,
             supplierType: supplier.type as string,
             province: supplier.province as string | undefined,
-            provinceMatch: provinceText(supplier.province as string | undefined, receiverProvince),
+            provinceMatch: getProvinceMatchText(supplier.province as string | undefined, receiverProvince),
             productCode: String(stock.product_code || product.code || ''),
             productName: String(stock.product_name || product.name || ''),
             quantity: stockQty,
@@ -305,7 +266,7 @@ export async function POST(request: NextRequest) {
           supplierName: supplier.name as string,
           supplierType: supplier.type as string,
           province: supplier.province as string | undefined,
-          provinceMatch: provinceText(supplier.province as string | undefined, receiverProvince),
+          provinceMatch: getProvinceMatchText(supplier.province as string | undefined, receiverProvince),
           productCode: product.code || '',
           productName: product.name || '',
           quantity: 0,
