@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { SuperadminGuard } from '@/components/auth/superadmin-guard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,6 +58,7 @@ export default function GlobalConfigsPage() {
   if (loading) return <div className="flex items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin" /></div>;
 
   return (
+    <SuperadminGuard>
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -127,5 +129,6 @@ export default function GlobalConfigsPage() {
         </TabsContent>
       </Tabs>
     </div>
+    </SuperadminGuard>
   );
 }

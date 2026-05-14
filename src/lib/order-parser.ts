@@ -150,7 +150,7 @@ export async function matchSystemProduct(
 
       if (pmProductId) {
         let q = client.from('products').select('*').eq('id', pmProductId);
-        if (tenantId) q = q.or(`owner_tenant_id.eq.${tenantId},visibility.eq.global`);
+        if (tenantId) q = q.eq('owner_tenant_id', tenantId);
         const { data: productsById } = await q.limit(1);
         if (productsById && productsById.length > 0) {
           const p = productsById[0] as Record<string, unknown>;
@@ -163,7 +163,7 @@ export async function matchSystemProduct(
         }
       } else if (pmProductCode) {
         let q = client.from('products').select('*').eq('code', pmProductCode);
-        if (tenantId) q = q.or(`owner_tenant_id.eq.${tenantId},visibility.eq.global`);
+        if (tenantId) q = q.eq('owner_tenant_id', tenantId);
         const { data: productsByCode } = await q.limit(1);
         if (productsByCode && productsByCode.length > 0) {
           const p = productsByCode[0] as Record<string, unknown>;

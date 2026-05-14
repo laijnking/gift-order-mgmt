@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // 先获取数据
-    let dataQuery = client.from('products').select('*').or(`owner_tenant_id.eq.${tenant.tenantId},visibility.eq.global`);
+    let dataQuery = client.from('products').select('*').eq('owner_tenant_id', tenant.tenantId);
 
     if (search) {
       dataQuery = dataQuery.or(`code.ilike.%${search}%,name.ilike.%${search}%,barcode.ilike.%${search}%`);

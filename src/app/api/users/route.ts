@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
-import { requirePermission } from '@/lib/server-auth';
+import { requirePermission, getRequestUser } from '@/lib/server-auth';
 import { PERMISSIONS } from '@/lib/permissions';
 
 // 数据库字段转前端格式
@@ -41,7 +41,38 @@ export async function GET(request: NextRequest) {
   const isActive = searchParams.get('isActive');
 
   try {
+    // 非 superadmin：只显示当前租户成员
+    const currentUser = getRequestUser(request);
+    let memberIds: string[] | null = null;
+
+    if (currentUser?.id) {
+      const { data: userRecord } = await client
+        .from('users')
+        .select('is_superadmin')
+        .eq('id', currentUser.id)
+        .maybeSingle();
+
+      if (!userRecord?.is_superadmin) {
+        const tenantId = request.headers.get('x-tenant-id');
+        if (tenantId) {
+          const { data: members } = await client
+            .from('user_tenants')
+            .select('user_id')
+            .eq('tenant_id', tenantId);
+
+          memberIds = (members || []).map(m => m.user_id);
+          if (memberIds.length === 0) {
+            return NextResponse.json({ success: true, data: [], total: 0 });
+          }
+        }
+      }
+    }
+
     let query = client.from('users').select('*');
+
+    if (memberIds) {
+      query = query.in('id', memberIds);
+    }
 
     if (search) {
       query = query.or(`username.ilike.%${search}%,name.ilike.%${search}%,real_name.ilike.%${search}%`);

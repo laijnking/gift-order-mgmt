@@ -156,6 +156,7 @@ export function buildUserInfoHeaders(user?: AuthUser | null): Record<string, str
       role: currentUser.role,
       dataScope: currentUser.dataScope,
       permissions: currentUser.permissions,
+      isSuperadmin: currentUser.isSuperadmin,
     }),
   };
 

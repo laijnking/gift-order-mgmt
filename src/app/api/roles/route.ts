@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
-import { requirePermission } from '@/lib/server-auth';
+import { requirePermission, getRequestUser } from '@/lib/server-auth';
 import { PERMISSIONS } from '@/lib/permissions';
 
 // 获取角色列表
@@ -15,9 +15,23 @@ export async function GET(request: NextRequest) {
   try {
     const query = client.from('roles').select('*');
 
-    const { data, error } = await query.order('is_system', { ascending: false }).order('created_at', { ascending: true });
+    let { data, error } = await query.order('is_system', { ascending: false }).order('created_at', { ascending: true });
 
     if (error) throw new Error(`查询角色失败: ${error.message}`);
+
+    // 非 superadmin 用户看不到 superadmin 角色
+    const currentUser = getRequestUser(request);
+    if (currentUser?.id) {
+      const { data: userRecord } = await client
+        .from('users')
+        .select('is_superadmin')
+        .eq('id', currentUser.id)
+        .maybeSingle();
+
+      if (!userRecord?.is_superadmin) {
+        data = (data || []).filter(r => r.code !== 'superadmin');
+      }
+    }
 
     // 如果需要包含权限信息
     if (includePermissions && data) {
@@ -33,8 +47,8 @@ export async function GET(request: NextRequest) {
             )
           `)
           .eq('role_id', role.id);
-        
-        (role as Record<string, unknown>).permissions = perms?.map((p: Record<string, unknown>) => 
+
+        (role as Record<string, unknown>).permissions = perms?.map((p: Record<string, unknown>) =>
           (p.permissions as Record<string, unknown>)?.code
         ) || [];
       }

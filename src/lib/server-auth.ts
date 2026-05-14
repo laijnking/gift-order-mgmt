@@ -187,6 +187,32 @@ export async function requirePermission(request: NextRequest, permission: string
   return null;
 }
 
+/**
+ * 验证当前用户是否为平台超级管理员（查询数据库确认 is_superadmin）
+ */
+export async function requireSuperadmin(request: NextRequest): Promise<NextResponse | null> {
+  const user = parseUserInfoHeader(request);
+  if (!user?.id) {
+    return NextResponse.json({ success: false, error: '未登录' }, { status: 401 });
+  }
+
+  const client = getSupabaseClient();
+  const { data, error } = await client
+    .from('users')
+    .select('is_superadmin')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (error || !data || data.is_superadmin !== true) {
+    return NextResponse.json(
+      { success: false, error: '需要平台管理员权限' },
+      { status: 403 }
+    );
+  }
+
+  return null;
+}
+
 export async function requireAnyPermission(request: NextRequest, permissions: string[]) {
   const sigResult = await verifyUserSignature(request);
   if (!sigResult.valid) {

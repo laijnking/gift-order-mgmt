@@ -173,7 +173,7 @@ async function matchProduct(
   customerProductSpec: string,
   tenantId: string
 ): Promise<ProductMatchResult> {
-  const productVisibility = `owner_tenant_id.eq.${tenantId},visibility.eq.global`;
+  const productTenantFilter = `owner_tenant_id.eq.${tenantId}`;
 
   // 1. 先查询SKU映射表（客户商品→系统商品）- 精确匹配
   const { data: mappings } = await client
@@ -191,7 +191,7 @@ async function matchProduct(
         .from('products')
         .select('*')
         .eq('id', mapping.system_product_id)
-        .or(productVisibility)
+        .or(productTenantFilter)
         .limit(1);
 
       if (products && products.length > 0) {
@@ -214,7 +214,7 @@ async function matchProduct(
     const { data: specProducts } = await client
       .from('products')
       .select('*')
-      .or(productVisibility)
+      .or(productTenantFilter)
       .eq('spec', customerProductSpec)
       .limit(1);
 
@@ -237,7 +237,7 @@ async function matchProduct(
     const { data: nameProducts } = await client
       .from('products')
       .select('*')
-      .or(productVisibility)
+      .or(productTenantFilter)
       .eq('name', customerProductName)
       .limit(1);
 

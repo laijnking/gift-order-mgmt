@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { SuperadminGuard } from '@/components/auth/superadmin-guard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { buildUserInfoHeaders } from '@/lib/auth';
 import { toast } from 'sonner';
@@ -68,7 +69,8 @@ export default function AdminTenantsPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <SuperadminGuard>
+      <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">租户管理</h1>
@@ -130,5 +132,6 @@ export default function AdminTenantsPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </SuperadminGuard>
   );
 }

@@ -389,6 +389,26 @@ pnpm build
 sudo systemctl restart gift-order-mgmt
 ```
 
+## Git Worktree 管理
+
+项目使用 `git worktree` 隔离多分支并行开发，**Agent 启动后必须先确认当前 worktree 上下文**。
+
+### 当前 Worktree 布局
+
+| 工作树路径 | 分支 | 用途 |
+|-----------|------|------|
+| `../gift-order-mgmt-master` | `master` | 主分支（生产） |
+| `../gift-order-mgmt-tenant` | `feature/saas-multi-tenant` | SaaS 多租户 |
+
+### 约定
+
+- 开发前检查：`git worktree list` 确认当前所在 worktree 和分支
+- 新功能/大改动 → 新建 worktree，路径格式 `../gift-order-mgmt-{feature}`
+- 小修复 → 直接在对应 worktree 操作
+- 功能合并后 → 删除 worktree（`git worktree remove`）和分支
+- **禁止在不同 worktree 之间共享未提交的修改**（每个 worktree 有独立的 working tree）
+- 运行 `pnpm check:*` 前确认 dev server 已启动在**当前 worktree** 上
+
 ## 参考文档
 
 | 文档 | 内容 |

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { PageGuard } from '@/components/auth/page-guard';
+import { SuperadminGuard } from '@/components/auth/superadmin-guard';
 import { buildUserInfoHeaders, useAuth, usePermission } from '@/lib/auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -508,6 +509,7 @@ export default function UsersPage() {
 
   return (
     <PageGuard permission={['user_management:view', 'settings:view']} title="无法访问用户管理">
+      <SuperadminGuard>
       {loading ? (
         <div className="flex items-center justify-center h-96">
           <RefreshCw className="h-8 w-8 animate-spin text-primary" />
@@ -871,6 +873,7 @@ export default function UsersPage() {
         }}
       />
 
+      </SuperadminGuard>
     </PageGuard>
   );
 }
