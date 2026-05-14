@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { normalizeTemplateType, syncTemplateTargetLink, transformTemplateRecord, type TemplateRecord } from '@/lib/template-utils';
 import { requirePermission } from '@/lib/server-auth';
 import { PERMISSIONS } from '@/lib/permissions';
@@ -12,14 +13,16 @@ export async function GET(
   const authError = await requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
   const { id } = await params;
-  
+
   try {
     const { data, error } = await client
       .from('templates')
       .select('*')
       .eq('id', id)
+      .eq('tenant_id', tenant.tenantId)
       .single();
     
     if (error) throw new Error(`查询模板失败: ${error.message}`);
@@ -51,19 +54,21 @@ export async function PUT(
   const authError = await requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
   const { id } = await params;
-  
+
   try {
     const body = await request.json();
-    
+
     // 如果设置为默认模板，先取消其他默认
     if (body.isDefault) {
       await client
         .from('templates')
         .update({ is_default: false })
         .eq('type', normalizeTemplateType(body.type))
-        .eq('is_default', true);
+        .eq('is_default', true)
+        .eq('tenant_id', tenant.tenantId);
     }
 
     // 转换 fieldMappings 为有序数组格式存储（如果已是数组则直接存储，否则转换对象格式）
@@ -102,6 +107,7 @@ export async function PUT(
       .from('templates')
       .update(templateData)
       .eq('id', id)
+      .eq('tenant_id', tenant.tenantId)
       .select()
       .single();
     
@@ -136,16 +142,18 @@ export async function DELETE(
   const authError = await requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
   const { id } = await params;
-  
+
   try {
     await client.from('template_links').delete().eq('template_id', id);
 
     const { error } = await client
       .from('templates')
       .update({ is_active: false, updated_at: new Date().toISOString() })
-      .eq('id', id);
+      .eq('id', id)
+      .eq('tenant_id', tenant.tenantId);
     
     if (error) throw new Error(`删除模板失败: ${error.message}`);
 

@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { buildUserInfoHeaders } from '@/lib/auth';
-import { Loader2, Save } from 'lucide-react';
+import { Loader2, Package, Save } from 'lucide-react';
 
 const STATUS_KEYS = ['pending', 'assigned', 'notified', 'partial_returned', 'returned', 'feedbacked', 'completed', 'cancelled'];
 const ACTION_KEYS = ['complete', 'exportKingdee', 'completeAction', 'shipping', 'exportShipping'];
@@ -22,7 +22,7 @@ export default function TenantSettingsPage() {
   const [saving, setSaving] = useState(false);
 
   const [basic, setBasic] = useState({ name: '', financialSystem: '' });
-  const [brand, setBrand] = useState({ logoUrl: '', themeColor: '#1890ff', welcomeMessage: '', footerText: '' });
+  const [brand, setBrand] = useState({ logoUrl: '', themeColor: '#1890ff', welcomeMessage: '' });
   const [statusLabels, setStatusLabels] = useState<Record<string, string>>({});
   const [actionLabels, setActionLabels] = useState<Record<string, string>>({});
   const [exportPrefixes, setExportPrefixes] = useState<Record<string, string>>({});
@@ -53,7 +53,6 @@ export default function TenantSettingsPage() {
             logoUrl: d.data.logo_url || '',
             themeColor: d.data.theme_color || '#1890ff',
             welcomeMessage: d.data.welcome_message || '',
-            footerText: d.data.footer_text || '',
           });
         }
       }).catch(() => {});
@@ -73,7 +72,7 @@ export default function TenantSettingsPage() {
         body: JSON.stringify({
           brand_name: basic.name, logo_url: brand.logoUrl,
           theme_color: brand.themeColor, welcome_message: brand.welcomeMessage,
-          footer_text: brand.footerText,
+          footer_text: '',
         }),
       });
       toast.success('配置已保存');
@@ -129,8 +128,40 @@ export default function TenantSettingsPage() {
             <CardHeader><CardTitle>品牌配置</CardTitle><CardDescription>登录页和系统界面的品牌展示</CardDescription></CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Logo URL</Label>
-                <Input value={brand.logoUrl} onChange={e => setBrand(p => ({ ...p, logoUrl: e.target.value }))} placeholder="https://..." />
+                <Label>Logo</Label>
+                <div className="flex gap-4 items-start">
+                  <div className="w-24 h-24 border rounded-lg flex items-center justify-center bg-muted/30 overflow-hidden shrink-0">
+                    {brand.logoUrl ? (
+                      <img src={brand.logoUrl} alt="Logo" className="w-full h-full object-contain" />
+                    ) : (
+                      <Package className="w-10 h-10 text-muted-foreground" />
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <Input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        try {
+                          const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                          const data = await res.json();
+                          if (data.success) setBrand(p => ({ ...p, logoUrl: data.data.url }));
+                          else toast.error(data.error || '上传失败');
+                        } catch { toast.error('上传失败'); }
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground">建议尺寸 200×200px，PNG/JPEG/WebP，最大 2MB</p>
+                    <Input
+                      value={brand.logoUrl}
+                      onChange={e => setBrand(p => ({ ...p, logoUrl: e.target.value }))}
+                      placeholder="或输入 Logo URL"
+                    />
+                  </div>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>主题色</Label>
@@ -142,10 +173,6 @@ export default function TenantSettingsPage() {
               <div className="space-y-2">
                 <Label>欢迎语</Label>
                 <Input value={brand.welcomeMessage} onChange={e => setBrand(p => ({ ...p, welcomeMessage: e.target.value }))} placeholder="欢迎使用..." />
-              </div>
-              <div className="space-y-2">
-                <Label>页脚文本</Label>
-                <Input value={brand.footerText} onChange={e => setBrand(p => ({ ...p, footerText: e.target.value }))} placeholder="© 2025 ..." />
               </div>
             </CardContent>
           </Card>

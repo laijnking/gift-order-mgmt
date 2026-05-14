@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission } from '@/lib/server-auth';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { PERMISSIONS } from '@/lib/permissions';
 
 // 获取单个角色
@@ -65,21 +66,35 @@ export async function PUT(
   const authError = await requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
   const { id } = await params;
 
   try {
-    // 检查是否为 admin 角色（admin 不能修改）
     const { data: existing } = await client
       .from('roles')
-      .select('code, is_system')
+      .select('code, is_system, tenant_id')
       .eq('id', id)
       .single();
-    
-    if (existing?.code === 'admin') {
-      return NextResponse.json({ 
-        success: false, 
-        error: '管理员角色不能修改' 
+
+    if (!existing) {
+      return NextResponse.json({ success: false, error: '角色不存在' }, { status: 404 });
+    }
+
+    // 系统角色（tenant_id IS NULL）不允许租户管理员修改
+    if (!existing.tenant_id && tenant.tenantId) {
+      return NextResponse.json({ success: false, error: '系统内置角色不能修改' }, { status: 403 });
+    }
+
+    // 租户归属校验
+    if (existing.tenant_id && existing.tenant_id !== tenant.tenantId) {
+      return NextResponse.json({ success: false, error: '无权操作此角色' }, { status: 403 });
+    }
+
+    if (existing.code === 'admin' || existing.code === 'superadmin') {
+      return NextResponse.json({
+        success: false,
+        error: '管理员角色不能修改'
       }, { status: 400 });
     }
 
@@ -138,21 +153,35 @@ export async function DELETE(
   const authError = await requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
   const { id } = await params;
 
   try {
-    // 检查是否为系统角色
     const { data: existing } = await client
       .from('roles')
-      .select('code, is_system')
+      .select('code, is_system, tenant_id')
       .eq('id', id)
       .single();
-    
-    if (existing?.is_system) {
-      return NextResponse.json({ 
-        success: false, 
-        error: '系统内置角色不能删除' 
+
+    if (!existing) {
+      return NextResponse.json({ success: false, error: '角色不存在' }, { status: 404 });
+    }
+
+    // 系统角色（tenant_id IS NULL）不允许租户管理员删除
+    if (!existing.tenant_id && tenant.tenantId) {
+      return NextResponse.json({ success: false, error: '系统内置角色不能删除' }, { status: 403 });
+    }
+
+    // 租户归属校验
+    if (existing.tenant_id && existing.tenant_id !== tenant.tenantId) {
+      return NextResponse.json({ success: false, error: '无权操作此角色' }, { status: 403 });
+    }
+
+    if (existing.is_system) {
+      return NextResponse.json({
+        success: false,
+        error: '系统内置角色不能删除'
       }, { status: 400 });
     }
 

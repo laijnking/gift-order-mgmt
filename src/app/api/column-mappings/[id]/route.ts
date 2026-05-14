@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { PERMISSIONS } from '@/lib/permissions';
 
 // 获取指定版本的映射配置
@@ -10,6 +11,7 @@ export async function GET(
 ) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_CREATE);
   if (authError) return authError;
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
   const { id } = await params;
 
@@ -22,6 +24,7 @@ export async function GET(
       .from('column_mappings')
       .select('*')
       .eq('id', id)
+      .eq('tenant_id', tenant.tenantId)
       .single();
 
     if (error) throw new Error(`查询映射配置失败: ${error.message}`);
@@ -46,6 +49,7 @@ export async function PATCH(
 ) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_CREATE);
   if (authError) return authError;
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
   const { id } = await params;
 
@@ -59,6 +63,7 @@ export async function PATCH(
       .from('column_mappings')
       .select('customer_code, version')
       .eq('id', id)
+      .eq('tenant_id', tenant.tenantId)
       .single();
 
     if (fetchError) throw new Error(`查询配置失败: ${fetchError.message}`);
@@ -67,13 +72,15 @@ export async function PATCH(
     await client
       .from('column_mappings')
       .update({ is_active: false })
-      .eq('customer_code', target.customer_code);
+      .eq('customer_code', target.customer_code)
+      .eq('tenant_id', tenant.tenantId);
 
     // 将目标版本标记为活跃
     const { data, error } = await client
       .from('column_mappings')
       .update({ is_active: true })
       .eq('id', id)
+      .eq('tenant_id', tenant.tenantId)
       .select()
       .single();
 
@@ -100,6 +107,7 @@ export async function DELETE(
 ) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_CREATE);
   if (authError) return authError;
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
   const { id } = await params;
 
@@ -111,7 +119,8 @@ export async function DELETE(
     const { error } = await client
       .from('column_mappings')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('tenant_id', tenant.tenantId);
 
     if (error) throw new Error(`删除配置失败: ${error.message}`);
 

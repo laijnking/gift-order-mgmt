@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { PERMISSIONS } from '@/lib/permissions';
 import { detectDuplicates, ENTITY_DEDUP_KEYS } from '@/lib/import-dedup';
 
@@ -35,6 +36,7 @@ export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.PRODUCTS_EDIT);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
   
   try {
@@ -183,6 +185,7 @@ export async function POST(request: NextRequest) {
         is_active: m.isActive !== false,
         remark: m.remark || '',
         mapping_type: m.mappingType || (m.customerCode ? 'customer' : 'supplier'),
+        tenant_id: tenant.tenantId,
       };
     });
 

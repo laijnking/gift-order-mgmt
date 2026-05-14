@@ -10,15 +10,21 @@ interface TenantContextType {
 
 const TenantContext = createContext<TenantContextType | undefined>(undefined);
 
-export function TenantProvider({ children }: { children: ReactNode }) {
+interface TenantProviderProps {
+  children: ReactNode;
+  initialTenants?: Tenant[];
+  initialCurrentTenant?: Tenant | null;
+}
+
+export function TenantProvider({ children, initialTenants: _initialTenants, initialCurrentTenant }: TenantProviderProps) {
   const { user, refreshUser } = useAuth();
-  const [currentTenant, setCurrentTenantState] = useState<Tenant | null>(null);
+  const [currentTenant, setCurrentTenantState] = useState<Tenant | null>(initialCurrentTenant ?? null);
 
   useEffect(() => {
-    if (user) {
+    if (!initialCurrentTenant && user) {
       setCurrentTenantState(user.currentTenant || user.tenants?.[0] || null);
     }
-  }, [user]);
+  }, [user, initialCurrentTenant]);
 
   const setCurrentTenant = useCallback((tenant: Tenant) => {
     if (!user) return;

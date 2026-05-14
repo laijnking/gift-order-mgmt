@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { PageGuard } from '@/components/auth/page-guard';
-import { SuperadminGuard } from '@/components/auth/superadmin-guard';
 import { buildUserInfoHeaders, useAuth } from '@/lib/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -284,7 +283,6 @@ export default function RolesPage() {
 
   return (
     <PageGuard permission={['roles:view', 'settings:view']} title="无法访问角色与权限">
-      <SuperadminGuard>
       <div className="space-y-6 px-3 pb-4 sm:px-4">
       {/* 头部 */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -685,7 +683,6 @@ export default function RolesPage() {
         </DialogContent>
       </Dialog>
       </div>
-      </SuperadminGuard>
     </PageGuard>
   );
 }

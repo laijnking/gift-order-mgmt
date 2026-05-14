@@ -171,6 +171,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setMobileOpen(false);
   }, [pathname]);
 
+  // 应用租户品牌主题色
+  useEffect(() => {
+    const tenantId = user?.currentTenant?.id;
+    if (!tenantId) return;
+    fetch(`/api/tenants/${tenantId}/brand`, { headers: buildUserInfoHeaders(user) })
+      .then(r => r.json())
+      .then(d => {
+        if (d.success && d.data?.theme_color) {
+          document.documentElement.style.setProperty('--brand-primary', d.data.theme_color);
+        }
+      })
+      .catch(() => {});
+  }, [user?.currentTenant?.id]);
+
   useEffect(() => {
     if (!mobileOpen) return;
     const previousOverflow = document.body.style.overflow;

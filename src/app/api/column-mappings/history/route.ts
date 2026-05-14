@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { supportsColumnMappingMetadata } from '@/lib/column-mapping-rules';
 import { requirePermission } from '@/lib/server-auth';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { PERMISSIONS } from '@/lib/permissions';
 
 // 获取客户字段映射历史版本
 export async function GET(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_CREATE);
   if (authError) return authError;
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
   const customerCode = searchParams.get('customerCode');
@@ -33,6 +35,7 @@ export async function GET(request: NextRequest) {
     let query = client
       .from('column_mappings')
       .select(selectColumns)
+      .eq('tenant_id', tenant.tenantId)
       .order('version', { ascending: false });
 
     if (customer?.id) {

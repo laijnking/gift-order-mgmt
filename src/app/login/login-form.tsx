@@ -15,7 +15,6 @@ interface BrandInfo {
   logoUrl?: string;
   themeColor?: string;
   welcomeMessage?: string;
-  footerText?: string;
   tenantCode?: string;
 }
 
@@ -30,7 +29,6 @@ export function LoginForm({ brand }: { brand: BrandInfo }) {
 
   const systemName = brand.brandName || '礼品订单管理系统';
   const welcomeMessage = brand.welcomeMessage || 'Gift Order Management System';
-  const footerText = brand.footerText || '© 2025 深圳链销云科技有限公司';
   const themeColor = brand.themeColor || 'hsl(217, 91%, 60%)';
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -101,7 +99,6 @@ export function LoginForm({ brand }: { brand: BrandInfo }) {
           <button className="text-sm text-muted-foreground hover:text-primary transition-colors" onClick={() => setForgotPasswordOpen(true)}>
             忘记密码?
           </button>
-          <p className="text-xs text-muted-foreground/60">{footerText}</p>
           <p className="text-xs text-muted-foreground/40">粤ICP备2025418442号</p>
         </div>
 

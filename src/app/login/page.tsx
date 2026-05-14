@@ -7,7 +7,6 @@ interface BrandInfo {
   logoUrl?: string;
   themeColor?: string;
   welcomeMessage?: string;
-  footerText?: string;
   tenantCode?: string;
 }
 
@@ -36,7 +35,7 @@ async function getBrandFromHost(): Promise<BrandInfo> {
       if (tenant) {
         const { data: brandData } = await client
           .from('brand_configs')
-          .select('brand_name, logo_url, theme_color, welcome_message, footer_text')
+          .select('brand_name, logo_url, theme_color, welcome_message')
           .eq('tenant_id', tenant.id)
           .maybeSingle();
 
@@ -46,7 +45,6 @@ async function getBrandFromHost(): Promise<BrandInfo> {
             logoUrl: brandData.logo_url as string,
             themeColor: brandData.theme_color as string,
             welcomeMessage: brandData.welcome_message as string,
-            footerText: brandData.footer_text as string,
             tenantCode,
           };
         }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { PERMISSIONS } from '@/lib/permissions';
 
 /**
@@ -18,8 +19,9 @@ export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.PRODUCTS_VIEW);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
-  
+
   try {
     const body = await request.json();
     const { productName, productSpec, customerCode } = body;
@@ -33,8 +35,8 @@ export async function POST(request: NextRequest) {
 
     // 1. 首先查询客户商品映射表
     // 重要变更：统一使用 customer_id 关联（通过 customers 表获取）
-    let mappingsQuery = client.from('product_mappings').select('*');
-    
+    let mappingsQuery = client.from('product_mappings').select('*').eq('tenant_id', tenant.tenantId);
+
     if (customerCode) {
       // 先获取 customer_id
       const { data: customer } = await client
@@ -118,7 +120,7 @@ export async function POST(request: NextRequest) {
 
     // 3. 如果SKU映射表没有匹配，尝试直接查询系统商品档案
     // 使用模糊匹配（商品名包含搜索词，或规格型号包含搜索词）
-    const productsQuery = client.from('products').select('*').eq('is_active', true);
+    const productsQuery = client.from('products').select('*').eq('is_active', true).eq('owner_tenant_id', tenant.tenantId);
     
     const { data: products, error: productsError } = await productsQuery;
     if (productsError) {
@@ -224,8 +226,9 @@ export async function PUT(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.PRODUCTS_VIEW);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
-  
+
   try {
     const body = await request.json();
     const { items, customerCode } = body;
@@ -239,7 +242,7 @@ export async function PUT(request: NextRequest) {
 
     // 获取客户SKU映射表
     // 重要变更：统一使用 customer_id 关联（通过 customers 表获取）
-    let mappingsQuery = client.from('product_mappings').select('*');
+    let mappingsQuery = client.from('product_mappings').select('*').eq('tenant_id', tenant.tenantId);
     if (customerCode) {
       const { data: customer } = await client
         .from('customers')
@@ -257,7 +260,8 @@ export async function PUT(request: NextRequest) {
     const { data: products } = await client
       .from('products')
       .select('*')
-      .eq('is_active', true);
+      .eq('is_active', true)
+      .eq('owner_tenant_id', tenant.tenantId);
 
     const results = items.map((item: { productName?: string; productSpec?: string }) => {
       const { productName, productSpec } = item;

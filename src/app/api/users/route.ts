@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission, getRequestUser } from '@/lib/server-auth';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { PERMISSIONS } from '@/lib/permissions';
 
 // 数据库字段转前端格式
@@ -219,11 +220,12 @@ export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.USERS_CREATE);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
-  
+
   try {
     const body = await request.json();
-    
+
     const userData = {
       username: body.username,
       password_hash: hashPassword(body.password || '123456'),
@@ -232,7 +234,6 @@ export async function POST(request: NextRequest) {
       role: body.role || 'operator',
       department: body.department,
       is_active: body.isActive !== false,
-      // 新增字段
       phone: body.phone || null,
       email: body.email || null,
       remark: body.remark || null,
@@ -244,8 +245,18 @@ export async function POST(request: NextRequest) {
       .insert(userData)
       .select()
       .single();
-    
+
     if (error) throw new Error(`创建用户失败: ${error.message}`);
+
+    // 创建 user_tenants 关联
+    if (tenant.tenantId) {
+      await client.from('user_tenants').insert({
+        user_id: (data as Record<string, unknown>).id as string,
+        tenant_id: tenant.tenantId,
+        role: body.tenantRole || 'member',
+        is_default: false,
+      });
+    }
 
     const { password_hash, ...rest } = data as Record<string, unknown>;
 

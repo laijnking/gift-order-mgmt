@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAnyPermission } from '@/lib/server-auth';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { resolvePreferredTemplate, transformTemplateRecord } from '@/lib/template-utils';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { PERMISSIONS } from '@/lib/permissions';
@@ -16,6 +17,7 @@ export async function GET(
   ]);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
   const { type } = await params;
@@ -31,6 +33,7 @@ export async function GET(
       type,
       targetType: partnerType,
       targetId: partnerId,
+      tenantId: tenant.tenantId,
     });
 
     return NextResponse.json({

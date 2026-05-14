@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { NextRequest, NextResponse } from 'next/server';
+import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission, getRequestUser } from '@/lib/server-auth';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { PERMISSIONS } from '@/lib/permissions';
 
 // 获取角色列表
@@ -11,9 +14,14 @@ export async function GET(request: NextRequest) {
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
   const includePermissions = searchParams.get('includePermissions') === 'true';
+  const tenant = await getTenantFromRequest(request);
 
   try {
-    const query = client.from('roles').select('*');
+    let query = client.from('roles').select('*');
+
+    if (tenant.tenantId) {
+      query = query.or(`tenant_id.is.null,tenant_id.eq.${tenant.tenantId}`);
+    }
 
     let { data, error } = await query.order('is_system', { ascending: false }).order('created_at', { ascending: true });
 
@@ -73,17 +81,18 @@ export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
-  
+
   try {
     const body = await request.json();
-    
-    // 检查编码是否已存在
-    const { data: existing } = await client
-      .from('roles')
-      .select('id')
-      .eq('code', body.code)
-      .single();
+
+    // 检查编码是否已存在（同租户内唯一）
+    let existingQuery = client.from('roles').select('id').eq('code', body.code);
+    if (tenant.tenantId) {
+      existingQuery = existingQuery.eq('tenant_id', tenant.tenantId);
+    }
+    const { data: existing } = await existingQuery.single();
     
     if (existing) {
       return NextResponse.json({ 
@@ -99,6 +108,7 @@ export async function POST(request: NextRequest) {
       data_scope: body.dataScope || 'self',
       is_system: false,
       is_active: body.isActive !== false,
+      tenant_id: tenant.tenantId || null,
     };
 
     const { data, error } = await client

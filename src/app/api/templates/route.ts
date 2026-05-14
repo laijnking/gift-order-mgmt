@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission, requireAnyPermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { normalizeTemplateType, syncTemplateTargetLink, transformTemplateRecord, type TemplateRecord } from '@/lib/template-utils';
 import { PERMISSIONS } from '@/lib/permissions';
 
@@ -13,13 +14,14 @@ export async function GET(request: NextRequest) {
   ]);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
   const type = searchParams.get('type');
   const isActive = searchParams.get('isActive');
 
   try {
-    let query = client.from('templates').select('*');
+    let query = client.from('templates').select('*').eq('tenant_id', tenant.tenantId);
 
     if (type) {
       query = query.eq('type', normalizeTemplateType(type));
@@ -55,18 +57,20 @@ export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
-  
+
   try {
     const body = await request.json();
-    
+
     // 如果设置为默认模板，先取消其他默认
     if (body.isDefault) {
       await client
         .from('templates')
         .update({ is_default: false })
         .eq('type', body.type)
-        .eq('is_default', true);
+        .eq('is_default', true)
+        .eq('tenant_id', tenant.tenantId);
     }
 
     // 转换 fieldMappings 为有序数组格式存储（如果已是数组则直接存储，否则转换对象格式）
@@ -98,6 +102,7 @@ export async function POST(request: NextRequest) {
       },
       is_default: body.isDefault ?? false,
       is_active: body.isActive !== false,
+      tenant_id: tenant.tenantId,
     };
 
     const { data, error } = await client

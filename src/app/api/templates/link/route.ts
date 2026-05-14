@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { PERMISSIONS } from '@/lib/permissions';
 
 // 关联模板到客户或发货方
@@ -8,6 +9,7 @@ export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.SETTINGS_EDIT);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
 
   try {
@@ -20,6 +22,17 @@ export async function POST(request: NextRequest) {
 
     if (!['customer', 'supplier'].includes(linkType)) {
       return NextResponse.json({ success: false, error: 'linkType必须是customer或supplier' }, { status: 400 });
+    }
+
+    // 验证模板属于当前租户
+    const { data: template, error: templateError } = await client
+      .from('templates')
+      .select('id')
+      .eq('id', templateId)
+      .eq('tenant_id', tenant.tenantId)
+      .maybeSingle();
+    if (templateError || !template) {
+      return NextResponse.json({ success: false, error: '模板不存在' }, { status: 404 });
     }
 
     // 检查是否已存在关联
@@ -68,6 +81,7 @@ export async function DELETE(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.SETTINGS_EDIT);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
 
   try {
@@ -78,6 +92,17 @@ export async function DELETE(request: NextRequest) {
 
     if (!templateId || !linkType || !partnerId) {
       return NextResponse.json({ success: false, error: '参数错误' }, { status: 400 });
+    }
+
+    // 验证模板属于当前租户
+    const { data: template, error: templateError } = await client
+      .from('templates')
+      .select('id')
+      .eq('id', templateId)
+      .eq('tenant_id', tenant.tenantId)
+      .maybeSingle();
+    if (templateError || !template) {
+      return NextResponse.json({ success: false, error: '模板不存在' }, { status: 404 });
     }
 
     const { error } = await client
@@ -104,6 +129,7 @@ export async function GET(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
   const templateId = searchParams.get('templateId');
@@ -112,6 +138,17 @@ export async function GET(request: NextRequest) {
   try {
     if (!templateId) {
       return NextResponse.json({ success: false, error: '缺少templateId参数' }, { status: 400 });
+    }
+
+    // 验证模板属于当前租户
+    const { data: template, error: templateError } = await client
+      .from('templates')
+      .select('id')
+      .eq('id', templateId)
+      .eq('tenant_id', tenant.tenantId)
+      .maybeSingle();
+    if (templateError || !template) {
+      return NextResponse.json({ success: false, error: '模板不存在' }, { status: 404 });
     }
 
     let query = client

@@ -188,15 +188,17 @@ export async function resolvePreferredTemplate(
     targetType?: string | null;
     targetId?: string | null;
     targetName?: string | null;
+    tenantId?: string;
   }
 ) {
   const normalizedType = normalizeTemplateType(options.type);
   const targetType = options.targetType || null;
   const targetId = options.targetId || null;
   const targetName = options.targetName || null;
+  const tenantId = options.tenantId;
 
   if (targetId && targetType) {
-    const { data: directTargetTemplate } = await client
+    let directQuery = client
       .from('templates')
       .select('*')
       .eq('type', normalizedType)
@@ -205,8 +207,9 @@ export async function resolvePreferredTemplate(
       .eq('is_active', true)
       .order('is_default', { ascending: false })
       .order('updated_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
+    if (tenantId) directQuery = directQuery.eq('tenant_id', tenantId);
+    const { data: directTargetTemplate } = await directQuery.maybeSingle();
 
     if (directTargetTemplate) {
       return {
@@ -226,7 +229,7 @@ export async function resolvePreferredTemplate(
 
     const templateIds = links?.map((link) => link.template_id).filter(Boolean) || [];
     if (templateIds.length > 0) {
-      const { data: linkedTemplate } = await client
+      let linkedQuery = client
         .from('templates')
         .select('*')
         .in('id', templateIds)
@@ -234,8 +237,9 @@ export async function resolvePreferredTemplate(
         .eq('is_active', true)
         .order('is_default', { ascending: false })
         .order('updated_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(1);
+      if (tenantId) linkedQuery = linkedQuery.eq('tenant_id', tenantId);
+      const { data: linkedTemplate } = await linkedQuery.maybeSingle();
 
       if (linkedTemplate) {
         return {
@@ -256,7 +260,7 @@ export async function resolvePreferredTemplate(
 
     const templateIdsByName = linksByName?.map((link) => link.template_id).filter(Boolean) || [];
     if (templateIdsByName.length > 0) {
-      const { data: templateByName } = await client
+      let nameQuery = client
         .from('templates')
         .select('*')
         .in('id', templateIdsByName)
@@ -264,8 +268,9 @@ export async function resolvePreferredTemplate(
         .eq('is_active', true)
         .order('is_default', { ascending: false })
         .order('updated_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(1);
+      if (tenantId) nameQuery = nameQuery.eq('tenant_id', tenantId);
+      const { data: templateByName } = await nameQuery.maybeSingle();
 
       if (templateByName) {
         return {
@@ -276,14 +281,15 @@ export async function resolvePreferredTemplate(
     }
   }
 
-  const { data: defaultTemplate } = await client
+  let defaultQuery = client
     .from('templates')
     .select('*')
     .eq('type', normalizedType)
     .eq('is_default', true)
     .eq('is_active', true)
-    .limit(1)
-    .maybeSingle();
+    .limit(1);
+  if (tenantId) defaultQuery = defaultQuery.eq('tenant_id', tenantId);
+  const { data: defaultTemplate } = await defaultQuery.maybeSingle();
 
   if (defaultTemplate) {
     return {
@@ -292,14 +298,15 @@ export async function resolvePreferredTemplate(
     };
   }
 
-  const { data: firstTemplate } = await client
+  let firstQuery = client
     .from('templates')
     .select('*')
     .eq('type', normalizedType)
     .eq('is_active', true)
     .order('updated_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(1);
+  if (tenantId) firstQuery = firstQuery.eq('tenant_id', tenantId);
+  const { data: firstTemplate } = await firstQuery.maybeSingle();
 
   return {
     template: (firstTemplate as TemplateRecord | null) || null,

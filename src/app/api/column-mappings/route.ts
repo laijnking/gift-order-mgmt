@@ -7,6 +7,7 @@ import {
   supportsColumnMappingMetadata,
 } from '@/lib/column-mapping-rules';
 import { requirePermission } from '@/lib/server-auth';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { PERMISSIONS } from '@/lib/permissions';
 
 const REQUIRED_MAPPING_FIELDS = [
@@ -48,6 +49,7 @@ function validateMappingConfig(mappingConfig: Record<string, string>) {
 export async function GET(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_CREATE);
   if (authError) return authError;
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
   const customerCode = searchParams.get('customerCode');
@@ -68,6 +70,7 @@ export async function GET(request: NextRequest) {
       .from('column_mappings')
       .select('*')
       .eq('is_active', true)
+      .eq('tenant_id', tenant.tenantId)
       .order('version', { ascending: false })
       .limit(1);
 
@@ -98,6 +101,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_CREATE);
   if (authError) return authError;
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
 
   try {
@@ -180,6 +184,7 @@ export async function POST(request: NextRequest) {
       is_active: true,
       remark: remark || null,
       created_by: createdBy || null,
+      tenant_id: tenant.tenantId,
     };
 
     if (await supportsColumnMappingMetadata(client)) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission, requireAnyPermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { PERMISSIONS } from '@/lib/permissions';
 
 // 数据库字段转前端格式
@@ -32,6 +33,7 @@ export async function GET(request: NextRequest) {
   const authError = await requireAnyPermission(request, [PERMISSIONS.PRODUCTS_VIEW, PERMISSIONS.SUPPLIERS_VIEW]);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
   const search = searchParams.get('search');
@@ -43,7 +45,7 @@ export async function GET(request: NextRequest) {
   const pageSize = parseInt(searchParams.get('pageSize') || '50');
 
   try {
-    let query = client.from('product_mappings').select('*', { count: 'exact' });
+    let query = client.from('product_mappings').select('*', { count: 'exact' }).eq('tenant_id', tenant.tenantId);
 
     if (mappingType) {
       query = query.eq('mapping_type', mappingType);
@@ -107,6 +109,7 @@ export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.PRODUCTS_EDIT);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
   
   try {
@@ -169,6 +172,7 @@ export async function POST(request: NextRequest) {
       is_active: body.isActive !== false,
       remark: body.remark || '',
       mapping_type: mappingType,
+      tenant_id: tenant.tenantId,
     };
 
     const { data, error } = await client
@@ -176,7 +180,7 @@ export async function POST(request: NextRequest) {
       .insert(mappingData)
       .select()
       .single();
-    
+
     if (error) throw new Error(`添加SKU映射失败: ${error.message}`);
 
     return NextResponse.json({
@@ -197,6 +201,7 @@ export async function PUT(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.PRODUCTS_EDIT);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
   
   try {
@@ -334,6 +339,7 @@ export async function PUT(request: NextRequest) {
         is_active: m.isActive !== false,
         remark: m.remark || '',
         mapping_type: mappingType,
+        tenant_id: tenant.tenantId,
       };
     });
 

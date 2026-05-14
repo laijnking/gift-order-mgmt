@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { PERMISSIONS } from '@/lib/permissions';
 
 // 数据库字段转前端格式
@@ -34,6 +35,7 @@ export async function GET(
   const authError = await requirePermission(request, PERMISSIONS.PRODUCTS_VIEW);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
   const { id } = await params;
 
@@ -42,6 +44,7 @@ export async function GET(
       .from('product_mappings')
       .select('*')
       .eq('id', id)
+      .eq('tenant_id', tenant.tenantId)
       .single();
     
     if (error) throw new Error(`查询SKU映射失败: ${error.message}`);
@@ -68,6 +71,7 @@ export async function PUT(
   const authError = await requirePermission(request, PERMISSIONS.PRODUCTS_EDIT);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
   const { id } = await params;
   
@@ -95,9 +99,10 @@ export async function PUT(
       .from('product_mappings')
       .update(updateData)
       .eq('id', id)
+      .eq('tenant_id', tenant.tenantId)
       .select()
       .single();
-    
+
     if (error) throw new Error(`更新SKU映射失败: ${error.message}`);
     if (!data) throw new Error('SKU映射不存在');
 
@@ -122,6 +127,7 @@ export async function DELETE(
   const authError = await requirePermission(request, PERMISSIONS.PRODUCTS_DELETE);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
   const { id } = await params;
 
@@ -129,7 +135,8 @@ export async function DELETE(
     const { error } = await client
       .from('product_mappings')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('tenant_id', tenant.tenantId);
     
     if (error) throw new Error(`删除SKU映射失败: ${error.message}`);
 
