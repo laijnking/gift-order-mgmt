@@ -369,7 +369,7 @@ function normalizeBundleDraftsForPage(
     originalStatus: String(bundle.originalStatus || ''),
     items: Array.isArray(bundle.items) ? bundle.items : [],
     selected: true,
-    expanded: true,
+    expanded: false,
   }));
 }
 
@@ -382,7 +382,7 @@ function buildFlatOrdersForPage(
     ...order,
     id: order.id || `${idPrefix}_${Date.now()}_${index}_${Math.random().toString(36).slice(2, 6)}`,
     selected: true,
-    expanded: true,
+    expanded: false,
   }));
 }
 
@@ -1114,7 +1114,7 @@ export default function OrderParsePage() {
         ...original,
         id: `copy_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         selected: true,
-        expanded: true,
+        expanded: false,
       };
       const newOrders = [...orders];
       newOrders.splice(idx + 1, 0, copy);
@@ -1136,7 +1136,7 @@ export default function OrderParsePage() {
         operator: operatorName || undefined,
         operatorId: operatorId || undefined,
         selected: true,
-        expanded: true,
+        expanded: false,
       },
     ]);
   };

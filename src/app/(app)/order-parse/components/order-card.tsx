@@ -123,9 +123,12 @@ export function OrderCard({
                     </Badge>
                   )}
                   {order.mappedProductName && (
-                    <Badge variant="default" className="text-xs">
-                      <Star className="h-3 w-3 mr-0.5" />
-                      已匹配
+                    <Badge variant={order.mappedProductCode === 'PENDING_MATCH' ? 'secondary' : 'default'} className="text-xs">
+                      {order.mappedProductCode === 'PENDING_MATCH' ? (
+                        <>待匹配</>
+                      ) : (
+                        <><Star className="h-3 w-3 mr-0.5" />已匹配</>
+                      )}
                     </Badge>
                   )}
                 </div>
@@ -165,7 +168,10 @@ export function OrderCard({
               <div className="mt-2 grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
                 <div className="flex items-center gap-1 min-w-0">
                   <Package className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  <span className="truncate font-medium">{order.product_name}</span>
+                  {order.mappedProductSpec && (
+                    <span className="text-muted-foreground truncate text-xs">{order.mappedProductSpec as string}</span>
+                  )}
+                  <span className="truncate font-medium">{order.mappedProductName || order.product_name}</span>
                   <span className="text-muted-foreground shrink-0">&times;{order.quantity}</span>
                 </div>
                 {order.receiver_name && (
@@ -184,45 +190,6 @@ export function OrderCard({
                   <div className="flex items-center gap-1 min-w-0 col-span-2">
                     <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                     <span className="truncate text-xs">{order.receiver_address}</span>
-                  </div>
-                )}
-
-                {/* System product matched */}
-                {order.mappedProductName && (
-                  <div className="col-span-2 mt-1 p-2 bg-green-50 rounded border border-green-100">
-                    <div className="flex items-center gap-1 mb-1">
-                      <Star className="h-3 w-3 text-green-500" />
-                      <span className="text-xs font-medium text-green-700">已匹配系统商品</span>
-                      {order.matchHint && (
-                        <Badge variant="outline" className="text-[10px] py-0 bg-green-50 text-green-600">
-                          {order.matchHint as string}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-1 gap-1 text-xs sm:grid-cols-3">
-                      <div>
-                        <span className="text-muted-foreground">系统商品:</span>
-                        <span className="ml-1 font-medium text-green-700">
-                          {order.mappedProductName as string}
-                        </span>
-                      </div>
-                      {order.mappedProductCode && (
-                        <div>
-                          <span className="text-muted-foreground">编码:</span>
-                          <code className="ml-1 text-green-600">
-                            {order.mappedProductCode as string}
-                          </code>
-                        </div>
-                      )}
-                      {order.mappedProductBrand && (
-                        <div>
-                          <span className="text-muted-foreground">品牌:</span>
-                          <span className="ml-1">
-                            {order.mappedProductBrand as string}
-                          </span>
-                        </div>
-                      )}
-                    </div>
                   </div>
                 )}
 
@@ -287,7 +254,7 @@ export function OrderCard({
                 )}
 
                 {/* Unmatched hint */}
-                {!order.mappedProductName && (
+                {(!order.mappedProductName || order.mappedProductCode === 'PENDING_MATCH') && (
                   <div className="col-span-2 mt-1 p-2 bg-yellow-50 rounded border border-yellow-100">
                     <div className="flex items-center gap-1">
                       <AlertTriangle className="h-3 w-3 text-yellow-500" />
@@ -427,14 +394,6 @@ export function OrderCard({
                         />
                       </div>
                     </div>
-                    {order.mappedProductName && (
-                      <div className="text-xs text-green-600 bg-green-50 p-2 rounded">
-                        <span className="text-muted-foreground">已匹配：</span>
-                        <span className="font-medium">
-                          {order.mappedProductName as string}
-                        </span>
-                      </div>
-                    )}
                   </div>
 
                   {/* 隐藏：价格信息区 */}
@@ -780,29 +739,6 @@ export function OrderCard({
                     />
                   </div>
 
-                  {/* SKU mapping info */}
-                  {order.mappedProductName && (
-                    <div className="bg-muted/50 p-2 rounded text-xs">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Star className="h-3 w-3 text-primary" />
-                        <span className="font-medium">SKU映射结果</span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-1 text-muted-foreground">
-                        <span>系统商品:</span>
-                        <span>
-                          {order.mappedProductName as string}
-                        </span>
-                        <span>商品编码:</span>
-                        <span>
-                          {(order.mappedProductCode as string) || '-'}
-                        </span>
-                        <span>客户SKU:</span>
-                        <span>
-                          {order.customerSku as string || '-'}
-                        </span>
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
