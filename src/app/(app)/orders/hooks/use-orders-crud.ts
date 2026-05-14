@@ -54,6 +54,9 @@ export function useOrdersCrud({
     productCode: '',
     productSpec: '',
     productBrand: '',
+    cuProductName: '',
+    cuProductCode: '',
+    cuProductSpec: '',
     quantity: 1,
     receiverName: '',
     receiverPhone: '',
@@ -156,18 +159,21 @@ export function useOrdersCrud({
   // Edit
   const openEditDialog = useCallback((order: Order) => {
     const firstItem = order.items?.[0] || {};
+    const item = firstItem as Record<string, unknown>;
     setEditForm({
       id: order.id,
       orderNo: order.orderNo,
       customerCode: order.customerCode || '',
-      productId: (firstItem as Record<string, unknown>).productId as string
-        || (firstItem as Record<string, unknown>).product_id as string || '',
-      productName: (firstItem as Record<string, unknown>).cuProductName as string
-        || (firstItem as Record<string, unknown>).product_name as string || '',
-      productCode: (firstItem as Record<string, unknown>).productCode as string || '',
-      productSpec: (firstItem as Record<string, unknown>).productSpec as string
-        || (firstItem as Record<string, unknown>).product_spec as string || '',
-      productBrand: (firstItem as Record<string, unknown>).productBrand as string || '',
+      // 系统商品信息
+      productId: (item.productId || item.product_id || '') as string,
+      productName: (item.productName || item.product_name || '') as string,
+      productCode: (item.productCode || item.product_code || '') as string,
+      productSpec: (item.productSpec || item.product_spec || '') as string,
+      productBrand: (item.productBrand || item.product_brand || '') as string,
+      // 客户原始商品信息
+      cuProductName: (item.cuProductName || item.cu_product_name || '') as string,
+      cuProductCode: (item.cuProductCode || item.cu_product_code || '') as string,
+      cuProductSpec: (item.cuProductSpec || item.cu_product_spec || '') as string,
       quantity: firstItem.quantity || 1,
       receiverName: order.receiver.name,
       receiverPhone: order.receiver.phone,
@@ -200,6 +206,9 @@ export function useOrdersCrud({
           product_code: editForm.productCode || '',
           product_spec: editForm.productSpec || '',
           product_brand: editForm.productBrand || '',
+          cu_product_name: editForm.cuProductName || '',
+          cu_product_code: editForm.cuProductCode || '',
+          cu_product_spec: editForm.cuProductSpec || '',
           quantity: editForm.quantity || 1,
           product_id: editForm.productId || '',
         }],

@@ -8,6 +8,7 @@ import { ORDER_STATUS_ASSIGNED, ORDER_STATUS_COMPLETED } from '@/lib/order-statu
 import { PERMISSIONS } from '@/lib/permissions';
 import { transformOrderItem, apiToDb } from '@/lib/order-adapter';
 import { generateSysOrderNo, bulkUpdateOrderStatus, extractName, getUserRealNameByUsername, findUserIdByName, findCustomerIdByCode, findSupplierIdByName, findWarehouseIdByName, buildRelatedMaps } from '@/lib/order-service';
+import { ensurePendingMatchProduct } from '@/lib/order-parser';
 
 interface DuplicateOrderDetail {
   orderNo: string;
@@ -159,7 +160,7 @@ interface ProductMatchResult {
   productSpec: string;
   productCode: string;
   unitPrice: number | null;
-  matchType: 'spec' | 'name' | 'mapping' | 'none';
+  matchType: 'spec' | 'name' | 'mapping' | 'unmatched' | 'none';
   matchHint: string;
 }
 
@@ -251,16 +252,30 @@ async function matchProduct(
     }
   }
 
-  // 4. 未匹配到任何商品档案
-  return {
-    productId: null,
-    productName: customerProductName,
-    productSpec: customerProductSpec,
-    productCode: customerProductCode,
-    unitPrice: null,
-    matchType: 'none',
-    matchHint: `未匹配到商品档案，使用客户原始信息`,
-  };
+  // 4. 未匹配到任何商品档案，回退到"商品待匹配"默认档案
+  try {
+    const pendingProduct = await ensurePendingMatchProduct(client);
+    return {
+      productId: (pendingProduct.id as string) || null,
+      productName: (pendingProduct.name as string) || '商品待匹配',
+      productSpec: (pendingProduct.spec as string) || '商品待匹配',
+      productCode: (pendingProduct.code as string) || 'PENDING_MATCH',
+      unitPrice: null,
+      matchType: 'unmatched' as ProductMatchResult['matchType'],
+      matchHint: '未精确匹配到系统商品，已关联默认"商品待匹配"档案',
+    };
+  } catch (fallbackErr) {
+    console.error('【orders/route】获取"商品待匹配"档案失败:', fallbackErr);
+    return {
+      productId: null,
+      productName: customerProductName,
+      productSpec: customerProductSpec,
+      productCode: customerProductCode,
+      unitPrice: null,
+      matchType: 'none',
+      matchHint: `未匹配到商品档案，使用客户原始信息`,
+    };
+  }
 }
 
 // 获取所有订单
@@ -875,7 +890,7 @@ export async function POST(request: NextRequest) {
     const ordersToInsert = [];
     const importBatch = `BATCH-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Date.now().toString().slice(-4)}`;
     // 记录匹配结果统计
-    const matchStats = { spec: 0, name: 0, mapping: 0, none: 0 };
+    const matchStats = { spec: 0, name: 0, mapping: 0, unmatched: 0, none: 0 };
 
     for (let i = 1; i < jsonData.length; i++) {
       const row = jsonData[i];
@@ -1142,7 +1157,7 @@ export async function POST(request: NextRequest) {
           fuzzyDuplicateCount: duplicateDetails.filter((item) => item.reason === 'fuzzy_match').length,
           details: duplicateDetails,
         },
-        matchStats: { total: 0, bySpec: matchStats.spec, byName: matchStats.name, byMapping: matchStats.mapping, none: matchStats.none, matched: 0, matchRate: '0.0%' },
+        matchStats: { total: 0, bySpec: matchStats.spec, byName: matchStats.name, byMapping: matchStats.mapping, unmatched: matchStats.unmatched, none: matchStats.none, matched: 0, matchRate: '0.0%' },
         message: `没有导入新订单，${batchSkippedCount} 条记录因重复被跳过`
       });
     }
@@ -1167,6 +1182,7 @@ export async function POST(request: NextRequest) {
         bySpec: matchStats.spec,
         byName: matchStats.name,
         byMapping: matchStats.mapping,
+        unmatched: matchStats.unmatched,
         none: matchStats.none,
         matched: Math.max(finalOrdersFd.length - matchStats.none, 0),
         matchRate: finalOrdersFd.length > 0

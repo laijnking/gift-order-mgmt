@@ -44,6 +44,9 @@ export interface EditOrderForm {
   productCode: string;
   productSpec: string;
   productBrand: string;
+  cuProductName: string;
+  cuProductCode: string;
+  cuProductSpec: string;
   quantity: number;
   receiverName: string;
   receiverPhone: string;
@@ -139,8 +142,31 @@ export function OrderEditDialog({
                 </div>
               </div>
               <div className="space-y-2 mt-3">
+                <Label className="text-muted-foreground">客户商品信息</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  <Input
+                    value={form.cuProductName || '-'}
+                    disabled
+                    className="bg-muted text-sm"
+                    placeholder="商品名称"
+                  />
+                  <Input
+                    value={form.cuProductCode || '-'}
+                    disabled
+                    className="bg-muted text-sm"
+                    placeholder="商品编码"
+                  />
+                  <Input
+                    value={form.cuProductSpec || '-'}
+                    disabled
+                    className="bg-muted text-sm"
+                    placeholder="商品规格"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2 mt-3">
                 <div className="flex items-center justify-between">
-                  <Label className="text-muted-foreground">匹配系统商品</Label>
+                  <Label className="text-muted-foreground">系统商品信息</Label>
                   {!isLocked && (
                     <Button
                       variant="outline"
