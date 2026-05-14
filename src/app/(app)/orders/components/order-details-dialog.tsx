@@ -51,7 +51,7 @@ export function OrderDetailsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-1.5rem)] max-w-2xl">
+      <DialogContent className="!max-w-[95vw]">
         <DialogHeader>
           <DialogTitle>订单详情</DialogTitle>
           <DialogDescription>系统单号：{order.sysOrderNo}</DialogDescription>

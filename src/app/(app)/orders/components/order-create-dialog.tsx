@@ -131,12 +131,12 @@ export function OrderCreateDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="!max-w-[95vw]">
           <DialogHeader>
             <DialogTitle>新增订单</DialogTitle>
             <DialogDescription>手动创建新订单</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+          <div className="space-y-4 max-h-[70vh] overflow-y-auto">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>订单号 <span className="text-destructive">*</span></Label>

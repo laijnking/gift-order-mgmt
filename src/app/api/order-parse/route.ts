@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { buildBundleDraftsFromFlatOrders } from '@/lib/order-parse-bundles';
-import { ensurePendingMatchProduct } from '@/lib/order-parser';
+import { ensurePendingMatchProduct, matchSystemProduct } from '@/lib/order-parser';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { requirePermission } from '@/lib/server-auth';
 import type { ParsedOrderDraft } from '@/types/order-parse';
@@ -89,19 +89,51 @@ export async function POST(request: NextRequest) {
       mappedOrders = await applySkuMappings(client, orders, customerCode);
     }
 
-    // 对未匹配到系统商品的订单，回退到默认「商品待匹配」档案
+    // 对未匹配到系统商品的订单，先尝试 products 表精确匹配，再回退到默认档案
     const pendingProduct = await ensurePendingMatchProduct(client).catch(() => null);
-    mappedOrders = mappedOrders.map(order => {
-      if (order.systemProductId || order.mappedProductName) return order;
-      return {
-        ...order,
-        systemProductId: pendingProduct?.id as string || undefined,
-        mappedProductName: pendingProduct?.name as string || '商品待匹配',
-        mappedProductSpec: pendingProduct?.spec as string || undefined,
-        mappedProductCode: pendingProduct?.code as string || undefined,
-        mappedProductBrand: pendingProduct?.brand as string || undefined,
-      };
-    });
+    const unmatchedOrders = mappedOrders.filter(o => !o.systemProductId && !o.mappedProductName);
+
+    if (unmatchedOrders.length > 0) {
+      const matchResults = await Promise.all(
+        unmatchedOrders.map(order =>
+          matchSystemProduct(
+            client,
+            customerCode || '',
+            order.product_name,
+            order.product_spec,
+            order.product_code,
+            undefined // barcode not available in AI parse
+          )
+        )
+      );
+
+      mappedOrders = mappedOrders.map(order => {
+        if (order.systemProductId || order.mappedProductName) return order;
+        const idx = unmatchedOrders.indexOf(order);
+        const match = idx >= 0 ? matchResults[idx] : null;
+
+        if (match?.productId) {
+          return {
+            ...order,
+            systemProductId: match.productId,
+            mappedProductName: match.productName || undefined,
+            mappedProductSpec: match.productSpec || undefined,
+            mappedProductCode: match.productCode || undefined,
+            mappedProductBrand: match.brand || undefined,
+          };
+        }
+
+        // 仍未匹配，回退到默认「商品待匹配」
+        return {
+          ...order,
+          systemProductId: pendingProduct?.id as string || undefined,
+          mappedProductName: pendingProduct?.name as string || '商品待匹配',
+          mappedProductSpec: pendingProduct?.spec as string || undefined,
+          mappedProductCode: pendingProduct?.code as string || undefined,
+          mappedProductBrand: pendingProduct?.brand as string || undefined,
+        };
+      });
+    }
 
     const bundleOrders = buildBundleDraftsFromFlatOrders(mappedOrders);
 

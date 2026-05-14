@@ -751,7 +751,7 @@ export function OrderCard({
                     <Label className="text-xs text-muted-foreground">订单备注</Label>
                     <Input
                       value={order.remark || ''}
-                      disabled
+                      readOnly
                       className="h-7 text-xs bg-muted"
                       placeholder="—"
                     />
@@ -762,7 +762,7 @@ export function OrderCard({
                     <Label className="text-xs text-muted-foreground">渠道备注</Label>
                     <Input
                       value={order.channel_remark as string || ''}
-                      disabled
+                      readOnly
                       className="h-7 text-xs bg-muted"
                       placeholder="—"
                     />

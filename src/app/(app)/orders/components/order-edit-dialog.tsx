@@ -99,7 +99,7 @@ export function OrderEditDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="!max-w-[95vw]">
           <DialogHeader>
             <DialogTitle>编辑订单</DialogTitle>
             <DialogDescription asChild>
@@ -123,7 +123,7 @@ export function OrderEditDialog({
               </p>
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+          <div className="space-y-4 max-h-[75vh] overflow-y-auto">
             {/* 基本信息 */}
             <div className="border-b pb-3">
               <div className="text-sm font-medium text-muted-foreground mb-2">基本信息</div>
@@ -147,19 +147,19 @@ export function OrderEditDialog({
                 <div className="grid grid-cols-3 gap-2">
                   <Input
                     value={form.cuProductName || '-'}
-                    disabled
+                    readOnly
                     className="bg-muted text-sm"
                     placeholder="商品名称"
                   />
                   <Input
                     value={form.cuProductCode || '-'}
-                    disabled
+                    readOnly
                     className="bg-muted text-sm"
                     placeholder="商品编码"
                   />
                   <Input
                     value={form.cuProductSpec || '-'}
-                    disabled
+                    readOnly
                     className="bg-muted text-sm"
                     placeholder="商品规格"
                   />

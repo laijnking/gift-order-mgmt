@@ -190,55 +190,86 @@ export async function matchSystemProduct(
     }
   }
 
-  // 2. 如果没有找到映射，直接在商品档案中精确匹配
+  // 2. 如果没有找到映射，通过针对性查询在商品档案中精确匹配
   if (!result.productId) {
-    const { data: products } = await client
-      .from('products')
-      .select('*')
-      .eq('is_active', true)
-      .limit(1000);
-
-    if (products && products.length > 0) {
-      let bestMatch: { product: Record<string, unknown>; score: number; matchType: string } | null = null;
-
-      for (const product of products) {
-        const pName = str(product.name);
-        const pSpec = str(product.spec);
-        const pCode = str(product.code);
-        const pBarcode = str(product.barcode);
-
-        let score = 0;
-        let matchType = '';
-
-        if (productCode && pCode && str(productCode) === pCode) {
-          score = PRODUCT_MATCH_SCORES.CODE_EXACT;
-          matchType = 'code';
-        } else if (barcode && pBarcode && str(barcode) === pBarcode) {
-          score = PRODUCT_MATCH_SCORES.BARCODE_EXACT;
-          matchType = 'barcode';
-        } else if (productSpec && pSpec && str(productSpec) === pSpec) {
-          score = PRODUCT_MATCH_SCORES.SPEC_EXACT;
-          matchType = 'spec';
-        } else if (productName && pName && str(productName) === pName) {
-          score = PRODUCT_MATCH_SCORES.NAME_EXACT;
-          matchType = 'name';
-        }
-
-        if (score > (bestMatch?.score || 0)) {
-          bestMatch = { product, score, matchType };
-        }
-      }
-
-      if (bestMatch) {
-        const p = bestMatch.product;
-        result.productId = p.id as string;
-        result.productName = p.name as string;
-        result.productSpec = p.spec as string;
-        result.productCode = p.code as string;
-        result.brand = p.brand as string;
+    // 按优先级逐一精确查询（避免 limit(1000) 遗漏超出范围的商品）
+    if (productCode) {
+      const { data: codeProducts } = await client
+        .from('products')
+        .select('*')
+        .eq('code', str(productCode))
+        .eq('is_active', true)
+        .limit(1);
+      if (codeProducts && codeProducts.length > 0) {
+        const p = codeProducts[0] as Record<string, unknown>;
+        result.productId = str(p.id);
+        result.productName = str(p.name);
+        result.productSpec = str(p.spec);
+        result.productCode = str(p.code);
+        result.brand = str(p.brand);
         result.price = p.retail_price as number;
-        result.matchType = bestMatch.matchType;
-        result.matchHint = `通过商品档案${MATCH_TYPE_LABELS[bestMatch.matchType] || bestMatch.matchType}精确匹配`;
+        result.matchType = 'code';
+        result.matchHint = `通过商品编码精确匹配：${str(productCode)} → ${str(p.name)}`;
+      }
+    }
+
+    if (!result.productId && barcode) {
+      const { data: barcodeProducts } = await client
+        .from('products')
+        .select('*')
+        .eq('barcode', str(barcode))
+        .eq('is_active', true)
+        .limit(1);
+      if (barcodeProducts && barcodeProducts.length > 0) {
+        const p = barcodeProducts[0] as Record<string, unknown>;
+        result.productId = str(p.id);
+        result.productName = str(p.name);
+        result.productSpec = str(p.spec);
+        result.productCode = str(p.code);
+        result.brand = str(p.brand);
+        result.price = p.retail_price as number;
+        result.matchType = 'barcode';
+        result.matchHint = `通过条码精确匹配：${str(barcode)} → ${str(p.name)}`;
+      }
+    }
+
+    if (!result.productId && productSpec) {
+      const { data: specProducts } = await client
+        .from('products')
+        .select('*')
+        .eq('spec', str(productSpec))
+        .eq('is_active', true)
+        .limit(1);
+      if (specProducts && specProducts.length > 0) {
+        const p = specProducts[0] as Record<string, unknown>;
+        result.productId = str(p.id);
+        result.productName = str(p.name);
+        result.productSpec = str(p.spec);
+        result.productCode = str(p.code);
+        result.brand = str(p.brand);
+        result.price = p.retail_price as number;
+        result.matchType = 'spec';
+        result.matchHint = `通过规格型号精确匹配：${str(productSpec)} → ${str(p.name)}`;
+      }
+    }
+
+    if (!result.productId && productName) {
+      const { data: nameProducts } = await client
+        .from('products')
+        .select('*')
+        .eq('name', str(productName))
+        .eq('is_active', true)
+        .limit(1);
+      if (nameProducts && nameProducts.length > 0) {
+        const p = nameProducts[0] as Record<string, unknown>;
+        result.productId = str(p.id);
+        result.productName = str(p.name);
+        result.productSpec = str(p.spec);
+        result.productCode = str(p.code);
+        result.brand = str(p.brand);
+        result.price = p.retail_price as number;
+        result.matchType = 'name';
+        result.matchHint = `通过商品名称精确匹配：${str(productName)} → ${str(p.name)}`;
       }
     }
   }
