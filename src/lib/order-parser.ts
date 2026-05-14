@@ -42,6 +42,46 @@ export function getFieldValue(
 }
 
 /**
+ * 确保"商品待匹配"默认档案存在，不存在则自动创建
+ */
+export async function ensurePendingMatchProduct(
+  client: ReturnType<typeof getSupabaseClient>,
+): Promise<Record<string, unknown>> {
+  // 先查找是否已存在
+  const { data: existing } = await client
+    .from('products')
+    .select('*')
+    .eq('code', 'PENDING_MATCH')
+    .limit(1);
+
+  if (existing && existing.length > 0) {
+    return existing[0] as Record<string, unknown>;
+  }
+
+  // 不存在则创建（upsert 防竞态）
+  const { data: created, error } = await client
+    .from('products')
+    .upsert(
+      {
+        code: 'PENDING_MATCH',
+        name: '商品待匹配',
+        spec: '商品待匹配',
+        is_active: true,
+      },
+      { onConflict: 'code' },
+    )
+    .select()
+    .single();
+
+  if (error) {
+    console.error('【order-parser】创建"商品待匹配"档案失败:', error);
+    throw error;
+  }
+
+  return created as Record<string, unknown>;
+}
+
+/**
  * 匹配系统商品
  */
 export async function matchSystemProduct(
@@ -73,7 +113,6 @@ export async function matchSystemProduct(
   };
 
   const str = (v: unknown): string => (v == null ? '' : String(v));
-  const safeIncludes = (s1: string, s2: string): boolean => s1.includes(s2);
 
   // 1. 先查找客户商品映射
   let mappings: Record<string, unknown>[] = [];
@@ -105,9 +144,7 @@ export async function matchSystemProduct(
     const mapping = mappings.find((m: Record<string, unknown>) => {
       const fieldValue = str(m[match.field]);
       if (!fieldValue) return false;
-      return fieldValue === matchValue ||
-             safeIncludes(fieldValue, matchValue) ||
-             safeIncludes(matchValue, fieldValue);
+      return fieldValue === matchValue;
     });
 
     if (mapping) {
@@ -153,7 +190,7 @@ export async function matchSystemProduct(
     }
   }
 
-  // 2. 如果没有找到映射，直接在商品档案中匹配
+  // 2. 如果没有找到映射，直接在商品档案中精确匹配
   if (!result.productId) {
     const { data: products } = await client
       .from('products')
@@ -161,66 +198,65 @@ export async function matchSystemProduct(
       .eq('is_active', true)
       .limit(1000);
 
-    if (!products || products.length === 0) {
-      return result;
-    }
+    if (products && products.length > 0) {
+      let bestMatch: { product: Record<string, unknown>; score: number; matchType: string } | null = null;
 
-    let bestMatch: { product: Record<string, unknown>; score: number; matchType: string } | null = null;
+      for (const product of products) {
+        const pName = str(product.name);
+        const pSpec = str(product.spec);
+        const pCode = str(product.code);
+        const pBarcode = str(product.barcode);
 
-    for (const product of products) {
-      const pName = str(product.name);
-      const pSpec = str(product.spec);
-      const pCode = str(product.code);
-      const pBarcode = str(product.barcode);
+        let score = 0;
+        let matchType = '';
 
-      let score = 0;
-      let matchType = '';
+        if (productCode && pCode && str(productCode) === pCode) {
+          score = PRODUCT_MATCH_SCORES.CODE_EXACT;
+          matchType = 'code';
+        } else if (barcode && pBarcode && str(barcode) === pBarcode) {
+          score = PRODUCT_MATCH_SCORES.BARCODE_EXACT;
+          matchType = 'barcode';
+        } else if (productSpec && pSpec && str(productSpec) === pSpec) {
+          score = PRODUCT_MATCH_SCORES.SPEC_EXACT;
+          matchType = 'spec';
+        } else if (productName && pName && str(productName) === pName) {
+          score = PRODUCT_MATCH_SCORES.NAME_EXACT;
+          matchType = 'name';
+        }
 
-      if (productCode && pCode && (str(productCode) === pCode || safeIncludes(pCode, str(productCode)) || safeIncludes(str(productCode), pCode))) {
-        score = PRODUCT_MATCH_SCORES.CODE_EXACT;
-        matchType = 'code';
-      } else if (barcode && pBarcode && (str(barcode) === pBarcode || safeIncludes(pBarcode, str(barcode)) || safeIncludes(str(barcode), pBarcode))) {
-        score = PRODUCT_MATCH_SCORES.BARCODE_EXACT;
-        matchType = 'barcode';
-      } else if (productSpec && pSpec && (str(productSpec) === pSpec || safeIncludes(pSpec, str(productSpec)) || safeIncludes(str(productSpec), pSpec))) {
-        score = PRODUCT_MATCH_SCORES.SPEC_EXACT;
-        matchType = 'spec';
-      } else if (productName && pName && str(productName) === pName) {
-        score = PRODUCT_MATCH_SCORES.NAME_EXACT;
-        matchType = 'name';
-      } else if (productName && pName && (safeIncludes(pName, str(productName)) || safeIncludes(str(productName), pName))) {
-        score = PRODUCT_MATCH_SCORES.NAME_CONTAINS;
-        matchType = 'name';
-      } else if (productSpec && pSpec && (safeIncludes(pSpec, str(productSpec)) || safeIncludes(str(productSpec), pSpec))) {
-        score = PRODUCT_MATCH_SCORES.SPEC_CONTAINS;
-        matchType = 'spec';
-      } else if (productCode && pCode && (safeIncludes(pCode, str(productCode)) || safeIncludes(str(productCode), pCode))) {
-        score = PRODUCT_MATCH_SCORES.CODE_CONTAINS;
-        matchType = 'code';
-      } else if (productName && pName) {
-        const key1 = str(productName).slice(0, Math.min(4, str(productName).length));
-        const key2 = pName.slice(0, Math.min(4, pName.length));
-        if (key1 && key2 && (safeIncludes(pName, key1) || safeIncludes(str(productName), key2))) {
-          score = PRODUCT_MATCH_SCORES.KEYWORD;
-          matchType = 'keyword';
+        if (score > (bestMatch?.score || 0)) {
+          bestMatch = { product, score, matchType };
         }
       }
 
-      if (score > (bestMatch?.score || 0)) {
-        bestMatch = { product, score, matchType };
+      if (bestMatch) {
+        const p = bestMatch.product;
+        result.productId = p.id as string;
+        result.productName = p.name as string;
+        result.productSpec = p.spec as string;
+        result.productCode = p.code as string;
+        result.brand = p.brand as string;
+        result.price = p.retail_price as number;
+        result.matchType = bestMatch.matchType;
+        result.matchHint = `通过商品档案${MATCH_TYPE_LABELS[bestMatch.matchType] || bestMatch.matchType}精确匹配`;
       }
     }
+  }
 
-    if (bestMatch && bestMatch.score >= PRODUCT_MATCH_SCORES.MIN_THRESHOLD) {
-      const p = bestMatch.product;
-      result.productId = p.id as string;
-      result.productName = p.name as string;
-      result.productSpec = p.spec as string;
-      result.productCode = p.code as string;
-      result.brand = p.brand as string;
-      result.price = p.retail_price as number;
-      result.matchType = bestMatch.matchType;
-      result.matchHint = `通过商品档案${MATCH_TYPE_LABELS[bestMatch.matchType] || bestMatch.matchType}匹配 (${bestMatch.score}%)`;
+  // 3. 未精确匹配到系统商品，回退到"商品待匹配"默认档案
+  if (!result.productId) {
+    try {
+      const pendingProduct = await ensurePendingMatchProduct(client);
+      result.productId = str(pendingProduct.id);
+      result.productName = str(pendingProduct.name);
+      result.productSpec = str(pendingProduct.spec);
+      result.productCode = str(pendingProduct.code);
+      result.brand = str(pendingProduct.brand);
+      result.price = Number(pendingProduct.retail_price || pendingProduct.cost_price) || null;
+      result.matchType = 'unmatched';
+      result.matchHint = '未精确匹配到系统商品，已关联默认"商品待匹配"档案';
+    } catch (fallbackErr) {
+      console.error('【order-parser】获取"商品待匹配"档案失败:', fallbackErr);
     }
   }
 
