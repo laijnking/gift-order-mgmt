@@ -29,6 +29,25 @@ export async function GET(request: NextRequest) {
         .select('id', { count: 'exact', head: true })
         .eq('tenant_id', id);
 
+      // 查询管理员信息
+      let adminUsername = '';
+      const { data: adminLink } = await client
+        .from('user_tenants')
+        .select('user_id')
+        .eq('tenant_id', id)
+        .eq('role', 'admin')
+        .limit(1)
+        .maybeSingle();
+
+      if (adminLink) {
+        const { data: adminUser } = await client
+          .from('users')
+          .select('username')
+          .eq('id', adminLink.user_id)
+          .maybeSingle();
+        adminUsername = (adminUser?.username as string) || '';
+      }
+
       data.push({
         id: t.id,
         code: t.code,
@@ -37,6 +56,7 @@ export async function GET(request: NextRequest) {
         plan: t.plan,
         created_at: t.created_at,
         member_count: count ?? 0,
+        admin_username: adminUsername,
       });
     }
 

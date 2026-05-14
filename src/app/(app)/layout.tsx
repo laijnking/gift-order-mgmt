@@ -65,7 +65,8 @@ const menuItems: MenuItem[] = [
     permissions: ['settings:view'],
     children: [
       { label: '业务规则配置', href: '/settings/business-rules', icon: Settings },
-      { label: '成员管理', href: '/settings/members', icon: Users },
+      { label: '角色定义', href: '/roles', icon: Settings },
+      { label: '用户管理', href: '/users', icon: Users },
       { label: '预警设置', href: '/alerts', icon: Bell },
       { label: '模板配置', href: '/templates', icon: Settings },
       { label: '租户设置', href: '/settings/tenant', icon: Building2 },
@@ -77,8 +78,6 @@ const menuItems: MenuItem[] = [
     superadminOnly: true,
     children: [
       { label: '租户管理', href: '/admin/tenants', icon: Building2 },
-      { label: '角色定义', href: '/roles', icon: Settings },
-      { label: '用户管理', href: '/users', icon: Users },
       { label: '全局默认配置', href: '/admin/global-configs', icon: Settings },
     ]
   },

@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
-import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission, getRequestUser } from '@/lib/server-auth';
 import { getTenantFromRequest } from '@/lib/tenant-context';
 import { PERMISSIONS } from '@/lib/permissions';
