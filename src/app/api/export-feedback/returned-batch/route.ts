@@ -5,6 +5,7 @@ import { buildExportRecordDownloadPath } from '@/lib/export-download';
 import { parseTemplateFieldMappings, migrateFieldMappings, type TemplateRecord } from '@/lib/template-utils';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { PERMISSIONS } from '@/lib/permissions';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { buildFeedbackRows, DEFAULT_CUSTOMER_FEEDBACK_MAPPINGS, applyTextFormat } from '@/lib/feedback-exporter';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
@@ -29,6 +30,8 @@ function summarizeTemplateSource(
 export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
   if (authError) return authError;
+  const tenant = await getTenantFromRequest(request);
+  const tenantId = tenant.tenantId;
 
   const client = getSupabaseClient();
 
@@ -72,7 +75,8 @@ export async function POST(request: NextRequest) {
         .from('orders')
         .select('*')
         .eq('customer_id', customerId)
-        .eq('status', 'returned');
+        .eq('status', 'returned')
+        .eq('tenant_id', tenantId);
 
       if (ordersError) throw new Error(`查询订单失败: ${ordersError.message}`);
       if (!orders || orders.length === 0) continue;
@@ -254,7 +258,8 @@ export async function POST(request: NextRequest) {
         .from('orders')
         .select('id')
         .eq('customer_id', customerId)
-        .eq('status', 'returned');
+        .eq('status', 'returned')
+        .eq('tenant_id', tenantId);
       if (customerOrders) {
         for (const o of customerOrders) {
           exportedOrderIds.push(o.id);
@@ -267,7 +272,8 @@ export async function POST(request: NextRequest) {
       const { error: feedbackError } = await client
         .from('orders')
         .update({ status: 'feedbacked', updated_at: now })
-        .in('id', exportedOrderIds);
+        .in('id', exportedOrderIds)
+        .eq('tenant_id', tenantId);
       if (feedbackError) {
         console.error('更新订单状态为 feedbacked 失败:', feedbackError.message);
       }
@@ -316,6 +322,7 @@ export async function POST(request: NextRequest) {
         zip_file_name: zipFileName,
         total_count: totalOrderCount,
         exported_by: exportedBy || 'system',
+        tenant_id: tenantId,
         metadata: {
           batch_id: batchId,
           customer_ids: customerIds,

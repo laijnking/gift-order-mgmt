@@ -3,11 +3,14 @@ import { requirePermission } from '@/lib/server-auth';
 import { CUSTOMER_FEEDBACK_SOURCE_STATUSES } from '@/lib/order-status';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { PERMISSIONS } from '@/lib/permissions';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 
 // 导出前校验订单回单状态
 export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
   if (authError) return authError;
+  const tenant = await getTenantFromRequest(request);
+  const tenantId = tenant.tenantId;
 
   const client = getSupabaseClient();
 
@@ -27,6 +30,7 @@ export async function POST(request: NextRequest) {
         .from('orders')
         .select('id, order_no, customer_order_no, tracking_no, assigned_at, returned_at, completed_at, status')
         .eq('customer_id', customerId)
+        .eq('tenant_id', tenantId)
         .in('status', CUSTOMER_FEEDBACK_SOURCE_STATUSES);
 
       if (ordersError) throw new Error(`查询订单失败: ${ordersError.message}`);

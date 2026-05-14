@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission } from '@/lib/server-auth';
 import { PERMISSIONS } from '@/lib/permissions';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 
 // 获取导出记录列表
 export async function GET(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_VIEW);
   if (authError) return authError;
+  const tenant = await getTenantFromRequest(request);
+  const tenantId = tenant.tenantId;
 
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
@@ -23,6 +26,7 @@ export async function GET(request: NextRequest) {
     let query = client
       .from('export_records')
       .select('*', { count: 'exact' })
+      .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false });
 
     if (exportType) {
@@ -50,6 +54,7 @@ export async function GET(request: NextRequest) {
       const { data: matchedShippers } = await client
         .from('shippers')
         .select('id')
+        .eq('tenant_id', tenantId)
         .ilike('name', `%${supplierName}%`);
       if (matchedShippers && matchedShippers.length > 0) {
         query = query.in('supplier_id', matchedShippers.map(s => s.id));
@@ -75,7 +80,7 @@ export async function GET(request: NextRequest) {
     // 批量查询发货方和客户名称
     const [shippersResult, customersResult] = await Promise.all([
       supplierIds.length > 0
-        ? client.from('shippers').select('id, name').in('id', supplierIds)
+        ? client.from('shippers').select('id, name').eq('tenant_id', tenantId).in('id', supplierIds)
         : { data: [], error: null },
       customerIds.length > 0
         ? client.from('customers').select('id, name').in('id', customerIds)

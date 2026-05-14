@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { PERMISSIONS } from '@/lib/permissions';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 
 // 兼容层：保留历史批次详情/重导出入口，实际数据与重导出逻辑均代理到 export_records / shipping-exports 主链路
 export async function GET(
@@ -10,6 +11,8 @@ export async function GET(
 ) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
   if (authError) return authError;
+  const tenant = await getTenantFromRequest(request);
+  const tenantId = tenant.tenantId;
 
   const client = getSupabaseClient();
   const { id } = await params;
@@ -20,6 +23,7 @@ export async function GET(
       .from('export_records')
       .select('*')
       .eq('id', id)
+      .eq('tenant_id', tenantId)
       .single();
 
     if (error) throw new Error(`查询导出记录失败: ${error.message}`);
@@ -50,6 +54,8 @@ export async function POST(
 ) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
   if (authError) return authError;
+  const tenant = await getTenantFromRequest(request);
+  const tenantId = tenant.tenantId;
 
   const client = getSupabaseClient();
   const { id } = await params;
@@ -63,6 +69,7 @@ export async function POST(
       .from('export_records')
       .select('*')
       .eq('id', id)
+      .eq('tenant_id', tenantId)
       .single();
 
     if (error) throw new Error(`查询导出记录失败: ${error.message}`);

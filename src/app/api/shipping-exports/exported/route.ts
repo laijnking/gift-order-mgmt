@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission } from '@/lib/server-auth';
 import { PERMISSIONS } from '@/lib/permissions';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 
 // 获取已导出发货通知的发货方列表（从 export_records 出发）
 export async function GET(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
   if (authError) return authError;
+  const tenant = await getTenantFromRequest(request);
+  const tenantId = tenant.tenantId;
 
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
@@ -18,6 +21,7 @@ export async function GET(request: NextRequest) {
       .from('export_records')
       .select('*')
       .eq('export_type', 'shipping_notice')
+      .eq('tenant_id', tenantId)
       .order('exported_at', { ascending: false });
 
     if (recordsError) throw new Error(`查询导出记录失败: ${recordsError.message}`);
@@ -41,7 +45,7 @@ export async function GET(request: NextRequest) {
         const { data: orders } = await client
           .from('orders')
           .select('supplier_id, supplier_name')
-          .in('id', orderIds);
+          .in('id', orderIds).eq('tenant_id', tenantId);
         for (const order of (orders || [])) {
           if ((order as Record<string, unknown>).supplier_id) {
             supplierIdSet.add((order as Record<string, unknown>).supplier_id as string);
@@ -57,7 +61,7 @@ export async function GET(request: NextRequest) {
     const supplierIds = [...supplierIdSet];
     const supplierNames = [...supplierNameSet];
 
-    let supplierQuery = client.from('shippers').select('*');
+    let supplierQuery = client.from('shippers').select('*').eq('tenant_id', tenantId);
     if (supplierIds.length > 0 && supplierNames.length > 0) {
       // Supabase .or() 不支持 .in()，需要展开为多个 .eq() 条件
       const idOrConditions = supplierIds.map(id => `id.eq.${id}`).join(',');
@@ -92,6 +96,7 @@ export async function GET(request: NextRequest) {
     const { data: allExportedOrders } = await client
       .from('orders')
       .select('id, supplier_id, supplier_name')
+      .eq('tenant_id', tenantId)
       .in('status', ['notified']);
 
     for (const order of (allExportedOrders || [])) {

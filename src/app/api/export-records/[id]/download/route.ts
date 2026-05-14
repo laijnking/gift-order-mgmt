@@ -3,6 +3,7 @@ import { getExportArtifactDownloadTarget, readExportArtifact } from '@/lib/expor
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission } from '@/lib/server-auth';
 import { PERMISSIONS } from '@/lib/permissions';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 
 type ExportDetailRecord = {
   artifact?: {
@@ -19,6 +20,8 @@ export async function GET(
 ) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
   if (authError) return authError;
+  const tenant = await getTenantFromRequest(request);
+  const tenantId = tenant.tenantId;
 
   const client = getSupabaseClient();
   const { id } = await params;
@@ -29,6 +32,7 @@ export async function GET(
       .from('export_records')
       .select('file_name, zip_file_name, metadata')
       .eq('id', id)
+      .eq('tenant_id', tenantId)
       .single();
 
     if (error) throw new Error(`查询导出记录失败: ${error.message}`);

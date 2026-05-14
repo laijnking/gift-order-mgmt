@@ -5,6 +5,7 @@ import { recordOrderCostFromDispatch } from '@/lib/order-cost-history';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { parseTemplateFieldMappings, parseTemplateFieldMappingsArray, resolvePreferredTemplate, type TemplateRecord } from '@/lib/template-utils';
 import { requirePermission } from '@/lib/server-auth';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { PERMISSIONS } from '@/lib/permissions';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
@@ -106,12 +107,14 @@ function stockMatchesItem(stock: Record<string, unknown>, item: OrderItem): bool
 async function findStockForItem(
   client: ReturnType<typeof getSupabaseClient>,
   supplierId: string,
-  item: OrderItem
+  item: OrderItem,
+  tenantId: string,
 ): Promise<Record<string, unknown> | null> {
   const { data: stocks, error } = await client
     .from('stocks')
     .select('*')
     .eq('supplier_id', supplierId)
+    .eq('tenant_id', tenantId)
     .eq('status', 'active')
     .gt('quantity', 0);
 
@@ -122,7 +125,8 @@ async function findStockForItem(
 async function findSupplierProductMapping(
   client: ReturnType<typeof getSupabaseClient>,
   supplierId: string,
-  productId: string
+  productId: string,
+  tenantId: string,
 ): Promise<{ supplierProductCode?: string; supplierProductName?: string; supplierProductSpec?: string } | null> {
   if (!supplierId || !productId) return null;
   const { data } = await client
@@ -130,6 +134,7 @@ async function findSupplierProductMapping(
     .select('supplier_product_code, supplier_product_name, supplier_product_spec')
     .eq('supplier_id', supplierId)
     .eq('product_id', productId)
+    .eq('tenant_id', tenantId)
     .maybeSingle();
 
   return data ? {
@@ -141,7 +146,8 @@ async function findSupplierProductMapping(
 
 async function getExistingDispatchContext(
   client: ReturnType<typeof getSupabaseClient>,
-  orderId: string
+  orderId: string,
+  tenantId: string,
 ) {
   // D-3 派发去重：以 dispatch_records 的 dispatched 记录为准，
   // 只要存在已派发记录，就复用而不重复扣库存/记成本
@@ -149,6 +155,7 @@ async function getExistingDispatchContext(
     .from('dispatch_records')
     .select('batch_no, items, dispatch_at')
     .eq('order_id', orderId)
+    .eq('tenant_id', tenantId)
     .eq('status', 'dispatched')
     .order('dispatch_at', { ascending: false })
     .limit(1)
@@ -180,11 +187,12 @@ async function dispatchPendingOrder(
   order: Record<string, unknown>,
   supplier: Record<string, unknown>,
   batchNo: string,
+  tenantId: string,
   supplierId?: string,
   isSynthetic = false,
   targetStatus: 'assigned' | 'notified' = 'notified'
 ) {
-  const existingDispatch = await getExistingDispatchContext(client, String(order.id));
+  const existingDispatch = await getExistingDispatchContext(client, String(order.id), tenantId);
   if (existingDispatch.hasExistingSideEffects) {
     const reusedBatchNo =
       String(existingDispatch.latestDispatch?.batch_no || order.assigned_batch || batchNo);
@@ -212,7 +220,8 @@ async function dispatchPendingOrder(
         assigned_at: order.assigned_at || existingDispatch.latestDispatch?.dispatch_at || new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
-      .eq('id', order.id);
+      .eq('id', order.id)
+      .eq('tenant_id', tenantId);
 
     return {
       dispatchItems: existingItems,
@@ -238,12 +247,12 @@ async function dispatchPendingOrder(
       ? undefined
       : (supplierId || (supplier?.id ? String(supplier.id) : undefined));
     const stock = stockQueryId
-      ? await findStockForItem(client, stockQueryId, item)
+      ? await findStockForItem(client, stockQueryId, item, tenantId)
       : null;
 
     // 发货方商品映射信息
     const supplierMapping = stockQueryId && stock?.product_id
-      ? await findSupplierProductMapping(client, stockQueryId, String(stock.product_id))
+      ? await findSupplierProductMapping(client, stockQueryId, String(stock.product_id), tenantId)
       : null;
 
     if (!stock) {
@@ -277,7 +286,8 @@ async function dispatchPendingOrder(
     const { error: stockError } = await client
       .from('stocks')
       .update({ quantity: afterQuantity, last_stock_out_at: now, updated_at: now })
-      .eq('id', stock.id);
+      .eq('id', stock.id)
+      .eq('tenant_id', tenantId);
     if (stockError) throw new Error(`扣减库存失败: ${stockError.message}`);
 
     await client.from('stock_versions').insert({
@@ -337,6 +347,7 @@ async function dispatchPendingOrder(
       dispatch_at: new Date().toISOString(),
       status: 'dispatched',
       items: dispatchItems,
+      tenant_id: tenantId,
     });
 
     await client
@@ -347,7 +358,8 @@ async function dispatchPendingOrder(
         assigned_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
-      .eq('id', order.id);
+      .eq('id', order.id)
+      .eq('tenant_id', tenantId);
 
   return {
     dispatchItems,
@@ -443,6 +455,8 @@ export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
+  const tenantId = tenant.tenantId;
   const client = getSupabaseClient();
 
   // 获取导出配置（数据库配置优先于环境变量）
@@ -508,7 +522,7 @@ export async function POST(request: NextRequest) {
       // 虚拟发货方：从 orders 表按 supplier_name 查询；真实发货方：查 shippers 表（统一数据源）
       const { data: supplier } = isSynthetic
         ? { data: null }
-        : await client.from('shippers').select('*').eq('id', supplierId).maybeSingle();
+        : await client.from('shippers').select('*').eq('id', supplierId).eq('tenant_id', tenantId).maybeSingle();
 
       if (!isSynthetic && !supplier) {
         errors.push(`发货方 ${supplierId} 不存在`);
@@ -559,6 +573,7 @@ export async function POST(request: NextRequest) {
           .from('orders')
           .select('*')
           .eq('supplier_name', supplierName)
+          .eq('tenant_id', tenantId)
           .in('status', isReexport ? ['assigned', 'notified'] : ['pending', 'assigned']);
         if (error) throw new Error(`按名称查询订单失败: ${error.message}`);
         orders = (data || []) as Record<string, unknown>[];
@@ -567,6 +582,7 @@ export async function POST(request: NextRequest) {
           .from('orders')
           .select('*')
           .eq('supplier_id', supplierId)
+          .eq('tenant_id', tenantId)
           .in('status', isReexport ? ['assigned', 'notified'] : ['pending', 'assigned']);
 
         if (ordersErrorById) throw new Error(`查询订单失败: ${ordersErrorById.message}`);
@@ -576,6 +592,7 @@ export async function POST(request: NextRequest) {
           .select('*')
           .is('supplier_id', null)
           .eq('supplier_name', supplierName)
+          .eq('tenant_id', tenantId)
           .in('status', isReexport ? ['assigned', 'notified'] : ['pending', 'assigned']);
 
         if (ordersErrorByName) throw new Error(`按名称查询订单失败: ${ordersErrorByName.message}`);
@@ -606,6 +623,7 @@ export async function POST(request: NextRequest) {
               .from('dispatch_records')
               .select('items, batch_no')
               .eq('order_id', order.id)
+              .eq('tenant_id', tenantId)
               .eq('status', 'dispatched')
               .order('dispatch_at', { ascending: false })
               .limit(1)
@@ -628,6 +646,7 @@ export async function POST(request: NextRequest) {
                   order,
                   supplier as Record<string, unknown>,
                   batchNo,
+                  tenantId,
                   isSynthetic ? undefined : supplierId,
                   isSynthetic,
                   'assigned'
@@ -808,6 +827,7 @@ export async function POST(request: NextRequest) {
       total_count: totalOrderCount,
       exported_by: exportedBy || 'system',
       exported_at: new Date().toISOString(),
+      tenant_id: tenantId,
       metadata: {
         batch_id: batchId,
         batch_no: batchNo,

@@ -4,6 +4,7 @@ import { getSupabaseClient } from '@/storage/database/supabase-client';
 import JSZip from 'jszip';
 import { requirePermission } from '@/lib/server-auth';
 import { PERMISSIONS } from '@/lib/permissions';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 
 type ExportRecordMetadata = {
   details?: Array<Record<string, unknown>>;
@@ -115,6 +116,8 @@ export async function GET(
 ) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
   if (authError) return authError;
+  const tenant = await getTenantFromRequest(request);
+  const tenantId = tenant.tenantId;
 
   const client = getSupabaseClient();
   const { id } = await params;
@@ -125,6 +128,7 @@ export async function GET(
       .from('export_records')
       .select('*')
       .eq('id', id)
+      .eq('tenant_id', tenantId)
       .single();
 
     if (recordError) throw new Error(`查询导出记录失败: ${recordError.message}`);
@@ -142,6 +146,7 @@ export async function GET(
         .from('shippers')
         .select('name')
         .eq('id', record.supplier_id)
+        .eq('tenant_id', tenantId)
         .single();
       entityName = supplier?.name || '';
     }
@@ -170,6 +175,8 @@ export async function POST(
 ) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
   if (authError) return authError;
+  const tenant = await getTenantFromRequest(request);
+  const tenantId = tenant.tenantId;
 
   const client = getSupabaseClient();
   const { id } = await params;
@@ -190,6 +197,7 @@ export async function POST(
       .from('export_records')
       .select('*')
       .eq('id', id)
+      .eq('tenant_id', tenantId)
       .single();
 
     if (recordError) throw new Error(`查询导出记录失败: ${recordError.message}`);
@@ -291,7 +299,8 @@ export async function POST(
                 }),
             metadata: nextMetadata,
           })
-          .eq('id', record.id);
+          .eq('id', record.id)
+          .eq('tenant_id', tenantId);
       }
 
       return NextResponse.json(data, { status: response.status });
@@ -391,7 +400,8 @@ export async function POST(
                 }),
             metadata: nextMetadata,
           })
-          .eq('id', record.id);
+          .eq('id', record.id)
+          .eq('tenant_id', tenantId);
       }
 
       return NextResponse.json(data, { status: response.status });

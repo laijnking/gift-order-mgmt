@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission } from '@/lib/server-auth';
 import { PERMISSIONS } from '@/lib/permissions';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 
 // 获取待发货发货方列表（从订单出发，只返回有待发货的发货方）
 export async function GET(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_VIEW);
   if (authError) return authError;
+  const tenant = await getTenantFromRequest(request);
+  const tenantId = tenant.tenantId;
 
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
@@ -19,6 +22,7 @@ export async function GET(request: NextRequest) {
     const { data: pendingOrders, error: ordersError } = await client
       .from('orders')
       .select('id, supplier_id, supplier_name, status')
+      .eq('tenant_id', tenantId)
       .in('status', ['pending', 'assigned']);
 
     if (ordersError) throw new Error(`查询待发货订单失败: ${ordersError.message}`);
@@ -43,7 +47,8 @@ export async function GET(request: NextRequest) {
     const { data: allExportRecords } = await client
       .from('export_records')
       .select('order_ids')
-      .eq('export_type', 'shipping_notice');
+      .eq('export_type', 'shipping_notice')
+      .eq('tenant_id', tenantId);
 
     // 收集所有已导出的订单ID（在内存中做交集）
     const exportedOrderIds = new Set<string>();
@@ -85,7 +90,7 @@ export async function GET(request: NextRequest) {
     const knownSupplierNames = new Set<string>();
 
     if (supplierIds.length > 0) {
-      const { data: byId } = await client.from('shippers').select('*').in('id', supplierIds);
+      const { data: byId } = await client.from('shippers').select('*').eq('tenant_id', tenantId).in('id', supplierIds);
       for (const s of (byId || [])) {
         if (status !== 'all' && (s as Record<string, unknown>).is_active !== (status === 'active')) continue;
         suppliersById.set(s.id, s);
@@ -94,7 +99,7 @@ export async function GET(request: NextRequest) {
       }
     }
     if (supplierNames.length > 0) {
-      const { data: byName } = await client.from('shippers').select('*').in('name', supplierNames);
+      const { data: byName } = await client.from('shippers').select('*').eq('tenant_id', tenantId).in('name', supplierNames);
       for (const s of (byName || [])) {
         if (suppliersById.has(s.id)) continue;
         if (status !== 'all' && (s as Record<string, unknown>).is_active !== (status === 'active')) continue;
@@ -133,6 +138,7 @@ export async function GET(request: NextRequest) {
         .from('orders')
         .select('id, status')
         .eq('supplier_id', supplierId)
+        .eq('tenant_id', tenantId)
         .in('status', ['pending', 'assigned']);
 
       // 按 supplier_name 匹配 supplier_id 为 null 的订单
@@ -142,6 +148,7 @@ export async function GET(request: NextRequest) {
             .select('id, status')
             .is('supplier_id', null)
             .eq('supplier_name', supplierName)
+            .eq('tenant_id', tenantId)
             .in('status', ['pending', 'assigned'])
         : { data: [] };
 
@@ -162,6 +169,7 @@ export async function GET(request: NextRequest) {
         .select('created_at')
         .eq('supplier_id', supplierId)
         .eq('export_type', 'shipping_notice')
+        .eq('tenant_id', tenantId)
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
@@ -185,6 +193,7 @@ export async function GET(request: NextRequest) {
         .from('orders')
         .select('id, status')
         .eq('supplier_name', syntheticName)
+        .eq('tenant_id', tenantId)
         .in('status', ['pending', 'assigned']);
 
       const unexportedCount = (ordersByName || [])
@@ -198,6 +207,7 @@ export async function GET(request: NextRequest) {
         .select('created_at')
         .eq('supplier_name', syntheticName)
         .eq('export_type', 'shipping_notice')
+        .eq('tenant_id', tenantId)
         .order('created_at', { ascending: false })
         .limit(1)
         .single();

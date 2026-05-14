@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 
 export const runtime = 'nodejs';
 
@@ -18,6 +19,8 @@ interface PreviewRequest {
  */
 export async function POST(request: NextRequest) {
   try {
+    const tenant = await getTenantFromRequest(request);
+    const tenantId = tenant.tenantId;
     const body: PreviewRequest = await request.json();
     const { customerIds, templateId } = body;
 
@@ -35,7 +38,8 @@ export async function POST(request: NextRequest) {
       .from('orders')
       .select('*', { count: 'exact', head: true })
       .in('customer_id', customerIds)
-      .eq('status', 'returned');
+      .eq('status', 'returned')
+      .eq('tenant_id', tenantId);
 
     if (countError) {
       console.error('预览查询失败:', countError);
