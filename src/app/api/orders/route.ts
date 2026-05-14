@@ -510,10 +510,18 @@ export async function POST(request: NextRequest) {
           status: itemSupplierInfo?.id ? 'assigned' : 'pending',
           items: [{
             product_id: item.systemProductId || item.productId || (pendingProduct?.id as string) || null,
-            product_name: item.systemProductName || item.mappedProductName || item.productName || (pendingProduct?.name as string) || '商品待匹配',
-            product_spec: item.systemProductSpec || item.mappedProductSpec || item.productSpec || (pendingProduct?.spec as string) || '',
-            product_code: item.systemProductCode || item.mappedProductCode || item.productCode || (pendingProduct?.code as string) || '',
-            product_brand: item.systemProductBrand || item.mappedProductBrand || (pendingProduct?.brand as string) || '',
+            product_name: (item.systemProductId || item.productId)
+              ? (item.systemProductName || item.mappedProductName || item.productName || '商品待匹配')
+              : ((pendingProduct?.name as string) || '商品待匹配'),
+            product_spec: (item.systemProductId || item.productId)
+              ? (item.systemProductSpec || item.mappedProductSpec || item.productSpec || '')
+              : ((pendingProduct?.spec as string) || ''),
+            product_code: (item.systemProductId || item.productId)
+              ? (item.systemProductCode || item.mappedProductCode || item.productCode || '')
+              : ((pendingProduct?.code as string) || ''),
+            product_brand: (item.systemProductId || item.productId)
+              ? (item.systemProductBrand || item.mappedProductBrand || '')
+              : ((pendingProduct?.brand as string) || ''),
             cu_product_name: item.cuProductName || item.productName,
             cu_product_spec: item.cuProductSpec || item.productSpec || '',
             cu_product_code: item.cuProductCode || item.productCode || '',
