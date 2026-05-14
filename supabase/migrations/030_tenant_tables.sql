@@ -46,7 +46,9 @@ CREATE TABLE IF NOT EXISTS tenant_configs (
     UNIQUE(tenant_id, category, config_key)
 );
 
--- 5. 补充 is_superadmin 字段（如不存在）
+-- 5. 存量表补字段
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS plan VARCHAR(20) DEFAULT 'basic';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_superadmin BOOLEAN DEFAULT false;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS is_superadmin BOOLEAN DEFAULT false;
 
 -- 6. 索引
