@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { PERMISSIONS } from '@/lib/permissions';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 
 // 数据库字段转前端格式
 function transformProduct(dbProduct: Record<string, unknown>) {
@@ -39,6 +40,7 @@ export async function GET(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.PRODUCTS_VIEW);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
   const search = searchParams.get('search');
@@ -50,7 +52,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // 先获取数据
-    let dataQuery = client.from('products').select('*');
+    let dataQuery = client.from('products').select('*').or(`owner_tenant_id.eq.${tenant.tenantId},visibility.eq.global`);
 
     if (search) {
       dataQuery = dataQuery.or(`code.ilike.%${search}%,name.ilike.%${search}%,barcode.ilike.%${search}%`);
@@ -104,12 +106,15 @@ export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.PRODUCTS_CREATE);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
-  
+
   try {
     const body = await request.json();
-    
+
     const productData = {
+      owner_tenant_id: tenant.tenantId,
+      visibility: body.visibility || 'private',
       code: body.code,
       barcode: body.barcode,
       name: body.name,

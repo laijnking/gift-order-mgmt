@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { PERMISSIONS } from '@/lib/permissions';
 import { detectDuplicates, ENTITY_DEDUP_KEYS } from '@/lib/import-dedup';
 
@@ -78,6 +79,8 @@ const CHINESE_MAPPING: Record<string, string> = {
 export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.PRODUCTS_CREATE);
   if (authError) return authError;
+
+  const tenant = await getTenantFromRequest(request);
 
   try {
     const { data } = await request.json();
@@ -199,7 +202,7 @@ export async function POST(request: NextRequest) {
 
         const { error } = await client
           .from('products')
-          .insert(productData);
+          .insert({ ...productData, owner_tenant_id: tenant.tenantId, visibility: 'private' });
 
         if (error) {
           errors.push(`第 ${rowNum} 行：${error.message}`);

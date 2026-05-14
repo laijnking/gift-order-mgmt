@@ -116,13 +116,15 @@ export async function saveExportArtifact(
   recordId: string,
   fileName: string,
   content: Buffer,
-  config?: ExportConfig
+  config?: ExportConfig,
+  tenantCode?: string
 ): Promise<SavedExportArtifact> {
   if (getExportArtifactProvider(config) === 's3') {
     const bucket = requireS3Bucket();
+    const safeTenantCode = tenantCode ? sanitizeSegment(tenantCode) : 'default';
     const safeRecordId = sanitizeSegment(recordId);
     const safeFileName = sanitizeSegment(fileName);
-    const key = `${safeRecordId}/${safeFileName}`;
+    const key = `${safeTenantCode}/${safeRecordId}/${safeFileName}`;
     const client = createS3Client();
 
     await client.send(
@@ -143,10 +145,11 @@ export async function saveExportArtifact(
     };
   }
 
+  const safeTenantCode = tenantCode ? sanitizeSegment(tenantCode) : 'default';
   const safeRecordId = sanitizeSegment(recordId);
   const safeFileName = sanitizeSegment(fileName);
   const artifactRoot = getExportArtifactRoot(config);
-  const directory = path.join(artifactRoot, safeRecordId);
+  const directory = path.join(artifactRoot, safeTenantCode, safeRecordId);
 
   try {
     await mkdir(directory, { recursive: true });

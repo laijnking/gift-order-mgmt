@@ -42,6 +42,46 @@ export function getFieldValue(
 }
 
 /**
+ * 确保"商品待匹配"默认档案存在，不存在则自动创建
+ */
+export async function ensurePendingMatchProduct(
+  client: ReturnType<typeof getSupabaseClient>,
+): Promise<Record<string, unknown>> {
+  // 先查找是否已存在
+  const { data: existing } = await client
+    .from('products')
+    .select('*')
+    .eq('code', 'PENDING_MATCH')
+    .limit(1);
+
+  if (existing && existing.length > 0) {
+    return existing[0] as Record<string, unknown>;
+  }
+
+  // 不存在则创建（upsert 防竞态）
+  const { data: created, error } = await client
+    .from('products')
+    .upsert(
+      {
+        code: 'PENDING_MATCH',
+        name: '商品待匹配',
+        spec: '商品待匹配',
+        is_active: true,
+      },
+      { onConflict: 'code' },
+    )
+    .select()
+    .single();
+
+  if (error) {
+    console.error('【order-parser】创建"商品待匹配"档案失败:', error);
+    throw error;
+  }
+
+  return created as Record<string, unknown>;
+}
+
+/**
  * 匹配系统商品
  */
 export async function matchSystemProduct(
@@ -50,7 +90,8 @@ export async function matchSystemProduct(
   productName: unknown,
   productSpec: unknown,
   productCode: unknown,
-  barcode: unknown
+  barcode: unknown,
+  tenantId?: string
 ): Promise<{
   productId: string | null;
   productName: string | null;
@@ -73,23 +114,18 @@ export async function matchSystemProduct(
   };
 
   const str = (v: unknown): string => (v == null ? '' : String(v));
-  const safeIncludes = (s1: string, s2: string): boolean => s1.includes(s2);
 
   // 1. 先查找客户商品映射
   let mappings: Record<string, unknown>[] = [];
   if (customerCode) {
-    const { data: customer } = await client
-      .from('customers')
-      .select('id')
-      .eq('code', customerCode)
-      .maybeSingle();
+    let customerQuery = client.from('customers').select('id').eq('code', customerCode);
+    if (tenantId) customerQuery = customerQuery.eq('tenant_id', tenantId);
+    const { data: customer } = await customerQuery.maybeSingle();
 
     if (customer?.id) {
-      const { data } = await client
-        .from('product_mappings')
-        .select('*')
-        .eq('customer_id', customer.id)
-        .eq('is_active', true);
+      let mappingQuery = client.from('product_mappings').select('*').eq('customer_id', customer.id).eq('is_active', true);
+      if (tenantId) mappingQuery = mappingQuery.eq('tenant_id', tenantId);
+      const { data } = await mappingQuery;
       mappings = (data || []) as Record<string, unknown>[];
     }
   }
@@ -105,9 +141,7 @@ export async function matchSystemProduct(
     const mapping = mappings.find((m: Record<string, unknown>) => {
       const fieldValue = str(m[match.field]);
       if (!fieldValue) return false;
-      return fieldValue === matchValue ||
-             safeIncludes(fieldValue, matchValue) ||
-             safeIncludes(matchValue, fieldValue);
+      return fieldValue === matchValue;
     });
 
     if (mapping) {
@@ -115,11 +149,9 @@ export async function matchSystemProduct(
       const pmProductCode = str(mapping.product_code);
 
       if (pmProductId) {
-        const { data: productsById } = await client
-          .from('products')
-          .select('*')
-          .eq('id', pmProductId)
-          .limit(1);
+        let q = client.from('products').select('*').eq('id', pmProductId);
+        if (tenantId) q = q.or(`owner_tenant_id.eq.${tenantId},visibility.eq.global`);
+        const { data: productsById } = await q.limit(1);
         if (productsById && productsById.length > 0) {
           const p = productsById[0] as Record<string, unknown>;
           result.productId = str(p.id);
@@ -130,11 +162,9 @@ export async function matchSystemProduct(
           result.price = Number(mapping.price) || null;
         }
       } else if (pmProductCode) {
-        const { data: productsByCode } = await client
-          .from('products')
-          .select('*')
-          .eq('code', pmProductCode)
-          .limit(1);
+        let q = client.from('products').select('*').eq('code', pmProductCode);
+        if (tenantId) q = q.or(`owner_tenant_id.eq.${tenantId},visibility.eq.global`);
+        const { data: productsByCode } = await q.limit(1);
         if (productsByCode && productsByCode.length > 0) {
           const p = productsByCode[0] as Record<string, unknown>;
           result.productId = str(p.id);
@@ -155,17 +185,12 @@ export async function matchSystemProduct(
 
   // 2. 如果没有找到映射，直接在商品档案中匹配
   if (!result.productId) {
-    const { data: products } = await client
-      .from('products')
-      .select('*')
-      .eq('is_active', true)
-      .limit(1000);
+    let generalQuery = client.from('products').select('*').eq('is_active', true);
+    if (tenantId) generalQuery = generalQuery.or(`owner_tenant_id.eq.${tenantId},visibility.eq.global`);
+    const { data: products } = await generalQuery.limit(1000);
 
-    if (!products || products.length === 0) {
-      return result;
-    }
-
-    let bestMatch: { product: Record<string, unknown>; score: number; matchType: string } | null = null;
+    if (products && products.length > 0) {
+      let bestMatch: { product: Record<string, unknown>; score: number; matchType: string } | null = null;
 
     for (const product of products) {
       const pName = str(product.name);
@@ -176,34 +201,18 @@ export async function matchSystemProduct(
       let score = 0;
       let matchType = '';
 
-      if (productCode && pCode && (str(productCode) === pCode || safeIncludes(pCode, str(productCode)) || safeIncludes(str(productCode), pCode))) {
+      if (productCode && pCode && str(productCode) === pCode) {
         score = PRODUCT_MATCH_SCORES.CODE_EXACT;
         matchType = 'code';
-      } else if (barcode && pBarcode && (str(barcode) === pBarcode || safeIncludes(pBarcode, str(barcode)) || safeIncludes(str(barcode), pBarcode))) {
+      } else if (barcode && pBarcode && str(barcode) === pBarcode) {
         score = PRODUCT_MATCH_SCORES.BARCODE_EXACT;
         matchType = 'barcode';
-      } else if (productSpec && pSpec && (str(productSpec) === pSpec || safeIncludes(pSpec, str(productSpec)) || safeIncludes(str(productSpec), pSpec))) {
+      } else if (productSpec && pSpec && str(productSpec) === pSpec) {
         score = PRODUCT_MATCH_SCORES.SPEC_EXACT;
         matchType = 'spec';
       } else if (productName && pName && str(productName) === pName) {
         score = PRODUCT_MATCH_SCORES.NAME_EXACT;
         matchType = 'name';
-      } else if (productName && pName && (safeIncludes(pName, str(productName)) || safeIncludes(str(productName), pName))) {
-        score = PRODUCT_MATCH_SCORES.NAME_CONTAINS;
-        matchType = 'name';
-      } else if (productSpec && pSpec && (safeIncludes(pSpec, str(productSpec)) || safeIncludes(str(productSpec), pSpec))) {
-        score = PRODUCT_MATCH_SCORES.SPEC_CONTAINS;
-        matchType = 'spec';
-      } else if (productCode && pCode && (safeIncludes(pCode, str(productCode)) || safeIncludes(str(productCode), pCode))) {
-        score = PRODUCT_MATCH_SCORES.CODE_CONTAINS;
-        matchType = 'code';
-      } else if (productName && pName) {
-        const key1 = str(productName).slice(0, Math.min(4, str(productName).length));
-        const key2 = pName.slice(0, Math.min(4, pName.length));
-        if (key1 && key2 && (safeIncludes(pName, key1) || safeIncludes(str(productName), key2))) {
-          score = PRODUCT_MATCH_SCORES.KEYWORD;
-          matchType = 'keyword';
-        }
       }
 
       if (score > (bestMatch?.score || 0)) {
@@ -211,7 +220,7 @@ export async function matchSystemProduct(
       }
     }
 
-    if (bestMatch && bestMatch.score >= PRODUCT_MATCH_SCORES.MIN_THRESHOLD) {
+    if (bestMatch) {
       const p = bestMatch.product;
       result.productId = p.id as string;
       result.productName = p.name as string;
@@ -220,7 +229,25 @@ export async function matchSystemProduct(
       result.brand = p.brand as string;
       result.price = p.retail_price as number;
       result.matchType = bestMatch.matchType;
-      result.matchHint = `通过商品档案${MATCH_TYPE_LABELS[bestMatch.matchType] || bestMatch.matchType}匹配 (${bestMatch.score}%)`;
+      result.matchHint = `通过商品档案${MATCH_TYPE_LABELS[bestMatch.matchType] || bestMatch.matchType}精确匹配`;
+    }
+    }
+  }
+
+  // 3. 未精确匹配到系统商品，回退到"商品待匹配"默认档案
+  if (!result.productId) {
+    try {
+      const pendingProduct = await ensurePendingMatchProduct(client);
+      result.productId = str(pendingProduct.id);
+      result.productName = str(pendingProduct.name);
+      result.productSpec = str(pendingProduct.spec);
+      result.productCode = str(pendingProduct.code);
+      result.brand = str(pendingProduct.brand);
+      result.price = Number(pendingProduct.retail_price || pendingProduct.cost_price) || null;
+      result.matchType = 'unmatched';
+      result.matchHint = '未精确匹配到系统商品，已关联默认"商品待匹配"档案';
+    } catch (fallbackErr) {
+      console.error('【order-parser】获取"商品待匹配"档案失败:', fallbackErr);
     }
   }
 
@@ -235,7 +262,8 @@ export async function matchSupplierStocks(
   productId: string | null,
   productSpec: string | null,
   productCode: string | null,
-  province: string
+  province: string,
+  tenantId?: string
 ): Promise<{
   supplierId: string;
   supplierName: string;
@@ -249,6 +277,8 @@ export async function matchSupplierStocks(
     .select('*')
     .gt('quantity', 0)
     .eq('status', 'active');
+
+  if (tenantId) query = query.eq('tenant_id', tenantId);
 
   if (productId) {
     query = query.eq('product_id', productId);
@@ -292,7 +322,8 @@ export async function parseExcelData(
   client: ReturnType<typeof getSupabaseClient>,
   rows: (string | number | null)[][],
   columnMapping: Record<string, string>,
-  customerCode: string
+  customerCode: string,
+  tenantId?: string
 ): Promise<ParsedOrderBundleDraft[]> {
   const orders: Map<string, ParsedOrderBundleDraft> = new Map();
 
@@ -379,7 +410,8 @@ export async function parseExcelData(
           finalProductName,
           finalProductSpec,
           finalProductCode,
-          barcode
+          barcode,
+          tenantId
         );
       } catch (matchErr) {
         console.error('【order-parser】matchSystemProduct失败:', matchErr, { productName: finalProductName, spec: finalProductSpec, code: finalProductCode });
@@ -391,7 +423,8 @@ export async function parseExcelData(
         matchedProduct.productId,
         matchedProduct.productSpec,
         matchedProduct.productCode,
-        order.province
+        order.province,
+        tenantId
       );
 
       const orderItem: ParsedOrderDraftItem = {

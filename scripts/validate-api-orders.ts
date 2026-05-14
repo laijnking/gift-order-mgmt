@@ -13,7 +13,7 @@ type QueryResponse<T = Row> = {
   count?: number | null;
 };
 
-type TableName = 'users' | 'customers' | 'orders' | 'suppliers' | 'warehouses';
+type TableName = 'users' | 'customers' | 'orders' | 'suppliers' | 'warehouses' | 'tenants';
 
 type ApiEnvelope<T> = {
   success: boolean;
@@ -91,6 +91,7 @@ class MemoryDatabase {
     orders: [],
     suppliers: [],
     warehouses: [],
+    tenants: [{ id: '00000000-0000-0000-0000-000000000001', code: 'SYL', name: '首映礼', status: 'active' }],
   };
 
   private counters: Record<TableName, number> = {
@@ -99,6 +100,7 @@ class MemoryDatabase {
     orders: 0,
     suppliers: 0,
     warehouses: 0,
+    tenants: 1,
   };
 
   seed(table: TableName, row: Row) {

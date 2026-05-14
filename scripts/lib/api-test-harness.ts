@@ -150,6 +150,7 @@ export function buildAuthedHeaders(user: MockUser = ADMIN_USER) {
       dataScope: user.dataScope,
       permissions: user.permissions,
     }),
+    'x-tenant-id': '00000000-0000-0000-0000-000000000001',
   };
 }
 

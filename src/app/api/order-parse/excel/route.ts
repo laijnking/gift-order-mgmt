@@ -4,6 +4,7 @@ import { getColumnMappingDiagnostics, autoDetectColumnMapping, buildChineseColum
 import { parseExcelData } from '@/lib/order-parser';
 import { requirePermission } from '@/lib/server-auth';
 import { PERMISSIONS } from '@/lib/permissions';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 
 export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_CREATE);
@@ -52,10 +53,12 @@ export async function POST(request: NextRequest) {
     console.log('【API】使用的映射:', mapping);
     console.log('【API】Excel表头:', excelHeaders);
     
+    const tenant = await getTenantFromRequest(request);
+
     // 解析数据
     let orders;
     try {
-      orders = await parseExcelData(client, rows, mapping, customerCode || '');
+      orders = await parseExcelData(client, rows, mapping, customerCode || '', tenant.tenantId);
     } catch (parseErr) {
       console.error('【API】parseExcelData内部错误:', parseErr);
       throw parseErr;

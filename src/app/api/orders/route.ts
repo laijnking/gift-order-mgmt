@@ -8,6 +8,8 @@ import { ORDER_STATUS_ASSIGNED, ORDER_STATUS_COMPLETED } from '@/lib/order-statu
 import { PERMISSIONS } from '@/lib/permissions';
 import { transformOrderItem, apiToDb } from '@/lib/order-adapter';
 import { generateSysOrderNo, bulkUpdateOrderStatus, extractName, getUserRealNameByUsername, findUserIdByName, findCustomerIdByCode, findSupplierIdByName, findWarehouseIdByName, buildRelatedMaps } from '@/lib/order-service';
+import { ensurePendingMatchProduct } from '@/lib/order-parser';
+import { getTenantFromRequest, verifyTenantOwnership } from '@/lib/tenant-context';
 
 interface DuplicateOrderDetail {
   orderNo: string;
@@ -159,7 +161,7 @@ interface ProductMatchResult {
   productSpec: string;
   productCode: string;
   unitPrice: number | null;
-  matchType: 'spec' | 'name' | 'mapping' | 'none';
+  matchType: 'spec' | 'name' | 'mapping' | 'unmatched';
   matchHint: string;
 }
 
@@ -168,27 +170,28 @@ async function matchProduct(
   client: ReturnType<typeof getSupabaseClient>,
   customerProductName: string,
   customerProductCode: string,
-  customerProductSpec: string
+  customerProductSpec: string,
+  tenantId: string
 ): Promise<ProductMatchResult> {
-  // 1. 先查询SKU映射表（客户商品→系统商品）
+  const productVisibility = `owner_tenant_id.eq.${tenantId},visibility.eq.global`;
+
+  // 1. 先查询SKU映射表（客户商品→系统商品）- 精确匹配
   const { data: mappings } = await client
     .from('product_mappings')
     .select('*')
-    .ilike('customer_product_name', `%${customerProductName}%`)
-    .limit(5);
+    .eq('tenant_id', tenantId)
+    .eq('customer_product_name', customerProductName)
+    .limit(1);
 
   if (mappings && mappings.length > 0) {
-    // 找到映射关系，匹配到系统商品
-    const mapping = mappings.find((m: Record<string, unknown>) => {
-      const mappingName = (m.customer_product_name as string) || '';
-      return mappingName.includes(customerProductName) || customerProductName.includes(mappingName);
-    }) || mappings[0];
+    const mapping = mappings[0];
 
     if (mapping) {
       const { data: products } = await client
         .from('products')
         .select('*')
         .eq('id', mapping.system_product_id)
+        .or(productVisibility)
         .limit(1);
 
       if (products && products.length > 0) {
@@ -211,11 +214,11 @@ async function matchProduct(
     const { data: specProducts } = await client
       .from('products')
       .select('*')
-      .ilike('spec', customerProductSpec)
-      .limit(3);
+      .or(productVisibility)
+      .eq('spec', customerProductSpec)
+      .limit(1);
 
     if (specProducts && specProducts.length > 0) {
-      // 找到精确匹配
       const p = specProducts[0];
       return {
         productId: p.id,
@@ -229,13 +232,14 @@ async function matchProduct(
     }
   }
 
-  // 3. 根据商品名称模糊匹配 products 表
+  // 3. 根据商品名称精确匹配 products 表
   if (customerProductName) {
     const { data: nameProducts } = await client
       .from('products')
       .select('*')
-      .ilike('name', `%${customerProductName}%`)
-      .limit(3);
+      .or(productVisibility)
+      .eq('name', customerProductName)
+      .limit(1);
 
     if (nameProducts && nameProducts.length > 0) {
       const p = nameProducts[0];
@@ -246,27 +250,41 @@ async function matchProduct(
         productCode: p.code as string || '',
         unitPrice: p.unit_price as number || null,
         matchType: 'name',
-        matchHint: `通过商品名称模糊匹配：${customerProductName} → ${p.name}`,
+        matchHint: `通过商品名称精确匹配：${customerProductName} → ${p.name}`,
       };
     }
   }
 
-  // 4. 未匹配到任何商品档案
-  return {
-    productId: null,
-    productName: customerProductName,
-    productSpec: customerProductSpec,
-    productCode: customerProductCode,
-    unitPrice: null,
-    matchType: 'none',
-    matchHint: `未匹配到商品档案，使用客户原始信息`,
-  };
+  // 4. 未精确匹配到，回退到"商品待匹配"默认档案
+  try {
+    const pendingProduct = await ensurePendingMatchProduct(client);
+    return {
+      productId: pendingProduct.id as string,
+      productName: pendingProduct.name as string,
+      productSpec: (pendingProduct.spec as string) || '',
+      productCode: (pendingProduct.code as string) || '',
+      unitPrice: Number((pendingProduct.retail_price || pendingProduct.cost_price) as number) || null,
+      matchType: 'unmatched',
+      matchHint: '未精确匹配到系统商品，已关联默认"商品待匹配"档案',
+    };
+  } catch {
+    return {
+      productId: null,
+      productName: customerProductName,
+      productSpec: customerProductSpec,
+      productCode: customerProductCode,
+      unitPrice: null,
+      matchType: 'unmatched',
+      matchHint: '未精确匹配到系统商品，且获取"商品待匹配"档案失败',
+    };
+  }
 }
 
 // 获取所有订单
 export async function GET(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_VIEW);
   if (authError) return authError;
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
   const status = searchParams.get('status');
@@ -287,6 +305,9 @@ export async function GET(request: NextRequest) {
 
   try {
     let query = client.from('orders').select('*', { count: 'exact' });
+
+    // 租户数据隔离
+    query = query.eq('tenant_id', tenant.tenantId);
 
     // ==================== 数据权限过滤 ====================
     // 仅本人(self)：只看业务员或跟单员是自己的订单
@@ -406,7 +427,8 @@ export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_CREATE);
   if (authError) return authError;
   const client = getSupabaseClient();
-  
+  const tenant = await getTenantFromRequest(request);
+
   try {
     const contentType = request.headers.get('content-type') || '';
 
@@ -875,7 +897,7 @@ export async function POST(request: NextRequest) {
     const ordersToInsert = [];
     const importBatch = `BATCH-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Date.now().toString().slice(-4)}`;
     // 记录匹配结果统计
-    const matchStats = { spec: 0, name: 0, mapping: 0, none: 0 };
+    const matchStats = { spec: 0, name: 0, mapping: 0, unmatched: 0 };
 
     for (let i = 1; i < jsonData.length; i++) {
       const row = jsonData[i];
@@ -905,7 +927,7 @@ export async function POST(request: NextRequest) {
       const originalStatus = getValue(fieldMappings.originalStatus) || '';
 
       // 商品档案自动匹配
-      const matchResult = await matchProduct(client, productName, customerProductCode, customerProductSpec);
+      const matchResult = await matchProduct(client, productName, customerProductCode, customerProductSpec, tenant.tenantId);
       matchStats[matchResult.matchType]++;
 
       // 生成唯一匹配码
@@ -1142,7 +1164,7 @@ export async function POST(request: NextRequest) {
           fuzzyDuplicateCount: duplicateDetails.filter((item) => item.reason === 'fuzzy_match').length,
           details: duplicateDetails,
         },
-        matchStats: { total: 0, bySpec: matchStats.spec, byName: matchStats.name, byMapping: matchStats.mapping, none: matchStats.none, matched: 0, matchRate: '0.0%' },
+        matchStats: { total: 0, bySpec: matchStats.spec, byName: matchStats.name, byMapping: matchStats.mapping, unmatched: matchStats.unmatched, matched: 0, matchRate: '0.0%' },
         message: `没有导入新订单，${batchSkippedCount} 条记录因重复被跳过`
       });
     }
@@ -1167,16 +1189,16 @@ export async function POST(request: NextRequest) {
         bySpec: matchStats.spec,
         byName: matchStats.name,
         byMapping: matchStats.mapping,
-        none: matchStats.none,
-        matched: Math.max(finalOrdersFd.length - matchStats.none, 0),
+        unmatched: matchStats.unmatched,
+        matched: Math.max(finalOrdersFd.length - matchStats.unmatched, 0),
         matchRate: finalOrdersFd.length > 0
-          ? ((Math.max(finalOrdersFd.length - matchStats.none, 0) / finalOrdersFd.length) * 100).toFixed(1) + '%'
+          ? ((Math.max(finalOrdersFd.length - matchStats.unmatched, 0) / finalOrdersFd.length) * 100).toFixed(1) + '%'
           : '0.0%'
       },
       message:
         batchSkippedCount > 0
           ? `成功导入 ${data?.length || 0} 条订单，另有 ${batchSkippedCount} 条重复记录已跳过`
-          : `成功导入 ${data?.length || 0} 条订单，其中 ${Math.max(finalOrdersFd.length - matchStats.none, 0)} 条已匹配商品档案`
+          : `成功导入 ${data?.length || 0} 条订单，其中 ${Math.max(finalOrdersFd.length - matchStats.unmatched, 0)} 条已匹配商品档案`
     });
 
   } catch (error) {
@@ -1338,11 +1360,19 @@ export async function PATCH(request: NextRequest) {
     debugInfo.updateDataKeys = Object.keys(updateData);
     debugInfo.updateData = updateData;
 
+    // 验证租户所有权
+    const patchTenant = await getTenantFromRequest(request);
+    const isOwner = await verifyTenantOwnership(client, 'orders', targetId, patchTenant.tenantId);
+    if (!isOwner) {
+      return NextResponse.json({ success: false, error: '订单不存在或无权操作' }, { status: 404 });
+    }
+
     console.log('[PATCH /api/orders] calling supabase with id:', targetId, 'data:', JSON.stringify(updateData));
     const { data, error } = await client
       .from('orders')
       .update(updateData)
       .eq('id', targetId)
+      .eq('tenant_id', patchTenant.tenantId)
       .select();
 
     if (error) {
@@ -1383,25 +1413,26 @@ export async function DELETE(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_DELETE);
   if (authError) return authError;
   const client = getSupabaseClient();
-  
+  const tenant = await getTenantFromRequest(request);
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    const ids = searchParams.get('ids'); // 批量删除，多个ID用逗号分隔
+    const ids = searchParams.get('ids');
 
     if (!id && !ids) {
-      return NextResponse.json({ 
-        success: false, 
-        error: '订单ID不能为空' 
+      return NextResponse.json({
+        success: false,
+        error: '订单ID不能为空'
       }, { status: 400 });
     }
 
-    // 检查订单状态约束：进入业务闭环后的订单不能删除
     const checkIds = id ? [id] : ids!.split(',');
-    
+
     const { data: ordersToDelete, error: queryError } = await client
       .from('orders')
       .select('id, status, sys_order_no')
+      .eq('tenant_id', tenant.tenantId)
       .in('id', checkIds);
 
     if (queryError) throw new Error(`查询订单失败: ${queryError.message}`);
@@ -1425,10 +1456,11 @@ export async function DELETE(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // 执行删除
+    // 执行删除（加租户隔离）
     const { error: deleteError } = await client
       .from('orders')
       .delete()
+      .eq('tenant_id', tenant.tenantId)
       .in('id', checkIds);
 
     if (deleteError) throw new Error(`删除订单失败: ${deleteError.message}`);
