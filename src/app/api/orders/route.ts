@@ -129,6 +129,7 @@ function transformOrder(dbOrder: Record<string, unknown>, options?: {
     completedAt: dbOrder.completed_at as string | undefined,
     remark: dbOrder.remark as string | undefined,
     channelRemark: dbOrder.channel_remark as string | undefined,
+    systemRemark: dbOrder.system_remark as string | undefined,
     suggestedShipper: dbOrder.suggested_shipper as string | undefined,
     originalStatus: dbOrder.original_status as string | undefined,
     expressRequirement: dbOrder.express_requirement as string | undefined,
@@ -462,6 +463,9 @@ export async function POST(request: NextRequest) {
       const importBatch = `AI-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Date.now().toString().slice(-4)}`;
       const ordersToInsert = [];
 
+      // 预取默认"商品待匹配"档案，用于未匹配商品回退
+      const pendingProduct = await ensurePendingMatchProduct(client).catch(() => null);
+
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
         if (!item.productName) continue;
@@ -505,11 +509,11 @@ export async function POST(request: NextRequest) {
           supplier_order_no: item.supplierOrderNo || null,
           status: itemSupplierInfo?.id ? 'assigned' : 'pending',
           items: [{
-            product_id: item.systemProductId || item.productId || null,
-            product_name: item.systemProductName || item.mappedProductName || item.productName,
-            product_spec: item.systemProductSpec || item.mappedProductSpec || item.productSpec || '',
-            product_code: item.systemProductCode || item.mappedProductCode || item.productCode || '',
-            product_brand: item.systemProductBrand || item.mappedProductBrand || '',
+            product_id: item.systemProductId || item.productId || (pendingProduct?.id as string) || null,
+            product_name: item.systemProductName || item.mappedProductName || item.productName || (pendingProduct?.name as string) || '商品待匹配',
+            product_spec: item.systemProductSpec || item.mappedProductSpec || item.productSpec || (pendingProduct?.spec as string) || '',
+            product_code: item.systemProductCode || item.mappedProductCode || item.productCode || (pendingProduct?.code as string) || '',
+            product_brand: item.systemProductBrand || item.mappedProductBrand || (pendingProduct?.brand as string) || '',
             cu_product_name: item.cuProductName || item.productName,
             cu_product_spec: item.cuProductSpec || item.productSpec || '',
             cu_product_code: item.cuProductCode || item.productCode || '',
@@ -556,6 +560,7 @@ export async function POST(request: NextRequest) {
           invoice_required: item.invoice_required || null,
           source: bodySource || 'ai_parse',
           channel_remark: item.channel_remark || null,
+          system_remark: item.system_remark || null,
           suggested_shipper: item.suggested_shipper || null,
           original_status: item.original_status || null,
           import_batch: importBatch,
@@ -865,6 +870,7 @@ export async function POST(request: NextRequest) {
       remark: findHeader(headers, ['备注', '商品行备注', '买家留言', '订单备注', '客服备注']),
       barcode: findHeader(headers, ['条码', '商品69码', '条形码']),
       channelRemark: findHeader(headers, ['渠道备注']),
+      system_remark: findHeader(headers, ['系统备注']),
       suggestedShipper: findHeader(headers, ['店铺名称', '供应商名称', '发货供应商']),
       originalStatus: findHeader(headers, ['订单状态', '付款状态', '发货状态']),
     };
@@ -916,6 +922,7 @@ export async function POST(request: NextRequest) {
       const remark = getValue(fieldMappings.remark) || '';
       const barcode = getValue(fieldMappings.barcode) || '';
       const channelRemark = getValue(fieldMappings.channelRemark) || '';
+      const systemRemark = getValue(fieldMappings.system_remark) || '';
       const suggestedShipper = getValue(fieldMappings.suggestedShipper) || '';
       const originalStatus = getValue(fieldMappings.originalStatus) || '';
 
@@ -979,6 +986,7 @@ export async function POST(request: NextRequest) {
         salesperson: salesperson,
         source: 'excel',
         channel_remark: channelRemark || null,
+        system_remark: systemRemark || null,
         suggested_shipper: suggestedShipper || null,
         original_status: originalStatus || null,
         import_batch: importBatch,
@@ -1246,6 +1254,7 @@ export async function PATCH(request: NextRequest) {
       customer_code,
       items: itemsArr,
       express_requirement,
+      system_remark,
       receiver_name,
       receiver_phone,
       receiver_address,
@@ -1339,6 +1348,8 @@ export async function PATCH(request: NextRequest) {
     // 新字段
     const { channelRemark, suggestedShipper, originalStatus } = body;
     if (channelRemark !== undefined) updateData.channel_remark = channelRemark;
+    if (system_remark !== undefined) updateData.system_remark = system_remark;
+    else if (body.systemRemark !== undefined) updateData.system_remark = body.systemRemark;
     if (suggestedShipper !== undefined) updateData.suggested_shipper = suggestedShipper;
     if (originalStatus !== undefined) updateData.original_status = originalStatus;
 

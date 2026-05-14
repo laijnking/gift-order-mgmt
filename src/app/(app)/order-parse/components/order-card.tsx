@@ -746,25 +746,37 @@ export function OrderCard({
                     </Select>
                   </div>
 
-                  {/* Remark */}
+                  {/* Remark (read-only) */}
                   <div>
-                    <Label className="text-xs text-muted-foreground">备注</Label>
+                    <Label className="text-xs text-muted-foreground">订单备注</Label>
                     <Input
                       value={order.remark || ''}
-                      onChange={(e) => onUpdate(order.id, 'remark', e.target.value)}
-                      className="h-7 text-xs"
-                      placeholder="备注信息"
+                      disabled
+                      className="h-7 text-xs bg-muted"
+                      placeholder="—"
                     />
                   </div>
 
-                  {/* Channel remark + suggested shipper + original status */}
+                  {/* Channel remark (read-only) */}
                   <div>
                     <Label className="text-xs text-muted-foreground">渠道备注</Label>
                     <Input
                       value={order.channel_remark as string || ''}
-                      onChange={(e) => onUpdate(order.id, 'channel_remark', e.target.value)}
+                      disabled
+                      className="h-7 text-xs bg-muted"
+                      placeholder="—"
+                    />
+                  </div>
+
+                  {/* System Remark (editable) */}
+                  <div>
+                    <Label className="text-xs text-muted-foreground">系统备注</Label>
+                    <Input
+                      value={order.system_remark as string || ''}
+                      onChange={(e) => onUpdate(order.id, 'system_remark', e.target.value)}
                       className="h-7 text-xs"
-                      placeholder="渠道备注"
+                      placeholder="系统备注（内部运营使用，最长200字）"
+                      maxLength={200}
                     />
                   </div>
 

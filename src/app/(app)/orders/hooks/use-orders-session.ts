@@ -130,6 +130,7 @@ export interface Order {
   invoiceRequired?: boolean;
   remark?: string;
   channelRemark?: string;
+  systemRemark?: string;
   suggestedShipper?: string;
   originalStatus?: string;
   expressRequirement?: string;

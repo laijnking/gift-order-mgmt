@@ -40,6 +40,7 @@ export function useOrdersCrud({
     channelRemark: '',
     expressRequirement: '',
     remark: '',
+    systemRemark: '',
   });
   const [createLoading, setCreateLoading] = useState(false);
 
@@ -64,6 +65,7 @@ export function useOrdersCrud({
     receiverProvince: '',
     expressRequirement: '',
     remark: '',
+    systemRemark: '',
     status: '',
     supplierId: '',
     supplierName: '',
@@ -119,6 +121,7 @@ export function useOrdersCrud({
             price: parseFloat(createForm.price) || null,
             remark: createForm.remark || '',
             channel_remark: createForm.channelRemark || null,
+            system_remark: createForm.systemRemark || '',
           }],
           receiver: {
             name: createForm.receiverName,
@@ -128,6 +131,7 @@ export function useOrdersCrud({
           freightCost: parseFloat(createForm.freightCost) || null,
           expressRequirement: createForm.expressRequirement || '',
           remark: createForm.remark || '',
+          system_remark: createForm.systemRemark || '',
           source: 'manual',
         }),
       });
@@ -143,7 +147,7 @@ export function useOrdersCrud({
           cuProductName: '', cuProductCode: '', cuProductSpec: '',
           quantity: 1, price: '',
           receiverName: '', receiverPhone: '', receiverAddress: '',
-          freightCost: '', channelRemark: '', expressRequirement: '', remark: '',
+          freightCost: '', channelRemark: '', expressRequirement: '', remark: '', systemRemark: '',
         });
         fetchOrders();
       } else {
@@ -181,6 +185,7 @@ export function useOrdersCrud({
       receiverProvince: order.receiver.province || '',
       expressRequirement: (order as unknown as Record<string, string>).expressRequirement || '',
       remark: (order as unknown as Record<string, string>).remark || '',
+      systemRemark: (order as unknown as Record<string, string>).systemRemark || '',
       status: order.status,
       supplierId: order.supplierId || '',
       supplierName: order.supplierName || '',
@@ -209,6 +214,7 @@ export function useOrdersCrud({
           cu_product_name: editForm.cuProductName || '',
           cu_product_code: editForm.cuProductCode || '',
           cu_product_spec: editForm.cuProductSpec || '',
+          system_remark: editForm.systemRemark || '',
           quantity: editForm.quantity || 1,
           product_id: editForm.productId || '',
         }],
@@ -218,6 +224,7 @@ export function useOrdersCrud({
         province: editForm.receiverProvince || '',
         express_requirement: editForm.expressRequirement || '',
         remark: editForm.remark || '',
+        system_remark: editForm.systemRemark || '',
       };
       if (!LOCKED_STATUSES.includes(editForm.status)) {
         if (editForm.supplierId) { updateData.supplier_id = editForm.supplierId; updateData.supplier_name = editForm.supplierName; }

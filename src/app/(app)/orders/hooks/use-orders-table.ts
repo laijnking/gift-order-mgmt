@@ -16,6 +16,7 @@ export interface VisibleColumns {
   salesperson: boolean;
   operator: boolean;
   supplier: boolean;
+  systemRemark: boolean;
   createdAt: boolean;
 }
 
@@ -31,6 +32,7 @@ export const DEFAULT_VISIBLE_COLUMNS: VisibleColumns = {
   salesperson: true,
   operator: true,
   supplier: true,
+  systemRemark: false,
   createdAt: true,
 };
 

@@ -232,6 +232,12 @@ export function OrderDetailsDialog({
               <p className="text-sm text-blue-700">{order.channelRemark}</p>
             </div>
           )}
+          {order.systemRemark && (
+            <div className="border rounded-lg p-4 bg-green-50 border-green-200">
+              <h4 className="text-sm font-medium text-green-800 mb-1">系统备注</h4>
+              <p className="text-sm text-green-700">{order.systemRemark}</p>
+            </div>
+          )}
 
           {/* Items */}
           <div>

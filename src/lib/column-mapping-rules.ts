@@ -17,6 +17,7 @@ export const COLUMN_OPTIONS = [
   { value: 'supplier_name', label: '发货方', group: '基础信息' },
   { value: 'suggested_shipper', label: '建议发货方', group: '基础信息' },
   { value: 'channel_remark', label: '渠道备注', group: '基础信息' },
+  { value: 'system_remark', label: '系统备注', group: '基础信息' },
   { value: 'original_status', label: '原订单状态', group: '基础信息' },
   { value: 'salesperson', label: '业务员', group: '人员信息' },
   { value: 'operator', label: '跟单员', group: '人员信息' },
@@ -69,6 +70,7 @@ export const COMMON_FIELDS = [
   'tracking_no',
   'remark',
   'channel_remark',
+  'system_remark',
   'suggested_shipper',
   'original_status',
 ];

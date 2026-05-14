@@ -356,6 +356,7 @@ export async function parseExcelData(
       const remark = getFieldValue(row, columnMapping, 'remark');
       const billDate = getFieldValue(row, columnMapping, 'bill_date');
       const channelRemark = getFieldValue(row, columnMapping, 'channel_remark');
+      const systemRemark = getFieldValue(row, columnMapping, 'system_remark');
       const suggestedShipper = getFieldValue(row, columnMapping, 'suggested_shipper');
       const originalStatus = getFieldValue(row, columnMapping, 'original_status');
 
@@ -396,6 +397,7 @@ export async function parseExcelData(
             trackingNo,
             remark,
             channelRemark,
+            systemRemark,
             suggestedShipper,
             originalStatus,
             extFields,

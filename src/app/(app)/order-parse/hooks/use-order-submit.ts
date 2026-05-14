@@ -114,6 +114,7 @@ export function useOrderSubmit() {
           operator: o.operator ?? '',
           extFields: o.extFields as Record<string, string> || {},
           channel_remark: o.channel_remark ?? null,
+          system_remark: o.system_remark ?? null,
           suggested_shipper: o.suggested_shipper ?? null,
           original_status: o.original_status ?? null,
         };

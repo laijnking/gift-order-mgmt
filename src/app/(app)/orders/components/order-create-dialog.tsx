@@ -50,6 +50,7 @@ export interface CreateOrderForm {
   channelRemark: string;
   expressRequirement: string;
   remark: string;
+  systemRemark: string;
 }
 
 interface UserInfo {
@@ -493,22 +494,13 @@ export function OrderCreateDialog({
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">客户备注（原渠道备注）</Label>
+              <Label className="text-xs text-muted-foreground">系统备注</Label>
               <Textarea
-                placeholder="客户下单时的原始备注"
+                placeholder="系统备注（内部运营使用，最长200字）"
                 rows={2}
-                value={form.channelRemark}
-                onChange={(e) => setForm(prev => ({ ...prev, channelRemark: e.target.value }))}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">内部运营备注</Label>
-              <Textarea
-                placeholder="运营人员备注"
-                rows={2}
-                value={form.remark}
-                onChange={(e) => setForm(prev => ({ ...prev, remark: e.target.value }))}
+                maxLength={200}
+                value={form.systemRemark}
+                onChange={(e) => setForm(prev => ({ ...prev, systemRemark: e.target.value }))}
               />
             </div>
 

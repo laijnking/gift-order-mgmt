@@ -182,6 +182,7 @@ const SYSTEM_FIELDS = [
   { key: 'expressFee', label: '运费' },             // order.express_fee
   // === 备注 ===
   { key: 'remark', label: '备注' },                  // order.remark
+  { key: 'systemRemark', label: '系统备注' },       // order.system_remark
   { key: 'createdAt', label: '创建日期' },          // order.created_at
 ];
 
