@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -69,6 +69,13 @@ export function OrderAssignDialog({
   const [manualSelectSupplierId, setManualSelectSupplierId] = useState('');
   const [manualSelectSupplierName, setManualSelectSupplierName] = useState('');
 
+  // 批量派发模式打开对话框时自动触发智能匹配
+  useEffect(() => {
+    if (open && !assigningOrderId && Object.keys(matchResults).length === 0) {
+      onSmartMatch();
+    }
+  }, [open, assigningOrderId, matchResults, onSmartMatch]);
+
   const openManualSelect = (orderId: string) => {
     setManualSelectOrderId(orderId);
     setManualSelectSupplierId(selectedSuppliers[orderId] || '');
@@ -107,7 +114,7 @@ export function OrderAssignDialog({
           if (!o) setMatchResults({});
         }}
       >
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="!max-w-[95vw] !w-[95vw] max-h-[95vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>
               {assigningOrderId ? '派发订单' : '批量派发订单'}
@@ -145,7 +152,7 @@ export function OrderAssignDialog({
                       {/* Header */}
                       <div className="bg-muted/50 px-4 py-3 flex items-center justify-between">
                         <div>
-                          <p className="font-medium">{order?.sysOrderNo || order?.orderNo || '未知订单'}</p>
+                          <p className="font-medium">{order?.customerName || order?.sysOrderNo || order?.orderNo || '未知订单'}</p>
                           <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
                             {result.receiverProvince && <span>收货省份：{result.receiverProvince}</span>}
                             {result.productName && <span>商品：{result.productName}</span>}

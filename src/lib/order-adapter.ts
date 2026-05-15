@@ -76,6 +76,7 @@ export const API_TO_DB_FIELD_MAP: Record<string, string> = {
   // 状态/时间
   status: 'status',
   remark: 'remark',
+  systemRemark: 'system_remark',
   isActive: 'is_active',
   assignedAt: 'assigned_at',
   completedAt: 'completed_at',

@@ -611,6 +611,7 @@ export default function OrdersPage() {
                     ['operator', '跟单员'],
                     ['supplier', '发货方'],
                     ['createdAt', '创建时间'],
+                    ['systemRemark', '系统备注'],
                   ] as [keyof typeof visibleColumns, string][]).map(([key, label]) => (
                     <label key={key} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/60 cursor-pointer text-sm">
                       <input
@@ -863,6 +864,7 @@ export default function OrdersPage() {
                   {visibleColumns.operator && <TableHead>跟单员</TableHead>}
                   <TableHead>状态</TableHead>
                   {visibleColumns.supplier && <TableHead>发货方</TableHead>}
+                  {visibleColumns.systemRemark && <TableHead>系统备注</TableHead>}
                   {visibleColumns.createdAt && <TableHead>创建时间</TableHead>}
                   <TableHead className="text-right">操作</TableHead>
                 </TableRow>
@@ -870,7 +872,7 @@ export default function OrdersPage() {
               <TableBody>
                 {filteredOrders.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={15} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={16} className="text-center py-8 text-muted-foreground">
                       {orders.length === 0 ? '暂无订单数据' : '未找到匹配的订单'}
                     </TableCell>
                   </TableRow>
@@ -971,6 +973,11 @@ export default function OrdersPage() {
                       </TableCell>
                       {visibleColumns.supplier && (
                         <TableCell className="text-sm">{order.supplierName || '-'}</TableCell>
+                      )}
+                      {visibleColumns.systemRemark && (
+                        <TableCell className="text-sm text-muted-foreground max-w-[150px] truncate" title={order.systemRemark || ''}>
+                          {order.systemRemark || '-'}
+                        </TableCell>
                       )}
                       {visibleColumns.createdAt && (
                         <TableCell className="text-sm text-muted-foreground">

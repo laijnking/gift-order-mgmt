@@ -44,6 +44,9 @@ export interface EditOrderForm {
   productCode: string;
   productSpec: string;
   productBrand: string;
+  cuProductName: string;
+  cuProductCode: string;
+  cuProductSpec: string;
   quantity: number;
   receiverName: string;
   receiverPhone: string;
@@ -51,6 +54,7 @@ export interface EditOrderForm {
   receiverProvince: string;
   expressRequirement: string;
   remark: string;
+  systemRemark: string;
   status: string;
   supplierId: string;
   supplierName: string;
@@ -95,7 +99,7 @@ export function OrderEditDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="!max-w-[95vw]">
           <DialogHeader>
             <DialogTitle>编辑订单</DialogTitle>
             <DialogDescription asChild>
@@ -119,7 +123,7 @@ export function OrderEditDialog({
               </p>
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+          <div className="space-y-4 max-h-[75vh] overflow-y-auto">
             {/* 基本信息 */}
             <div className="border-b pb-3">
               <div className="text-sm font-medium text-muted-foreground mb-2">基本信息</div>
@@ -139,8 +143,31 @@ export function OrderEditDialog({
                 </div>
               </div>
               <div className="space-y-2 mt-3">
+                <Label className="text-muted-foreground">客户商品信息</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  <Input
+                    value={form.cuProductName || '-'}
+                    readOnly
+                    className="bg-muted text-sm"
+                    placeholder="商品名称"
+                  />
+                  <Input
+                    value={form.cuProductCode || '-'}
+                    readOnly
+                    className="bg-muted text-sm"
+                    placeholder="商品编码"
+                  />
+                  <Input
+                    value={form.cuProductSpec || '-'}
+                    readOnly
+                    className="bg-muted text-sm"
+                    placeholder="商品规格"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2 mt-3">
                 <div className="flex items-center justify-between">
-                  <Label className="text-muted-foreground">匹配系统商品</Label>
+                  <Label className="text-muted-foreground">系统商品信息</Label>
                   {!isLocked && (
                     <Button
                       variant="outline"
@@ -341,11 +368,12 @@ export function OrderEditDialog({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>备注</Label>
+                  <Label>系统备注</Label>
                   <Textarea
                     rows={2}
-                    value={form.remark}
-                    onChange={(e) => setForm(prev => ({ ...prev, remark: e.target.value }))}
+                    maxLength={200}
+                    value={form.systemRemark}
+                    onChange={(e) => setForm(prev => ({ ...prev, systemRemark: e.target.value }))}
                   />
                 </div>
               </div>

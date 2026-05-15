@@ -130,6 +130,7 @@ function transformOrder(dbOrder: Record<string, unknown>, options?: {
     completedAt: dbOrder.completed_at as string | undefined,
     remark: dbOrder.remark as string | undefined,
     channelRemark: dbOrder.channel_remark as string | undefined,
+    systemRemark: dbOrder.system_remark as string | undefined,
     suggestedShipper: dbOrder.suggested_shipper as string | undefined,
     originalStatus: dbOrder.original_status as string | undefined,
     expressRequirement: dbOrder.express_requirement as string | undefined,
@@ -161,7 +162,7 @@ interface ProductMatchResult {
   productSpec: string;
   productCode: string;
   unitPrice: number | null;
-  matchType: 'spec' | 'name' | 'mapping' | 'unmatched';
+  matchType: 'spec' | 'name' | 'mapping' | 'unmatched' | 'none';
   matchHint: string;
 }
 
@@ -255,27 +256,28 @@ async function matchProduct(
     }
   }
 
-  // 4. 未精确匹配到，回退到"商品待匹配"默认档案
+// 4. 未匹配到任何商品档案，回退到"商品待匹配"默认档案
   try {
     const pendingProduct = await ensurePendingMatchProduct(client);
     return {
-      productId: pendingProduct.id as string,
-      productName: pendingProduct.name as string,
-      productSpec: (pendingProduct.spec as string) || '',
-      productCode: (pendingProduct.code as string) || '',
-      unitPrice: Number((pendingProduct.retail_price || pendingProduct.cost_price) as number) || null,
-      matchType: 'unmatched',
+      productId: (pendingProduct.id as string) || null,
+      productName: (pendingProduct.name as string) || '商品待匹配',
+      productSpec: (pendingProduct.spec as string) || '商品待匹配',
+      productCode: (pendingProduct.code as string) || 'PENDING_MATCH',
+      unitPrice: null,
+      matchType: 'unmatched' as ProductMatchResult['matchType'],
       matchHint: '未精确匹配到系统商品，已关联默认"商品待匹配"档案',
     };
-  } catch {
+  } catch (fallbackErr) {
+    console.error('【orders/route】获取"商品待匹配"档案失败:', fallbackErr);
     return {
       productId: null,
       productName: customerProductName,
       productSpec: customerProductSpec,
       productCode: customerProductCode,
       unitPrice: null,
-      matchType: 'unmatched',
-      matchHint: '未精确匹配到系统商品，且获取"商品待匹配"档案失败',
+      matchType: 'none',
+      matchHint: `未匹配到商品档案，使用客户原始信息`,
     };
   }
 }
@@ -469,6 +471,9 @@ export async function POST(request: NextRequest) {
       const importBatch = `AI-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Date.now().toString().slice(-4)}`;
       const ordersToInsert = [];
 
+      // 预取默认"商品待匹配"档案，用于未匹配商品回退
+      const pendingProduct = await ensurePendingMatchProduct(client).catch(() => null);
+
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
         if (!item.productName) continue;
@@ -512,11 +517,19 @@ export async function POST(request: NextRequest) {
           supplier_order_no: item.supplierOrderNo || null,
           status: itemSupplierInfo?.id ? 'assigned' : 'pending',
           items: [{
-            product_id: item.systemProductId || item.productId || null,
-            product_name: item.systemProductName || item.mappedProductName || item.productName,
-            product_spec: item.systemProductSpec || item.mappedProductSpec || item.productSpec || '',
-            product_code: item.systemProductCode || item.mappedProductCode || item.productCode || '',
-            product_brand: item.systemProductBrand || item.mappedProductBrand || '',
+            product_id: item.systemProductId || item.productId || (pendingProduct?.id as string) || null,
+            product_name: (item.systemProductId || item.productId)
+              ? (item.systemProductName || item.mappedProductName || item.productName || '商品待匹配')
+              : ((pendingProduct?.name as string) || '商品待匹配'),
+            product_spec: (item.systemProductId || item.productId)
+              ? (item.systemProductSpec || item.mappedProductSpec || item.productSpec || '')
+              : ((pendingProduct?.spec as string) || ''),
+            product_code: (item.systemProductId || item.productId)
+              ? (item.systemProductCode || item.mappedProductCode || item.productCode || '')
+              : ((pendingProduct?.code as string) || ''),
+            product_brand: (item.systemProductId || item.productId)
+              ? (item.systemProductBrand || item.mappedProductBrand || '')
+              : ((pendingProduct?.brand as string) || ''),
             cu_product_name: item.cuProductName || item.productName,
             cu_product_spec: item.cuProductSpec || item.productSpec || '',
             cu_product_code: item.cuProductCode || item.productCode || '',
@@ -563,6 +576,7 @@ export async function POST(request: NextRequest) {
           invoice_required: item.invoice_required || null,
           source: bodySource || 'ai_parse',
           channel_remark: item.channel_remark || null,
+          system_remark: item.system_remark || null,
           suggested_shipper: item.suggested_shipper || null,
           original_status: item.original_status || null,
           import_batch: importBatch,
@@ -872,6 +886,7 @@ export async function POST(request: NextRequest) {
       remark: findHeader(headers, ['备注', '商品行备注', '买家留言', '订单备注', '客服备注']),
       barcode: findHeader(headers, ['条码', '商品69码', '条形码']),
       channelRemark: findHeader(headers, ['渠道备注']),
+      system_remark: findHeader(headers, ['系统备注']),
       suggestedShipper: findHeader(headers, ['店铺名称', '供应商名称', '发货供应商']),
       originalStatus: findHeader(headers, ['订单状态', '付款状态', '发货状态']),
     };
@@ -897,7 +912,7 @@ export async function POST(request: NextRequest) {
     const ordersToInsert = [];
     const importBatch = `BATCH-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Date.now().toString().slice(-4)}`;
     // 记录匹配结果统计
-    const matchStats = { spec: 0, name: 0, mapping: 0, unmatched: 0 };
+    const matchStats = { spec: 0, name: 0, mapping: 0, unmatched: 0, none: 0 };
 
     for (let i = 1; i < jsonData.length; i++) {
       const row = jsonData[i];
@@ -923,6 +938,7 @@ export async function POST(request: NextRequest) {
       const remark = getValue(fieldMappings.remark) || '';
       const barcode = getValue(fieldMappings.barcode) || '';
       const channelRemark = getValue(fieldMappings.channelRemark) || '';
+      const systemRemark = getValue(fieldMappings.system_remark) || '';
       const suggestedShipper = getValue(fieldMappings.suggestedShipper) || '';
       const originalStatus = getValue(fieldMappings.originalStatus) || '';
 
@@ -986,6 +1002,7 @@ export async function POST(request: NextRequest) {
         salesperson: salesperson,
         source: 'excel',
         channel_remark: channelRemark || null,
+        system_remark: systemRemark || null,
         suggested_shipper: suggestedShipper || null,
         original_status: originalStatus || null,
         import_batch: importBatch,
@@ -1164,7 +1181,7 @@ export async function POST(request: NextRequest) {
           fuzzyDuplicateCount: duplicateDetails.filter((item) => item.reason === 'fuzzy_match').length,
           details: duplicateDetails,
         },
-        matchStats: { total: 0, bySpec: matchStats.spec, byName: matchStats.name, byMapping: matchStats.mapping, unmatched: matchStats.unmatched, matched: 0, matchRate: '0.0%' },
+        matchStats: { total: 0, bySpec: matchStats.spec, byName: matchStats.name, byMapping: matchStats.mapping, unmatched: matchStats.unmatched, none: matchStats.none, matched: 0, matchRate: '0.0%' },
         message: `没有导入新订单，${batchSkippedCount} 条记录因重复被跳过`
       });
     }
@@ -1190,15 +1207,16 @@ export async function POST(request: NextRequest) {
         byName: matchStats.name,
         byMapping: matchStats.mapping,
         unmatched: matchStats.unmatched,
-        matched: Math.max(finalOrdersFd.length - matchStats.unmatched, 0),
+        none: matchStats.none,
+        matched: Math.max(finalOrdersFd.length - matchStats.none, 0),
         matchRate: finalOrdersFd.length > 0
-          ? ((Math.max(finalOrdersFd.length - matchStats.unmatched, 0) / finalOrdersFd.length) * 100).toFixed(1) + '%'
+          ? ((Math.max(finalOrdersFd.length - matchStats.none, 0) / finalOrdersFd.length) * 100).toFixed(1) + '%'
           : '0.0%'
       },
       message:
         batchSkippedCount > 0
           ? `成功导入 ${data?.length || 0} 条订单，另有 ${batchSkippedCount} 条重复记录已跳过`
-          : `成功导入 ${data?.length || 0} 条订单，其中 ${Math.max(finalOrdersFd.length - matchStats.unmatched, 0)} 条已匹配商品档案`
+          : `成功导入 ${data?.length || 0} 条订单，其中 ${Math.max(finalOrdersFd.length - matchStats.none, 0)} 条已匹配商品档案`
     });
 
   } catch (error) {
@@ -1252,6 +1270,7 @@ export async function PATCH(request: NextRequest) {
       customer_code,
       items: itemsArr,
       express_requirement,
+      system_remark,
       receiver_name,
       receiver_phone,
       receiver_address,
@@ -1345,6 +1364,8 @@ export async function PATCH(request: NextRequest) {
     // 新字段
     const { channelRemark, suggestedShipper, originalStatus } = body;
     if (channelRemark !== undefined) updateData.channel_remark = channelRemark;
+    if (system_remark !== undefined) updateData.system_remark = system_remark;
+    else if (body.systemRemark !== undefined) updateData.system_remark = body.systemRemark;
     if (suggestedShipper !== undefined) updateData.suggested_shipper = suggestedShipper;
     if (originalStatus !== undefined) updateData.original_status = originalStatus;
 

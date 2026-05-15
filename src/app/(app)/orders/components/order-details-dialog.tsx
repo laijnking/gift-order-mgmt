@@ -51,7 +51,7 @@ export function OrderDetailsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-1.5rem)] max-w-2xl">
+      <DialogContent className="!max-w-[95vw]">
         <DialogHeader>
           <DialogTitle>订单详情</DialogTitle>
           <DialogDescription>系统单号：{order.sysOrderNo}</DialogDescription>
@@ -230,6 +230,12 @@ export function OrderDetailsDialog({
             <div className="border rounded-lg p-4 bg-blue-50 border-blue-200">
               <h4 className="text-sm font-medium text-blue-800 mb-1">渠道备注</h4>
               <p className="text-sm text-blue-700">{order.channelRemark}</p>
+            </div>
+          )}
+          {order.systemRemark && (
+            <div className="border rounded-lg p-4 bg-green-50 border-green-200">
+              <h4 className="text-sm font-medium text-green-800 mb-1">系统备注</h4>
+              <p className="text-sm text-green-700">{order.systemRemark}</p>
             </div>
           )}
 

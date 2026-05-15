@@ -52,6 +52,7 @@ export interface ParsedOrderDraft {
   warehouse?: string;
   remark?: string;
   channel_remark?: string;
+  system_remark?: string;
   suggested_shipper?: string;
   original_status?: string;
   invoice_required?: boolean;
@@ -92,6 +93,7 @@ export interface ParsedOrderBundleDraft {
   trackingNo: string;
   remark: string;
   channelRemark: string;
+  systemRemark: string;
   suggestedShipper: string;
   originalStatus: string;
   extFields?: Record<string, string>;

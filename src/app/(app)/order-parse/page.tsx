@@ -223,6 +223,7 @@ const COLUMN_OPTIONS = [
   { value: 'supplier_name', label: '发货方', group: '基础信息' },
   { value: 'suggested_shipper', label: '建议发货方', group: '基础信息' },
   { value: 'channel_remark', label: '渠道备注', group: '基础信息' },
+  { value: 'system_remark', label: '系统备注', group: '基础信息' },
   { value: 'original_status', label: '原订单状态', group: '基础信息' },
   { value: 'salesperson', label: '业务员', group: '人员信息' },
   { value: 'operator', label: '跟单员', group: '人员信息' },
@@ -363,11 +364,12 @@ function normalizeBundleDraftsForPage(
     trackingNo: String(bundle.trackingNo || ''),
     remark: String(bundle.remark || ''),
     channelRemark: String(bundle.channelRemark || ''),
+    systemRemark: String(bundle.systemRemark || ''),
     suggestedShipper: String(bundle.suggestedShipper || ''),
     originalStatus: String(bundle.originalStatus || ''),
     items: Array.isArray(bundle.items) ? bundle.items : [],
     selected: true,
-    expanded: true,
+    expanded: false,
   }));
 }
 
@@ -380,7 +382,7 @@ function buildFlatOrdersForPage(
     ...order,
     id: order.id || `${idPrefix}_${Date.now()}_${index}_${Math.random().toString(36).slice(2, 6)}`,
     selected: true,
-    expanded: true,
+    expanded: false,
   }));
 }
 
@@ -1112,7 +1114,7 @@ export default function OrderParsePage() {
         ...original,
         id: `copy_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         selected: true,
-        expanded: true,
+        expanded: false,
       };
       const newOrders = [...orders];
       newOrders.splice(idx + 1, 0, copy);
@@ -1134,7 +1136,7 @@ export default function OrderParsePage() {
         operator: operatorName || undefined,
         operatorId: operatorId || undefined,
         selected: true,
-        expanded: true,
+        expanded: false,
       },
     ]);
   };
