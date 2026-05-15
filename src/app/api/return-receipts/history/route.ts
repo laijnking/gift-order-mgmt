@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission } from '@/lib/server-auth';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { PERMISSIONS } from '@/lib/permissions';
 
 interface ImportedReceiptInput {
@@ -188,6 +189,8 @@ function mapReceipt(receipt: Record<string, unknown>) {
 export async function GET(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_VIEW);
   if (authError) return authError;
+
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
   const recordId = searchParams.get('recordId');
@@ -205,6 +208,7 @@ export async function GET(request: NextRequest) {
         .from('return_receipt_records')
         .select('*')
         .eq('id', recordId)
+        .eq('tenant_id', tenant.tenantId)
         .single();
 
       if (recordError) throw new Error(`查询导入记录失败: ${recordError.message}`);
@@ -213,6 +217,7 @@ export async function GET(request: NextRequest) {
         .from('return_receipts')
         .select('*')
         .eq('record_id', recordId)
+        .eq('tenant_id', tenant.tenantId)
         .order('created_at', { ascending: false });
 
       if (receiptsError) throw new Error(`查询回单明细失败: ${receiptsError.message}`);
@@ -260,6 +265,7 @@ export async function GET(request: NextRequest) {
       let allQuery = client
         .from('return_receipt_records')
         .select('*', { count: 'exact' })
+        .eq('tenant_id', tenant.tenantId)
         .order('imported_at', { ascending: false });
 
       if (supplierId) {
@@ -291,6 +297,7 @@ export async function GET(request: NextRequest) {
         const { data: receiptRows, error: receiptStatsError } = await client
           .from('return_receipts')
           .select('record_id, match_status')
+          .eq('tenant_id', tenant.tenantId)
           .in('record_id', allRecordIds);
 
         if (receiptStatsError) throw new Error(`查询回单复核统计失败: ${receiptStatsError.message}`);
@@ -360,6 +367,7 @@ export async function GET(request: NextRequest) {
     let query = client
       .from('return_receipt_records')
       .select('*', { count: 'exact' })
+      .eq('tenant_id', tenant.tenantId)
       .order('imported_at', { ascending: false });
 
     if (supplierId) {
@@ -393,6 +401,7 @@ export async function GET(request: NextRequest) {
       const { data: receiptRows, error: receiptStatsError } = await client
         .from('return_receipts')
         .select('record_id, match_status')
+        .eq('tenant_id', tenant.tenantId)
         .in('record_id', recordIds);
 
       if (receiptStatsError) throw new Error(`查询回单复核统计失败: ${receiptStatsError.message}`);
@@ -452,6 +461,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_EDIT);
   if (authError) return authError;
+
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
 
   try {
@@ -471,7 +482,8 @@ export async function POST(request: NextRequest) {
     const { data: existingReceipts, error: existingReceiptsError } = await client
       .from('return_receipts')
       .select('id, tracking_no, supplier_order_no, customer_order_no')
-      .eq('supplier_id', supplierId);
+      .eq('supplier_id', supplierId)
+      .eq('tenant_id', tenant.tenantId);
 
     if (existingReceiptsError) throw new Error(`查询已存在回单失败: ${existingReceiptsError.message}`);
 
@@ -572,6 +584,7 @@ export async function POST(request: NextRequest) {
     const { data: record, error: recordError } = await client
       .from('return_receipt_records')
       .insert({
+        tenant_id: tenant.tenantId,
         // supplier_id 改为可选
         ...(supplierId ? { supplier_id: supplierId, supplier_name: supplierName } : {}),
         file_name: fileName,
@@ -588,6 +601,7 @@ export async function POST(request: NextRequest) {
 
     // 批量插入回单明细
     const receiptData = acceptedReceipts.map(({ receipt }) => ({
+      tenant_id: tenant.tenantId,
       record_id: record.id,
       // supplier_id 改为可选（匹配成功后再填充）
       customer_order_no: receipt.customerOrderNo,

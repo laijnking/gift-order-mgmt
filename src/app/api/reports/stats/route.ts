@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission } from '@/lib/server-auth';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { ORDER_STATUS_PENDING, ORDER_STATUS_ASSIGNED, ORDER_STATUS_NOTIFIED, ORDER_STATUS_PARTIAL_RETURNED, ORDER_STATUS_RETURNED, ORDER_STATUS_FEEDBACKED, ORDER_STATUS_COMPLETED, ORDER_STATUS_CANCELLED } from '@/lib/order-status';
 import { PERMISSIONS } from '@/lib/permissions';
 
@@ -8,27 +9,22 @@ import { PERMISSIONS } from '@/lib/permissions';
 export async function GET(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.DASHBOARD_VIEW);
   if (authError) return authError;
+
+  const tenant = await getTenantFromRequest(request);
+
   try {
     const supabase = await getSupabaseClient();
-    
+
     const searchParams = request.nextUrl.searchParams;
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate') || new Date().toISOString().slice(0, 10);
     const groupBy = searchParams.get('groupBy') || 'day'; // day, week, month
 
-    // 构建日期筛选
-    let dateFilter = '';
-    const params: Record<string, string> = {};
-    if (startDate) {
-      dateFilter = `created_at >= '${startDate}' AND created_at <= '${endDate}'`;
-      params.startDate = startDate;
-      params.endDate = endDate;
-    }
-
     // 1. 订单统计
     let orderQuery = supabase
       .from('orders')
       .select('*')
+      .eq('tenant_id', tenant.tenantId)
       .order('created_at', { ascending: false });
 
     if (startDate) {
@@ -85,7 +81,8 @@ export async function GET(request: NextRequest) {
     // 3. 客户统计
     const { data: customers } = await supabase
       .from('customers')
-      .select('*');
+      .select('*')
+      .eq('tenant_id', tenant.tenantId);
 
     const allCustomers = customers || [];
     const now = new Date();
@@ -100,7 +97,8 @@ export async function GET(request: NextRequest) {
     // 4. 发货方统计（统一查询 shippers 表）
     const { data: shippers } = await supabase
       .from('shippers')
-      .select('*');
+      .select('*')
+      .eq('tenant_id', tenant.tenantId);
 
     const allSuppliers = shippers || [];
     const supplierTypeStats: Record<string, number> = {};
@@ -118,7 +116,8 @@ export async function GET(request: NextRequest) {
     // 5. 库存统计
     const { data: stocks } = await supabase
       .from('stocks')
-      .select('*');
+      .select('*')
+      .eq('tenant_id', tenant.tenantId);
 
     const allStocks = stocks || [];
     const stockStats = {

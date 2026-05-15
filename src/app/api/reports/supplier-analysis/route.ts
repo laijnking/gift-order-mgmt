@@ -2,12 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isReturnProgressStatus, ORDER_STATUS_PENDING, ORDER_STATUS_ASSIGNED, ORDER_STATUS_COMPLETED, ORDER_STATUS_CANCELLED } from '@/lib/order-status';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission } from '@/lib/server-auth';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { PERMISSIONS } from '@/lib/permissions';
 
 // 获取发货方分析数据
 export async function GET(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.DASHBOARD_VIEW);
   if (authError) return authError;
+
+  const tenant = await getTenantFromRequest(request);
+
   try {
     const supabase = await getSupabaseClient();
     const searchParams = request.nextUrl.searchParams;
@@ -18,6 +22,7 @@ export async function GET(request: NextRequest) {
     const { data: shippers, error: supplierError } = await supabase
       .from('shippers')
       .select('*')
+      .eq('tenant_id', tenant.tenantId)
       .order('name');
 
     if (supplierError) {
@@ -27,7 +32,8 @@ export async function GET(request: NextRequest) {
     // 查询所有订单
     let orderQuery = supabase
       .from('orders')
-      .select('*');
+      .select('*')
+      .eq('tenant_id', tenant.tenantId);
 
     if (startDate) {
       orderQuery = orderQuery

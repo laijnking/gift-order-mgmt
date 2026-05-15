@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { PERMISSIONS } from '@/lib/permissions';
 
 // 数据库字段转前端格式（统一使用 shippers 表）
@@ -38,6 +39,7 @@ export async function GET(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.SUPPLIERS_VIEW);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
   const type = searchParams.get('type'); // warehouse | supplier | jd | pdd | self | third_party
@@ -45,7 +47,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // 统一查询 shippers 表
-    let query = client.from('shippers').select('*');
+    let query = client.from('shippers').select('*').eq('tenant_id', tenant.tenantId);
 
     // 默认只返回活跃发货方（除非显式传 active=false）
     if (active !== 'false') {
@@ -81,13 +83,15 @@ export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.SUPPLIERS_CREATE);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
-  
+
   try {
     const body = await request.json();
-    
+
     // 统一写入 shippers 表
     const supplierData = {
+      tenant_id: tenant.tenantId,
       name: body.name,
       short_name: body.shortName,
       type: body.type || 'supplier',

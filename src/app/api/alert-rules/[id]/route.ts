@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission } from '@/lib/server-auth';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { PERMISSIONS } from '@/lib/permissions';
 
 // 获取单个预警规则详情
@@ -11,6 +12,7 @@ export async function GET(
   const authError = await requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
   const { id } = await params;
 
@@ -19,6 +21,7 @@ export async function GET(
       .from('alert_rules')
       .select('*')
       .eq('id', id)
+      .eq('tenant_id', tenant.tenantId)
       .single();
 
     if (error) {
@@ -64,6 +67,7 @@ export async function PUT(
   const authError = await requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
   const { id } = await params;
 
@@ -87,6 +91,7 @@ export async function PUT(
       .from('alert_rules')
       .update(updateData)
       .eq('id', id)
+      .eq('tenant_id', tenant.tenantId)
       .select()
       .single();
 
@@ -114,6 +119,7 @@ export async function DELETE(
   const authError = await requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
   const { id } = await params;
 
@@ -121,7 +127,8 @@ export async function DELETE(
     const { error } = await client
       .from('alert_rules')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('tenant_id', tenant.tenantId);
 
     if (error) throw new Error(`删除预警规则失败: ${error.message}`);
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { syncOrderCostHistoryAfterReturn } from '@/lib/order-cost-history';
 import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { PERMISSIONS } from '@/lib/permissions';
 import * as XLSX from 'xlsx';
 
@@ -113,9 +114,9 @@ async function parseRows(request: NextRequest): Promise<{ rows: ReturnRow[]; sup
   };
 }
 
-async function findOrder(client: ReturnType<typeof getSupabaseClient>, row: ReturnRow) {
+async function findOrder(client: ReturnType<typeof getSupabaseClient>, row: ReturnRow, tenantId: string) {
   if (row.matchCode) {
-    const { data } = await client.from('orders').select('*').eq('match_code', row.matchCode).maybeSingle();
+    const { data } = await client.from('orders').select('*').eq('match_code', row.matchCode).eq('tenant_id', tenantId).maybeSingle();
     if (data) return { order: data as Record<string, unknown>, matchedBy: 'match_code' };
   }
 
@@ -125,6 +126,7 @@ async function findOrder(client: ReturnType<typeof getSupabaseClient>, row: Retu
       .select('*')
       .eq('order_no', row.orderNo)
       .eq('receiver_phone', row.receiverPhone)
+      .eq('tenant_id', tenantId)
       .maybeSingle();
     if (data) return { order: data as Record<string, unknown>, matchedBy: 'order_phone' };
   }
@@ -135,12 +137,13 @@ async function findOrder(client: ReturnType<typeof getSupabaseClient>, row: Retu
       .select('*')
       .eq('order_no', row.orderNo)
       .eq('receiver_name', row.receiverName)
+      .eq('tenant_id', tenantId)
       .maybeSingle();
     if (data) return { order: data as Record<string, unknown>, matchedBy: 'order_name' };
   }
 
   if (row.orderNo) {
-    const { data } = await client.from('orders').select('*').eq('order_no', row.orderNo).maybeSingle();
+    const { data } = await client.from('orders').select('*').eq('order_no', row.orderNo).eq('tenant_id', tenantId).maybeSingle();
     if (data) return { order: data as Record<string, unknown>, matchedBy: 'order_no' };
   }
 
@@ -149,6 +152,7 @@ async function findOrder(client: ReturnType<typeof getSupabaseClient>, row: Retu
       .from('orders')
       .select('*')
       .eq('receiver_phone', row.receiverPhone)
+      .eq('tenant_id', tenantId)
       .limit(20);
     const match = data?.find((order: Record<string, unknown>) => JSON.stringify(order.items || '').includes(row.productName));
     if (match) return { order: match as Record<string, unknown>, matchedBy: 'phone_product' };
@@ -160,6 +164,8 @@ async function findOrder(client: ReturnType<typeof getSupabaseClient>, row: Retu
 export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_EDIT);
   if (authError) return authError;
+
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
 
   try {
@@ -173,7 +179,7 @@ export async function POST(request: NextRequest) {
     const unmatched: string[] = [];
 
     for (const row of rows) {
-      const matched = await findOrder(client, row);
+      const matched = await findOrder(client, row, tenant.tenantId);
       const now = new Date().toISOString();
 
       // D-1 重复检测：同订单 + 同物流单号 + 同快递公司 已存在则跳过（不阻塞，由人工复核）
@@ -184,6 +190,7 @@ export async function POST(request: NextRequest) {
           .eq('order_id', matched.order.id)
           .eq('tracking_no', row.trackingNo)
           .eq('express_company', row.expressCompany)
+          .eq('tenant_id', tenant.tenantId)
           .maybeSingle();
         if (existingReceipt?.data) {
           unmatched.push(
@@ -197,6 +204,7 @@ export async function POST(request: NextRequest) {
         unmatchedCount += 1;
         unmatched.push(`${row.orderNo || row.matchCode || row.receiverPhone || '未知'} - ${row.trackingNo}`);
         await client.from('return_records').insert({
+          tenant_id: tenant.tenantId,
           order_no: row.orderNo || null,
           express_company: row.expressCompany,
           tracking_no: row.trackingNo,
@@ -214,6 +222,7 @@ export async function POST(request: NextRequest) {
 
       const order = matched.order;
       await client.from('return_records').insert({
+        tenant_id: tenant.tenantId,
         order_id: order.id,
         order_no: order.order_no,
         express_company: row.expressCompany,
@@ -246,6 +255,7 @@ export async function POST(request: NextRequest) {
       });
 
       await client.from('return_receipts').insert({
+        tenant_id: tenant.tenantId,
         order_id: order.id,
         supplier_id: supplierId || order.supplier_id || null,
         supplier_name: supplierName || order.supplier_name || null,

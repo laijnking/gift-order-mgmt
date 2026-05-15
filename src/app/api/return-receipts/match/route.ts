@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { syncOrderCostHistoryAfterReturn } from '@/lib/order-cost-history';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission } from '@/lib/server-auth';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { PERMISSIONS } from '@/lib/permissions';
 
 type ReceiptRow = {
@@ -24,7 +25,8 @@ type OrderRow = {
 
 async function collectOrderCandidates(
   client: ReturnType<typeof getSupabaseClient>,
-  receipt: ReceiptRow
+  receipt: ReceiptRow,
+  tenantId: string,
 ) {
   const candidates = new Map<string, OrderRow>();
 
@@ -46,6 +48,7 @@ async function collectOrderCandidates(
       .from('orders')
       .select('id, order_no, supplier_id, supplier_name')
       .eq('sys_order_no', receipt.customer_order_no)
+      .eq('tenant_id', tenantId)
       .limit(1);
 
     if (sysOrderError) throw new Error(`按系统订单号精确匹配失败: ${sysOrderError.message}`);
@@ -59,6 +62,7 @@ async function collectOrderCandidates(
       .from('orders')
       .select('id, order_no, supplier_id, supplier_name')
       .eq('order_no', receipt.customer_order_no)
+      .eq('tenant_id', tenantId)
       .limit(10);
 
     if (exactError) throw new Error(`按客户订单号精确匹配失败: ${exactError.message}`);
@@ -70,6 +74,7 @@ async function collectOrderCandidates(
         .from('orders')
         .select('id, order_no, supplier_id, supplier_name')
         .ilike('order_no', `%${receipt.customer_order_no}%`)
+        .eq('tenant_id', tenantId)
         .limit(10);
 
       if (fuzzyOrderNoError) throw new Error(`按订单号模糊匹配失败: ${fuzzyOrderNoError.message}`);
@@ -84,6 +89,8 @@ async function collectOrderCandidates(
 export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_EDIT);
   if (authError) return authError;
+
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
 
   try {
@@ -103,6 +110,7 @@ export async function POST(request: NextRequest) {
     const { data: receipts, error: receiptsError } = await client
       .from('return_receipts')
       .select('*')
+      .eq('tenant_id', tenant.tenantId)
       .in('id', receiptIds)
       .eq('match_status', 'pending');
 
@@ -110,7 +118,7 @@ export async function POST(request: NextRequest) {
 
     for (const receipt of ((receipts || []) as ReceiptRow[])) {
       touchedRecordIds.add(receipt.record_id);
-      const candidates = await collectOrderCandidates(client, receipt);
+      const candidates = await collectOrderCandidates(client, receipt, tenant.tenantId);
       const matchedOrder = candidates.length === 1 ? candidates[0] : null;
 
       // 更新回单状态
@@ -130,7 +138,8 @@ export async function POST(request: NextRequest) {
             tracking_no: receipt.tracking_no || undefined,
             freight_cost: receipt.freight_cost || undefined,
           })
-          .eq('id', receipt.id);
+          .eq('id', receipt.id)
+          .eq('tenant_id', tenant.tenantId);
 
         // 更新订单的快递信息（追加模式，支持部分回单）
         // 先获取当前订单的物流信息
@@ -198,7 +207,8 @@ export async function POST(request: NextRequest) {
             match_status: 'conflict',
             matched_at: null,
           })
-          .eq('id', receipt.id);
+          .eq('id', receipt.id)
+          .eq('tenant_id', tenant.tenantId);
 
         results.push({
           receiptId: receipt.id,
@@ -227,7 +237,8 @@ export async function POST(request: NextRequest) {
       const { data: recordReceipts, error: countError } = await client
         .from('return_receipts')
         .select('match_status')
-        .eq('record_id', recordId);
+        .eq('record_id', recordId)
+        .eq('tenant_id', tenant.tenantId);
 
       if (countError) {
         throw new Error(`更新回单记录计数失败: ${countError.message}`);
@@ -243,7 +254,8 @@ export async function POST(request: NextRequest) {
           matched_count: matchedCount,
           unmatched_count: (recordReceipts?.length || 0) - matchedCount,
         })
-        .eq('id', recordId);
+        .eq('id', recordId)
+        .eq('tenant_id', tenant.tenantId);
     }
 
     return NextResponse.json({

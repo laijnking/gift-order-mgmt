@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { syncOrderCostHistoryAfterReturn } from '@/lib/order-cost-history';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission } from '@/lib/server-auth';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { PERMISSIONS } from '@/lib/permissions';
 
 type ReceiptRow = {
@@ -25,6 +26,8 @@ function appendLogisticsInfo(existing: string | null, newValue: string | null): 
 export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_EDIT);
   if (authError) return authError;
+
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
 
   try {
@@ -43,6 +46,7 @@ export async function POST(request: NextRequest) {
     const { data: receipts, error: receiptsError } = await client
       .from('return_receipts')
       .select('*')
+      .eq('tenant_id', tenant.tenantId)
       .in('id', receiptIds)
       .in('match_status', ['auto_matched', 'manual_matched']);
 
@@ -107,7 +111,8 @@ export async function POST(request: NextRequest) {
         await client
           .from('return_receipts')
           .update({ matched_at: now })
-          .eq('id', receipt.id);
+          .eq('id', receipt.id)
+          .eq('tenant_id', tenant.tenantId);
       }
     }
 

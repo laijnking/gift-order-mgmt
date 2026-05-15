@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/server-auth';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { executeAlertRules } from '@/lib/alert-executor';
 import { PERMISSIONS } from '@/lib/permissions';
 
@@ -7,12 +8,15 @@ export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
+
   try {
     const body = await request.json().catch(() => ({}));
     const result = await executeAlertRules({
       ruleId: body.ruleId,
       ruleCode: body.ruleCode,
       type: body.type,
+      tenantId: tenant.tenantId,
     });
 
     return NextResponse.json({

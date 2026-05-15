@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission } from '@/lib/server-auth';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { PERMISSIONS } from '@/lib/permissions';
 import { ORDER_STATUS_ASSIGNED, ORDER_STATUS_PARTIAL_RETURNED, ORDER_STATUS_RETURNED, ORDER_STATUS_FEEDBACKED, ORDER_STATUS_COMPLETED } from '@/lib/order-status';
 
@@ -8,6 +9,9 @@ import { ORDER_STATUS_ASSIGNED, ORDER_STATUS_PARTIAL_RETURNED, ORDER_STATUS_RETU
 export async function GET(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.DASHBOARD_VIEW);
   if (authError) return authError;
+
+  const tenant = await getTenantFromRequest(request);
+
   try {
     const supabase = await getSupabaseClient();
     const searchParams = request.nextUrl.searchParams;
@@ -18,6 +22,7 @@ export async function GET(request: NextRequest) {
     let orderQuery = supabase
       .from('orders')
       .select('*')
+      .eq('tenant_id', tenant.tenantId)
       .in('status', [ORDER_STATUS_ASSIGNED, ORDER_STATUS_PARTIAL_RETURNED, ORDER_STATUS_RETURNED, ORDER_STATUS_FEEDBACKED, ORDER_STATUS_COMPLETED]);
 
     if (startDate) {

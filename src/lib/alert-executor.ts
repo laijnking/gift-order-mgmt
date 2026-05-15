@@ -22,6 +22,7 @@ type ExecuteAlertRulesOptions = {
   ruleId?: string;
   ruleCode?: string;
   type?: string;
+  tenantId?: string;
 };
 
 type RuleExecutionSummary = {
@@ -52,13 +53,19 @@ function hoursAgo(hours: number) {
   return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
 }
 
-async function fetchUnresolvedRecords(ruleCode: string) {
+async function fetchUnresolvedRecords(ruleCode: string, tenantId: string) {
   const client = getSupabaseClient();
-  const { data, error } = await client
+  let query = client
     .from('alert_records')
     .select('id, rule_code, order_id, stock_id, is_resolved')
     .eq('rule_code', ruleCode)
     .eq('is_resolved', false);
+
+  if (tenantId) {
+    query = query.eq('tenant_id', tenantId);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw new Error(`查询未处理预警失败: ${error.message}`);
@@ -67,11 +74,11 @@ async function fetchUnresolvedRecords(ruleCode: string) {
   return (data || []) as AlertRecordRow[];
 }
 
-async function markResolved(ids: string[], resolution: string) {
+async function markResolved(ids: string[], resolution: string, tenantId: string) {
   if (ids.length === 0) return 0;
 
   const client = getSupabaseClient();
-  const { error } = await client
+  let query = client
     .from('alert_records')
     .update({
       is_resolved: true,
@@ -81,6 +88,12 @@ async function markResolved(ids: string[], resolution: string) {
     })
     .in('id', ids);
 
+  if (tenantId) {
+    query = query.eq('tenant_id', tenantId);
+  }
+
+  const { error } = await query;
+
   if (error) {
     throw new Error(`更新预警处理状态失败: ${error.message}`);
   }
@@ -88,18 +101,18 @@ async function markResolved(ids: string[], resolution: string) {
   return ids.length;
 }
 
-async function createAlertRecord(payload: Record<string, unknown>) {
+async function createAlertRecord(payload: Record<string, unknown>, tenantId: string) {
   const client = getSupabaseClient();
   const { error } = await client
     .from('alert_records')
-    .insert(payload);
+    .insert({ ...payload, tenant_id: tenantId });
 
   if (error) {
     throw new Error(`创建预警记录失败: ${error.message}`);
   }
 }
 
-async function executeLowStockRule(rule: AlertRuleRecord): Promise<RuleExecutionSummary> {
+async function executeLowStockRule(rule: AlertRuleRecord, tenantId: string): Promise<RuleExecutionSummary> {
   const client = getSupabaseClient();
   const config = rule.config || {};
   const threshold = toNumber(config.threshold, 2);
@@ -110,6 +123,10 @@ async function executeLowStockRule(rule: AlertRuleRecord): Promise<RuleExecution
     .select('id, product_code, product_name, supplier_id, supplier_name, quantity, status')
     .eq('status', 'active');
 
+  if (tenantId) {
+    query = query.eq('tenant_id', tenantId);
+  }
+
   query = compare === 'lt' ? query.lt('quantity', threshold) : query.lte('quantity', threshold);
 
   const { data, error } = await query;
@@ -118,7 +135,7 @@ async function executeLowStockRule(rule: AlertRuleRecord): Promise<RuleExecution
   }
 
   const matches = (data || []) as Array<Record<string, unknown>>;
-  const unresolved = await fetchUnresolvedRecords(rule.code);
+  const unresolved = await fetchUnresolvedRecords(rule.code, tenantId);
   const unresolvedByStock = new Map(
     unresolved.filter((record) => record.stock_id).map((record) => [record.stock_id as string, record])
   );
@@ -153,13 +170,14 @@ async function executeLowStockRule(rule: AlertRuleRecord): Promise<RuleExecution
       is_read: false,
       is_resolved: false,
       created_at: new Date().toISOString(),
-    });
+    }, tenantId);
     triggered += 1;
   }
 
   const resolved = await markResolved(
     Array.from(unresolvedByStock.values()).map((record) => record.id),
-    '库存已恢复到阈值以上，自动关闭预警'
+    '库存已恢复到阈值以上，自动关闭预警',
+    tenantId
   );
 
   return {
@@ -172,23 +190,29 @@ async function executeLowStockRule(rule: AlertRuleRecord): Promise<RuleExecution
   };
 }
 
-async function executeOrderTimeoutRule(rule: AlertRuleRecord): Promise<RuleExecutionSummary> {
+async function executeOrderTimeoutRule(rule: AlertRuleRecord, tenantId: string): Promise<RuleExecutionSummary> {
   const client = getSupabaseClient();
   const timeoutHours = toNumber(rule.config?.timeout_hours, 24);
   const cutoff = hoursAgo(timeoutHours);
 
-  const { data, error } = await client
+  let query = client
     .from('orders')
     .select('id, order_no, customer_code, customer_name, created_at, status')
     .eq('status', 'pending')
     .lte('created_at', cutoff);
+
+  if (tenantId) {
+    query = query.eq('tenant_id', tenantId);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw new Error(`执行订单超时预警失败: ${error.message}`);
   }
 
   const matches = (data || []) as Array<Record<string, unknown>>;
-  const unresolved = await fetchUnresolvedRecords(rule.code);
+  const unresolved = await fetchUnresolvedRecords(rule.code, tenantId);
   const unresolvedByOrder = new Map(
     unresolved.filter((record) => record.order_id).map((record) => [record.order_id as string, record])
   );
@@ -222,13 +246,14 @@ async function executeOrderTimeoutRule(rule: AlertRuleRecord): Promise<RuleExecu
       is_read: false,
       is_resolved: false,
       created_at: new Date().toISOString(),
-    });
+    }, tenantId);
     triggered += 1;
   }
 
   const resolved = await markResolved(
     Array.from(unresolvedByOrder.values()).map((record) => record.id),
-    '订单已不再满足超时条件，自动关闭预警'
+    '订单已不再满足超时条件，自动关闭预警',
+    tenantId
   );
 
   return {
@@ -241,16 +266,22 @@ async function executeOrderTimeoutRule(rule: AlertRuleRecord): Promise<RuleExecu
   };
 }
 
-async function executeReturnDelayRule(rule: AlertRuleRecord): Promise<RuleExecutionSummary> {
+async function executeReturnDelayRule(rule: AlertRuleRecord, tenantId: string): Promise<RuleExecutionSummary> {
   const client = getSupabaseClient();
   const delayHours = toNumber(rule.config?.delay_hours, 48);
   const cutoff = hoursAgo(delayHours);
 
-  const { data, error } = await client
+  let query = client
     .from('orders')
     .select('id, order_no, customer_code, customer_name, assigned_at, status, tracking_no')
     .in('status', ['assigned', 'notified', 'partial_returned'])
     .lte('assigned_at', cutoff);
+
+  if (tenantId) {
+    query = query.eq('tenant_id', tenantId);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw new Error(`执行回单超时预警失败: ${error.message}`);
@@ -259,7 +290,7 @@ async function executeReturnDelayRule(rule: AlertRuleRecord): Promise<RuleExecut
   const matches = ((data || []) as Array<Record<string, unknown>>).filter(
     (order) => !order.tracking_no
   );
-  const unresolved = await fetchUnresolvedRecords(rule.code);
+  const unresolved = await fetchUnresolvedRecords(rule.code, tenantId);
   const unresolvedByOrder = new Map(
     unresolved.filter((record) => record.order_id).map((record) => [record.order_id as string, record])
   );
@@ -293,13 +324,14 @@ async function executeReturnDelayRule(rule: AlertRuleRecord): Promise<RuleExecut
       is_read: false,
       is_resolved: false,
       created_at: new Date().toISOString(),
-    });
+    }, tenantId);
     triggered += 1;
   }
 
   const resolved = await markResolved(
     Array.from(unresolvedByOrder.values()).map((record) => record.id),
-    '订单已回传物流或不再满足回单超时条件，自动关闭预警'
+    '订单已回传物流或不再满足回单超时条件，自动关闭预警',
+    tenantId
   );
 
   return {
@@ -312,17 +344,17 @@ async function executeReturnDelayRule(rule: AlertRuleRecord): Promise<RuleExecut
   };
 }
 
-async function executeRule(rule: AlertRuleRecord): Promise<RuleExecutionSummary> {
+async function executeRule(rule: AlertRuleRecord, tenantId: string): Promise<RuleExecutionSummary> {
   if (rule.code === 'LOW_STOCK_ALERT' || rule.type === 'stock') {
-    return executeLowStockRule(rule);
+    return executeLowStockRule(rule, tenantId);
   }
 
   if (rule.code === 'ORDER_TIMEOUT_ALERT' || rule.type === 'order') {
-    return executeOrderTimeoutRule(rule);
+    return executeOrderTimeoutRule(rule, tenantId);
   }
 
   if (rule.code === 'RETURN_DELAY_ALERT' || rule.type === 'return') {
-    return executeReturnDelayRule(rule);
+    return executeReturnDelayRule(rule, tenantId);
   }
 
   return {
@@ -338,6 +370,7 @@ async function executeRule(rule: AlertRuleRecord): Promise<RuleExecutionSummary>
 export async function executeAlertRules(
   options: ExecuteAlertRulesOptions = {}
 ): Promise<ExecuteAlertRulesResult> {
+  const tenantId = options.tenantId || '';
   const client = getSupabaseClient();
   let query = client
     .from('alert_rules')
@@ -345,6 +378,9 @@ export async function executeAlertRules(
     .eq('is_enabled', true)
     .order('priority', { ascending: false });
 
+  if (tenantId) {
+    query = query.eq('tenant_id', tenantId);
+  }
   if (options.ruleId) {
     query = query.eq('id', options.ruleId);
   }
@@ -364,7 +400,7 @@ export async function executeAlertRules(
   const summaries: RuleExecutionSummary[] = [];
 
   for (const rule of rules) {
-    summaries.push(await executeRule(rule));
+    summaries.push(await executeRule(rule, tenantId));
   }
 
   return {

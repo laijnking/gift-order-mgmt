@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { syncOrderCostHistoryAfterReturn } from '@/lib/order-cost-history';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission } from '@/lib/server-auth';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { PERMISSIONS } from '@/lib/permissions';
 
 interface RecordReceiptMatch {
@@ -31,6 +32,8 @@ function appendLogisticsInfo(existing: string | null, newValue: string | null): 
 export async function GET(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_VIEW);
   if (authError) return authError;
+
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
   const { searchParams } = new URL(request.url);
   const recordId = searchParams.get('recordId');
@@ -45,6 +48,7 @@ export async function GET(request: NextRequest) {
       .from('return_receipt_records')
       .select('*')
       .eq('id', recordId)
+      .eq('tenant_id', tenant.tenantId)
       .single();
 
     if (recordError) throw new Error(`查询导入记录失败: ${recordError.message}`);
@@ -54,6 +58,7 @@ export async function GET(request: NextRequest) {
       .from('return_receipts')
       .select('*')
       .eq('record_id', recordId)
+      .eq('tenant_id', tenant.tenantId)
       .order('created_at', { ascending: false });
 
     if (receiptsError) throw new Error(`查询回单明细失败: ${receiptsError.message}`);
@@ -81,6 +86,8 @@ export async function PATCH(
 ) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_EDIT);
   if (authError) return authError;
+
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
 
   try {
@@ -97,6 +104,7 @@ export async function PATCH(
       .from('return_receipts')
       .select('id, record_id, express_company, tracking_no, freight_cost, match_status')
       .eq('id', receiptId)
+      .eq('tenant_id', tenant.tenantId)
       .single<ReceiptRow>();
 
     if (receiptError) throw new Error(`查询回单失败: ${receiptError.message}`);
@@ -122,7 +130,8 @@ export async function PATCH(
         match_status: 'manual_matched',
         matched_at: new Date().toISOString(),
       })
-      .eq('id', receiptId);
+      .eq('id', receiptId)
+      .eq('tenant_id', tenant.tenantId);
 
     if (updateError) throw new Error(`更新回单失败: ${updateError.message}`);
 
@@ -179,7 +188,8 @@ export async function PATCH(
       const { data: allReceipts } = await client
         .from('return_receipts')
         .select('id, match_status')
-        .eq('record_id', receipt.record_id);
+        .eq('record_id', receipt.record_id)
+        .eq('tenant_id', tenant.tenantId);
 
       const matchedCount = (allReceipts as RecordReceiptMatch[] | null)?.filter((r) => 
         r.id !== receiptId && 
@@ -192,7 +202,8 @@ export async function PATCH(
           matched_count: matchedCount + 1,
           unmatched_count: (allReceipts?.length || 0) - matchedCount - 1,
         })
-        .eq('id', receipt.record_id);
+        .eq('id', receipt.record_id)
+        .eq('tenant_id', tenant.tenantId);
     }
 
     return NextResponse.json({

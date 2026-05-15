@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission } from '@/lib/server-auth';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { PERMISSIONS } from '@/lib/permissions';
 
 // 获取预警规则列表
@@ -8,8 +9,9 @@ export async function GET(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
-  
+
   try {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type');
@@ -18,6 +20,7 @@ export async function GET(request: NextRequest) {
     let query = client
       .from('alert_rules')
       .select('*')
+      .eq('tenant_id', tenant.tenantId)
       .order('priority', { ascending: false });
 
     if (type) {
@@ -65,8 +68,9 @@ export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.SETTINGS_EDIT);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
-  
+
   try {
     const body = await request.json();
     const { name, code, type, config, priority, isEnabled, notificationChannels, description } = body;
@@ -79,6 +83,7 @@ export async function POST(request: NextRequest) {
     }
 
     const ruleData = {
+      tenant_id: tenant.tenantId,
       name,
       code,
       type,
@@ -127,25 +132,27 @@ export async function PATCH(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.SETTINGS_EDIT);
   if (authError) return authError;
 
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
-  
+
   try {
     const body = await request.json();
     const { ids, isEnabled } = body;
 
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
-      return NextResponse.json({ 
-        success: false, 
-        error: '请选择要更新的规则' 
+      return NextResponse.json({
+        success: false,
+        error: '请选择要更新的规则'
       }, { status: 400 });
     }
 
     const { error } = await client
       .from('alert_rules')
-      .update({ 
+      .update({
         is_enabled: isEnabled,
         updated_at: new Date().toISOString()
       })
+      .eq('tenant_id', tenant.tenantId)
       .in('id', ids);
 
     if (error) throw new Error(`更新预警规则失败: ${error.message}`);

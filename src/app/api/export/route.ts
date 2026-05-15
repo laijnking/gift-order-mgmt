@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { recordOrderCostFromDispatch } from '@/lib/order-cost-history';
 import { requirePermission } from '@/lib/server-auth';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { PERMISSIONS } from '@/lib/permissions';
 import * as XLSX from 'xlsx';
 
@@ -92,10 +93,12 @@ async function createLowStockAlert(
     productName: string;
     supplierName: string;
     quantity: number;
-  }
+  },
+  tenantId: string,
 ) {
   if (payload.quantity > 2) return;
   await client.from('alert_records').insert({
+    tenant_id: tenantId,
     stock_id: payload.stockId,
     order_id: payload.orderId,
     order_no: payload.orderNo,
@@ -119,7 +122,8 @@ async function dispatchOneOrder(
   client: ReturnType<typeof getSupabaseClient>,
   order: Record<string, unknown>,
   supplier: Record<string, unknown>,
-  batchNo: string
+  batchNo: string,
+  tenantId: string,
 ) {
   const items = parseItems(order.items);
   if (items.length === 0) {
@@ -178,7 +182,7 @@ async function dispatchOneOrder(
       productName: String(stock.product_name || item.product_name || item.productName || ''),
       supplierName: String(supplier.name || ''),
       quantity: afterQuantity,
-    });
+    }, tenantId);
 
     const unitCost = beforePrice || toNumber(item.unit_price ?? item.price);
     await recordOrderCostFromDispatch(client, {
@@ -229,6 +233,8 @@ async function dispatchOneOrder(
 export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_EXPORT);
   if (authError) return authError;
+
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
 
   try {
@@ -269,7 +275,7 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        const dispatchItems = await dispatchOneOrder(client, order, supplier, batchNo);
+        const dispatchItems = await dispatchOneOrder(client, order, supplier, batchNo, tenant.tenantId);
         const supplierName = String(supplier.name || '未知发货方');
         if (!rowsBySupplier[supplierName]) rowsBySupplier[supplierName] = [];
 

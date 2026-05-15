@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission } from '@/lib/server-auth';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { PERMISSIONS } from '@/lib/permissions';
 
 // 获取预警记录列表
 export async function GET(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_VIEW);
   if (authError) return authError;
+
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
-  
+
   try {
     const { searchParams } = new URL(request.url);
     const ruleCode = searchParams.get('ruleCode');
@@ -24,6 +27,7 @@ export async function GET(request: NextRequest) {
     let query = client
       .from('alert_records')
       .select('*, alert_rules(name, code)')
+      .eq('tenant_id', tenant.tenantId)
       .order('created_at', { ascending: false });
 
     if (ruleCode) {
@@ -60,7 +64,8 @@ export async function GET(request: NextRequest) {
     // 获取统计数据
     const { data: statsData } = await client
       .from('alert_records')
-      .select('alert_level, is_read', { count: 'exact' });
+      .select('alert_level, is_read', { count: 'exact' })
+      .eq('tenant_id', tenant.tenantId);
 
     const unreadCount = statsData?.filter(r => !r.is_read).length || 0;
     const warningCount = statsData?.filter(r => r.alert_level === 'warning' && !r.is_read).length || 0;
@@ -115,11 +120,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_EDIT);
   if (authError) return authError;
+
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
-  
+
   try {
     const body = await request.json();
-    const { 
+    const {
       ruleId,
       ruleCode,
       orderId,
@@ -136,13 +143,14 @@ export async function POST(request: NextRequest) {
     } = body;
 
     if (!ruleCode || !title) {
-      return NextResponse.json({ 
-        success: false, 
-        error: '缺少必要参数' 
+      return NextResponse.json({
+        success: false,
+        error: '缺少必要参数'
       }, { status: 400 });
     }
 
     const recordData = {
+      tenant_id: tenant.tenantId,
       rule_id: ruleId || null,
       rule_code: ruleCode,
       order_id: orderId || null,
@@ -188,16 +196,18 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_EDIT);
   if (authError) return authError;
+
+  const tenant = await getTenantFromRequest(request);
   const client = getSupabaseClient();
-  
+
   try {
     const body = await request.json();
     const { ids, isRead, isResolved, resolvedBy } = body;
 
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
-      return NextResponse.json({ 
-        success: false, 
-        error: '请选择要更新的记录' 
+      return NextResponse.json({
+        success: false,
+        error: '请选择要更新的记录'
       }, { status: 400 });
     }
 
@@ -216,6 +226,7 @@ export async function PATCH(request: NextRequest) {
     const { error } = await client
       .from('alert_records')
       .update(updateData)
+      .eq('tenant_id', tenant.tenantId)
       .in('id', ids);
 
     if (error) throw new Error(`更新预警记录失败: ${error.message}`);

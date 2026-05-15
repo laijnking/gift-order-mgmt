@@ -2,12 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isReturnProgressStatus, ORDER_STATUS_PENDING, ORDER_STATUS_ASSIGNED, ORDER_STATUS_COMPLETED, ORDER_STATUS_CANCELLED } from '@/lib/order-status';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { requirePermission } from '@/lib/server-auth';
+import { getTenantFromRequest } from '@/lib/tenant-context';
 import { PERMISSIONS } from '@/lib/permissions';
 
 // 获取销售业绩数据
 export async function GET(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.DASHBOARD_VIEW);
   if (authError) return authError;
+
+  const tenant = await getTenantFromRequest(request);
+
   try {
     const supabase = await getSupabaseClient();
     const searchParams = request.nextUrl.searchParams;
@@ -19,6 +23,7 @@ export async function GET(request: NextRequest) {
     let orderQuery = supabase
       .from('orders')
       .select('*')
+      .eq('tenant_id', tenant.tenantId)
       .order('created_at', { ascending: false });
 
     if (startDate) {
