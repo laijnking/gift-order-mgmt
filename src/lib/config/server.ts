@@ -60,6 +60,9 @@ export async function getTenantConfigAsync(tenantId?: string): Promise<TenantCon
         else if (key === 'adjacentProvince') config.matchWeights.adjacentProvince = Number(value) || config.matchWeights.adjacentProvince;
         else if (key === 'distantProvince') config.matchWeights.distantProvince = Number(value) || config.matchWeights.distantProvince;
         else if (key === 'unknownProvince') config.matchWeights.unknownProvince = Number(value) || config.matchWeights.unknownProvince;
+        else if (key === 'stockBonus') config.matchWeights.stockBonus = Number(value) || config.matchWeights.stockBonus;
+        else if (key === 'priceScoreMax') config.matchWeights.priceScoreMax = Number(value) || config.matchWeights.priceScoreMax;
+        else if (key === 'selfBonus') config.matchWeights.selfBonus = Number(value) || config.matchWeights.selfBonus;
       }
     }
 

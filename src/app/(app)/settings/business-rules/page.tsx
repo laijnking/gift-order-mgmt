@@ -31,6 +31,11 @@ export default function BusinessRulesPage() {
   // Supplier matching
   const [matchWeights, setMatchWeights] = useState(MATCH_CONFIG.weights);
   const [remoteRegions, setRemoteRegions] = useState(MATCH_CONFIG.remoteRegions.join('\n'));
+  const [scoreWeights, setScoreWeights] = useState({
+    stockBonus: MATCH_CONFIG.weights.stockBonus,
+    priceScoreMax: MATCH_CONFIG.weights.priceScoreMax,
+    selfBonus: MATCH_CONFIG.weights.selfBonus,
+  });
 
   // Import mapping
   const [supplierTypeMap, setSupplierTypeMap] = useState<Record<string, string>>({});
@@ -47,7 +52,20 @@ export default function BusinessRulesPage() {
         const rules = data.data.businessRules;
         if (rules.costAllocation) setCostAllocation(prev => ({ ...prev, ...rules.costAllocation }));
         if (rules.receiptMatch) setReceiptMatch(prev => ({ ...prev, ...rules.receiptMatch }));
-        if (rules.matchWeights) setMatchWeights(prev => ({ ...prev, ...rules.matchWeights }));
+        if (rules.matchWeights) {
+          setMatchWeights(prev => ({
+            ...prev,
+            sameProvince: rules.matchWeights.sameProvince ?? prev.sameProvince,
+            adjacentProvince: rules.matchWeights.adjacentProvince ?? prev.adjacentProvince,
+            distantProvince: rules.matchWeights.distantProvince ?? prev.distantProvince,
+            unknownProvince: rules.matchWeights.unknownProvince ?? prev.unknownProvince,
+          }));
+          setScoreWeights(prev => ({
+            stockBonus: rules.matchWeights.stockBonus ?? prev.stockBonus,
+            priceScoreMax: rules.matchWeights.priceScoreMax ?? prev.priceScoreMax,
+            selfBonus: rules.matchWeights.selfBonus ?? prev.selfBonus,
+          }));
+        }
         if (rules.remoteRegions) setRemoteRegions(rules.remoteRegions);
         if (rules.supplierTypeMap) setSupplierTypeMap(rules.supplierTypeMap);
         if (rules.sendTypeMap) setSendTypeMap(rules.sendTypeMap);
@@ -70,7 +88,7 @@ export default function BusinessRulesPage() {
           businessRules: {
             costAllocation,
             receiptMatch,
-            matchWeights,
+            matchWeights: { ...matchWeights, ...scoreWeights },
             remoteRegions,
             supplierTypeMap,
             sendTypeMap,
@@ -103,6 +121,7 @@ export default function BusinessRulesPage() {
       <Tabs defaultValue="match">
         <TabsList>
           <TabsTrigger value="match">发货方匹配</TabsTrigger>
+          <TabsTrigger value="score">综合得分</TabsTrigger>
           <TabsTrigger value="import">导入映射</TabsTrigger>
           <TabsTrigger value="receipt">回单匹配</TabsTrigger>
           <TabsTrigger value="cost">成本分摊</TabsTrigger>
@@ -136,6 +155,48 @@ export default function BusinessRulesPage() {
                 value={remoteRegions}
                 onChange={e => setRemoteRegions(e.target.value)}
               />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* 综合得分 */}
+        <TabsContent value="score" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>综合得分规则</CardTitle>
+              <CardDescription>发货方匹配时各评分项的加分值，设为 0 即禁用该项</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-4">
+                <Label className="w-32 text-right text-sm">库存充足加分</Label>
+                <Input
+                  type="number"
+                  className="w-32"
+                  value={scoreWeights.stockBonus}
+                  onChange={e => setScoreWeights(prev => ({ ...prev, stockBonus: Number(e.target.value) }))}
+                />
+                <span className="text-xs text-muted-foreground">库存 &gt; 需求数量时加分</span>
+              </div>
+              <div className="flex items-center gap-4">
+                <Label className="w-32 text-right text-sm">价格评分上限</Label>
+                <Input
+                  type="number"
+                  className="w-32"
+                  value={scoreWeights.priceScoreMax}
+                  onChange={e => setScoreWeights(prev => ({ ...prev, priceScoreMax: Number(e.target.value) }))}
+                />
+                <span className="text-xs text-muted-foreground">max(0, 上限 − 单价÷10)</span>
+              </div>
+              <div className="flex items-center gap-4">
+                <Label className="w-32 text-right text-sm">自有仓加分</Label>
+                <Input
+                  type="number"
+                  className="w-32"
+                  value={scoreWeights.selfBonus}
+                  onChange={e => setScoreWeights(prev => ({ ...prev, selfBonus: Number(e.target.value) }))}
+                />
+                <span className="text-xs text-muted-foreground">发货方类型 = 自有仓时加分</span>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -202,7 +263,7 @@ export default function BusinessRulesPage() {
                   <div key={p} className="flex items-center gap-3 border rounded p-3">
                     <span className="text-muted-foreground text-sm w-6">#{i + 1}</span>
                     <span className="text-sm">
-                      {p === 'tracking_no' ? '快递单号精确匹配' : p === 'order_no_phone' ? '订单号+手机号' : p === 'order_no_name' ? '订单号+收货人' : '手机号+商品名'}
+                      {p === 'tracking_no' ? '系统订单号精确匹配' : p === 'order_no_phone' ? '订单号+手机号' : p === 'order_no_name' ? '订单号+收货人' : '手机号+商品名'}
                     </span>
                   </div>
                 ))}

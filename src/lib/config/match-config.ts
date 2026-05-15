@@ -18,6 +18,12 @@ export interface MatchConfig {
     distantProvince: number;
     /** 无省份信息得分 */
     unknownProvince: number;
+    /** 库存充足加分（库存>需求数量） */
+    stockBonus: number;
+    /** 价格评分上限（max(0, priceScoreMax - unitPrice/10)） */
+    priceScoreMax: number;
+    /** 自有仓加分 */
+    selfBonus: number;
   };
   /** 偏远地区关键词 */
   remoteRegions: string[];
@@ -70,6 +76,9 @@ export const MATCH_CONFIG: MatchConfig = {
     adjacentProvince: 30,
     distantProvince: 10,
     unknownProvince: 15,
+    stockBonus: 20,
+    priceScoreMax: 50,
+    selfBonus: 30,
   },
 
   remoteRegions: ['新疆', '西藏'],

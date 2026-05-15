@@ -18,8 +18,8 @@ export const SUPPLIER_TYPE_OPTIONS = [
 
 export const SEND_TYPE_OPTIONS = [
   { value: 'download', label: '下载发货' },
-  { value: 'jd', label: '京东' },
-  { value: 'pdd', label: '拼多多' },
+  { value: 'jd', label: '平台' },
+  { value: 'pdd', label: '平台' },
   { value: 'self', label: '自有物流' },
 ];
 

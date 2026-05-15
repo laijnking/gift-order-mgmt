@@ -87,7 +87,13 @@ export async function PATCH(request: NextRequest) {
     }
     if (businessRules && typeof businessRules === 'object') {
       for (const key of Object.keys(businessRules)) {
-        rows.push({ tenant_id: tenant.tenantId, category: 'businessRules', config_key: key, config_value: businessRules[key] });
+        const val = businessRules[key];
+        rows.push({
+          tenant_id: tenant.tenantId,
+          category: 'businessRules',
+          config_key: key,
+          config_value: typeof val === 'string' ? JSON.stringify(val) : val,
+        });
       }
     }
 

@@ -4,6 +4,7 @@ import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { PERMISSIONS } from '@/lib/permissions';
 import { getTenantFromRequest } from '@/lib/tenant-context';
 import { MATCH_CONFIG, getProvinceScore, extractProvince, getProvinceMatchText } from '@/lib/config';
+import { getTenantConfigAsync } from '@/lib/config/server';
 
 interface OrderItem {
   product_id?: string | null;
@@ -157,6 +158,7 @@ export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, PERMISSIONS.ORDERS_VIEW);
   if (authError) return authError;
   const tenant = await getTenantFromRequest(request);
+  const tenantConfig = await getTenantConfigAsync(tenant.tenantId);
   const client = getSupabaseClient();
 
   try {
@@ -212,10 +214,11 @@ export async function POST(request: NextRequest) {
           const unitPrice = toNumber(stock.unit_price);
           const stockQty = toNumber(stock.quantity);
           const historyCost = costs.find((c) => c.product_code === stock.product_code && c.supplier_id === supplier.id)?.unit_cost;
-          const provinceScore = getProvinceScore(supplier.province as string | undefined, receiverProvince);
-          const stockScore = stockQty > quantity ? 20 : 0;
-          const priceScore = unitPrice > 0 ? Math.max(0, 50 - unitPrice / 10) : 0;
-          const selfScore = supplier.type === 'self' ? 30 : 0;
+          const provinceScore = getProvinceScore(supplier.province as string | undefined, receiverProvince, tenantConfig.matchWeights);
+          const w = tenantConfig.matchWeights;
+          const stockScore = stockQty > quantity ? w.stockBonus : 0;
+          const priceScore = unitPrice > 0 ? Math.max(0, w.priceScoreMax - unitPrice / 10) : 0;
+          const selfScore = supplier.type === 'self' ? w.selfBonus : 0;
           const score = provinceScore + stockScore + priceScore + selfScore;
 
           return {

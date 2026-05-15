@@ -40,5 +40,8 @@ export const TENANT_DEFAULTS: TenantConfig = {
     adjacentProvince: MATCH_CONFIG.weights.adjacentProvince,
     distantProvince: MATCH_CONFIG.weights.distantProvince,
     unknownProvince: MATCH_CONFIG.weights.unknownProvince,
+    stockBonus: MATCH_CONFIG.weights.stockBonus,
+    priceScoreMax: MATCH_CONFIG.weights.priceScoreMax,
+    selfBonus: MATCH_CONFIG.weights.selfBonus,
   },
 };
