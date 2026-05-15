@@ -5,11 +5,12 @@ import { PERMISSIONS } from '@/lib/permissions';
 import { getRuleById } from '@/lib/rules/storage';
 import { RuleEngine } from '@/lib/rules/engine';
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const authError = await requirePermission(request, PERMISSIONS.SETTINGS_EDIT);
   if (authError) return authError;
 
   const tenant = await getTenantFromRequest(request);
+  const { id } = await params;
 
   try {
     const body = await request.json();
@@ -22,7 +23,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       );
     }
 
-    const rule = await getRuleById(tenant.tenantId, params.id);
+    const rule = await getRuleById(tenant.tenantId, id);
 
     if (!rule) {
       return NextResponse.json(

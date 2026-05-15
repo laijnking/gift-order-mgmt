@@ -5,14 +5,15 @@ import { PERMISSIONS } from '@/lib/permissions';
 import { getRuleById, updateRule, deleteRule } from '@/lib/rules/storage';
 import type { ConditionGroup, Action } from '@/lib/rules/engine';
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const authError = await requirePermission(request, PERMISSIONS.SETTINGS_VIEW);
   if (authError) return authError;
 
   const tenant = await getTenantFromRequest(request);
+  const { id } = await params;
 
   try {
-    const rule = await getRuleById(tenant.tenantId, params.id);
+    const rule = await getRuleById(tenant.tenantId, id);
 
     if (!rule) {
       return NextResponse.json(
@@ -34,11 +35,12 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const authError = await requirePermission(request, PERMISSIONS.SETTINGS_EDIT);
   if (authError) return authError;
 
   const tenant = await getTenantFromRequest(request);
+  const { id } = await params;
 
   try {
     const body = await request.json();
@@ -62,7 +64,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     if (conditions !== undefined) updates.conditions = conditions as ConditionGroup;
     if (actions !== undefined) updates.actions = actions as Action[];
 
-    const rule = await updateRule(tenant.tenantId, params.id, updates);
+    const rule = await updateRule(tenant.tenantId, id, updates);
 
     if (!rule) {
       return NextResponse.json(
@@ -85,14 +87,15 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const authError = await requirePermission(request, PERMISSIONS.SETTINGS_EDIT);
   if (authError) return authError;
 
   const tenant = await getTenantFromRequest(request);
+  const { id } = await params;
 
   try {
-    const success = await deleteRule(tenant.tenantId, params.id);
+    const success = await deleteRule(tenant.tenantId, id);
 
     if (!success) {
       return NextResponse.json(

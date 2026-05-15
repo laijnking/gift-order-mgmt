@@ -4,14 +4,15 @@ import { getTenantFromRequest } from '@/lib/tenant-context';
 import { PERMISSIONS } from '@/lib/permissions';
 import { toggleRuleStatus } from '@/lib/rules/storage';
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const authError = await requirePermission(request, PERMISSIONS.SETTINGS_EDIT);
   if (authError) return authError;
 
   const tenant = await getTenantFromRequest(request);
+  const { id } = await params;
 
   try {
-    const success = await toggleRuleStatus(tenant.tenantId, params.id);
+    const success = await toggleRuleStatus(tenant.tenantId, id);
 
     if (!success) {
       return NextResponse.json(
