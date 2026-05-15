@@ -66,10 +66,10 @@ export const MATCH_CONFIG: MatchConfig = {
   },
 
   weights: {
-    sameProvince: 100,
-    adjacentProvince: 60,
-    distantProvince: 20,
-    unknownProvince: 30,
+    sameProvince: 50,
+    adjacentProvince: 30,
+    distantProvince: 10,
+    unknownProvince: 15,
   },
 
   remoteRegions: ['新疆', '西藏'],
@@ -84,40 +84,44 @@ export const MATCH_CONFIG: MatchConfig = {
   ],
 };
 
+export type MatchWeights = MatchConfig['weights'];
+
 /**
  * 根据收货省份计算发货省份得分
+ * @param supplierProvince 发货方省份
+ * @param receiverProvince 收货省份
+ * @param customWeights 可选的自定义权重配置（用于租户级配置）
  */
 export function getProvinceScore(
   supplierProvince: string | undefined,
-  receiverProvince: string | null
+  receiverProvince: string | null,
+  customWeights?: MatchWeights
 ): number {
-  const { weights, adjacentProvinces, directCities } = MATCH_CONFIG;
+  const config = customWeights || MATCH_CONFIG.weights;
+  const { adjacentProvinces, directCities } = MATCH_CONFIG;
 
-  if (!receiverProvince) return weights.unknownProvince;
-  if (!supplierProvince) return weights.distantProvince;
+  if (!receiverProvince) return config.unknownProvince;
+  if (!supplierProvince) return config.distantProvince;
 
-  // 检查直辖市
   for (const city of directCities) {
     if (receiverProvince.includes(city)) {
-      if (supplierProvince.includes(city)) return weights.sameProvince;
-      if (MATCH_CONFIG.adjacentProvinces[city]?.includes(supplierProvince)) {
-        return weights.adjacentProvince;
+      if (supplierProvince.includes(city)) return config.sameProvince;
+      if (adjacentProvinces[city]?.includes(supplierProvince)) {
+        return config.adjacentProvince;
       }
-      return weights.distantProvince;
+      return config.distantProvince;
     }
   }
 
-  // 同省匹配
   if (supplierProvince.includes(receiverProvince) || receiverProvince.includes(supplierProvince)) {
-    return weights.sameProvince;
+    return config.sameProvince;
   }
 
-  // 邻近省匹配
   if (adjacentProvinces[receiverProvince]?.includes(supplierProvince)) {
-    return weights.adjacentProvince;
+    return config.adjacentProvince;
   }
 
-  return weights.distantProvince;
+  return config.distantProvince;
 }
 
 /**
@@ -146,13 +150,15 @@ export function extractProvince(address: string): string | null {
  */
 export function getProvinceMatchText(
   supplierProvince: string | undefined,
-  receiverProvince: string | null
+  receiverProvince: string | null,
+  customWeights?: MatchWeights
 ): string {
   if (!receiverProvince) return '';
   if (!supplierProvince) return '省份未知';
 
-  const score = getProvinceScore(supplierProvince, receiverProvince);
-  if (score >= MATCH_CONFIG.weights.sameProvince) return '同省';
-  if (score >= MATCH_CONFIG.weights.adjacentProvince) return '邻近';
+  const config = customWeights || MATCH_CONFIG.weights;
+  const score = getProvinceScore(supplierProvince, receiverProvince, customWeights);
+  if (score >= config.sameProvince) return '同省';
+  if (score >= config.adjacentProvince) return '邻近';
   return '较远';
 }

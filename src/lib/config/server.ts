@@ -39,6 +39,7 @@ export async function getTenantConfigAsync(tenantId?: string): Promise<TenantCon
       statusLabels: { ...TENANT_DEFAULTS.statusLabels },
       actionLabels: { ...TENANT_DEFAULTS.actionLabels },
       exportPrefixes: { ...TENANT_DEFAULTS.exportPrefixes },
+      matchWeights: { ...TENANT_DEFAULTS.matchWeights },
     };
 
     for (const item of configs) {
@@ -54,6 +55,11 @@ export async function getTenantConfigAsync(tenantId?: string): Promise<TenantCon
         config.actionLabels[key] = value as string;
       } else if (item.category === 'exportPrefixes') {
         config.exportPrefixes[key] = value as string;
+      } else if (item.category === 'matchWeights') {
+        if (key === 'sameProvince') config.matchWeights.sameProvince = Number(value) || config.matchWeights.sameProvince;
+        else if (key === 'adjacentProvince') config.matchWeights.adjacentProvince = Number(value) || config.matchWeights.adjacentProvince;
+        else if (key === 'distantProvince') config.matchWeights.distantProvince = Number(value) || config.matchWeights.distantProvince;
+        else if (key === 'unknownProvince') config.matchWeights.unknownProvince = Number(value) || config.matchWeights.unknownProvince;
       }
     }
 

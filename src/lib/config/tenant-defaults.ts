@@ -1,3 +1,5 @@
+import { MATCH_CONFIG, type MatchWeights } from './match-config';
+
 export interface TenantConfig {
   name: string;
   shortCode: string;
@@ -5,6 +7,7 @@ export interface TenantConfig {
   statusLabels: Record<string, string>;
   actionLabels: Record<string, string>;
   exportPrefixes: Record<string, string>;
+  matchWeights: MatchWeights;
 }
 
 export const TENANT_DEFAULTS: TenantConfig = {
@@ -31,5 +34,11 @@ export const TENANT_DEFAULTS: TenantConfig = {
   exportPrefixes: {
     kingdee: '导出',
     shipping: '发货通知单',
+  },
+  matchWeights: {
+    sameProvince: MATCH_CONFIG.weights.sameProvince,
+    adjacentProvince: MATCH_CONFIG.weights.adjacentProvince,
+    distantProvince: MATCH_CONFIG.weights.distantProvince,
+    unknownProvince: MATCH_CONFIG.weights.unknownProvince,
   },
 };
